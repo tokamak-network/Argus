@@ -20,14 +20,14 @@
 //! # Open http://localhost:4321/sentinel
 //! ```
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
+use axum::Router;
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{Query, State, WebSocketUpgrade};
 use axum::response::{IntoResponse, Json};
 use axum::routing::get;
-use axum::Router;
 use tower_http::cors::CorsLayer;
 
 use bytes::Bytes;
@@ -106,8 +106,7 @@ fn flash_loan_topic() -> H256 {
 }
 
 fn aave_v2_address() -> Address {
-    let bytes =
-        hex::decode("7d2768de32b0b80b7a3454c06bdac94a69ddc7a9").expect("valid hex address");
+    let bytes = hex::decode("7d2768de32b0b80b7a3454c06bdac94a69ddc7a9").expect("valid hex address");
     Address::from_slice(&bytes)
 }
 
@@ -282,10 +281,7 @@ async fn handle_history(
 }
 
 /// GET /sentinel/ws — WebSocket upgrade for real-time alert feed.
-async fn handle_ws(
-    State(state): State<Arc<AppState>>,
-    ws: WebSocketUpgrade,
-) -> impl IntoResponse {
+async fn handle_ws(State(state): State<Arc<AppState>>, ws: WebSocketUpgrade) -> impl IntoResponse {
     ws.on_upgrade(move |socket| ws_session(socket, state.broadcaster.clone()))
 }
 

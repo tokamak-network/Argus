@@ -116,8 +116,7 @@ impl SentinelService {
             })
             .expect("Failed to spawn sentinel worker thread");
 
-        let mempool_filter =
-            mempool_config.map(|cfg| MempoolPreFilter::new(&cfg));
+        let mempool_filter = mempool_config.map(|cfg| MempoolPreFilter::new(&cfg));
 
         Self {
             sender: Mutex::new(sender),

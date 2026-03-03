@@ -7,8 +7,8 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use ethrex_common::types::Block;
 use ethrex_common::U256;
+use ethrex_common::types::Block;
 use ethrex_storage::Store;
 
 #[cfg(feature = "autopsy")]
@@ -22,9 +22,7 @@ use crate::types::StepRecord;
 
 use super::ml_model::{AnomalyModel, StatisticalAnomalyDetector};
 use super::replay::{self, ReplayResult};
-use super::types::{
-    AlertPriority, AnalysisConfig, SentinelAlert, SentinelError, SuspiciousTx,
-};
+use super::types::{AlertPriority, AnalysisConfig, SentinelAlert, SentinelError, SuspiciousTx};
 
 // Opcode constants for feature extraction
 const OP_SLOAD: u8 = 0x54;
@@ -267,7 +265,10 @@ fn detect_reentrancy_depth(steps: &[StepRecord]) -> u32 {
     let mut max_reentry = 0u32;
 
     for step in steps {
-        if matches!(step.opcode, OP_CALL | OP_CALLCODE | OP_DELEGATECALL | OP_STATICCALL) {
+        if matches!(
+            step.opcode,
+            OP_CALL | OP_CALLCODE | OP_DELEGATECALL | OP_STATICCALL
+        ) {
             let addr = step.code_address;
             match first_depth.get(&addr) {
                 Some(&first) if step.depth > first => {
@@ -365,7 +366,8 @@ impl AnalysisPipeline {
                 break;
             }
             let step_start = Instant::now();
-            let result = self.execute_step(step.as_ref(), &mut ctx, store, block, suspicion, config)?;
+            let result =
+                self.execute_step(step.as_ref(), &mut ctx, store, block, suspicion, config)?;
             let elapsed_ms = step_start.elapsed().as_millis() as u64;
             metrics.step_durations.push((step.name(), elapsed_ms));
             metrics.steps_executed += 1;
@@ -391,7 +393,8 @@ impl AnalysisPipeline {
             }
             dynamic_steps_run += 1;
             let step_start = Instant::now();
-            let result = self.execute_step(step.as_ref(), &mut ctx, store, block, suspicion, config)?;
+            let result =
+                self.execute_step(step.as_ref(), &mut ctx, store, block, suspicion, config)?;
             let elapsed_ms = step_start.elapsed().as_millis() as u64;
             metrics.step_durations.push((step.name(), elapsed_ms));
             metrics.steps_executed += 1;
@@ -498,9 +501,12 @@ impl AnalysisStep for PatternMatcher {
         };
 
         // Dismiss if no CALL opcodes at all (simple transfer, no external interactions)
-        let has_calls = steps
-            .iter()
-            .any(|s| matches!(s.opcode, OP_CALL | OP_CALLCODE | OP_DELEGATECALL | OP_STATICCALL));
+        let has_calls = steps.iter().any(|s| {
+            matches!(
+                s.opcode,
+                OP_CALL | OP_CALLCODE | OP_DELEGATECALL | OP_STATICCALL
+            )
+        });
 
         if !has_calls {
             ctx.evidence
@@ -510,10 +516,8 @@ impl AnalysisStep for PatternMatcher {
 
         let patterns = AttackClassifier::classify_with_confidence(steps);
         if !patterns.is_empty() {
-            ctx.evidence.push(format!(
-                "Detected {} attack pattern(s)",
-                patterns.len()
-            ));
+            ctx.evidence
+                .push(format!("Detected {} attack pattern(s)", patterns.len()));
         }
         ctx.patterns = patterns;
         Ok(StepResult::Continue)
@@ -595,8 +599,7 @@ fn execute_anomaly_step(
     let features = FeatureVector::from_trace(steps, gas_used, gas_limit);
     let score = model.predict(&features);
 
-    ctx.evidence
-        .push(format!("Anomaly score: {score:.4}"));
+    ctx.evidence.push(format!("Anomaly score: {score:.4}"));
     ctx.anomaly_score = Some(score);
     ctx.features = Some(features);
 
@@ -695,11 +698,7 @@ fn compute_total_value(flows: &[FundFlow]) -> U256 {
 }
 
 #[cfg(feature = "autopsy")]
-fn generate_summary(
-    patterns: &[DetectedPattern],
-    total_value: U256,
-    block_number: u64,
-) -> String {
+fn generate_summary(patterns: &[DetectedPattern], total_value: U256, block_number: u64) -> String {
     use crate::autopsy::types::AttackPattern;
 
     if patterns.is_empty() {
@@ -895,8 +894,8 @@ mod tests {
 
     #[test]
     fn pipeline_add_steps_queues_dynamic_follow_up() {
-        use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
 
         let follow_up_ran = Arc::new(AtomicBool::new(false));
         let follow_up_clone = follow_up_ran.clone();
@@ -1162,10 +1161,7 @@ mod tests {
         }
 
         let pipeline = AnalysisPipeline {
-            steps: vec![
-                Box::new(AdderThenDismiss),
-                Box::new(UnreachableStep),
-            ],
+            steps: vec![Box::new(AdderThenDismiss), Box::new(UnreachableStep)],
             anomaly_model: Box::new(StatisticalAnomalyDetector::default()),
         };
 

@@ -99,11 +99,8 @@ mod tests {
     #[test]
     fn critical_alert_high_confidence_triggers_pause() {
         let pc = Arc::new(PauseController::new(Some(300)));
-        let handler = AutoPauseHandler::with_thresholds(
-            Arc::clone(&pc),
-            0.8,
-            AlertPriority::Critical,
-        );
+        let handler =
+            AutoPauseHandler::with_thresholds(Arc::clone(&pc), 0.8, AlertPriority::Critical);
 
         assert!(!pc.is_paused());
         handler.on_alert(make_alert(AlertPriority::Critical, 0.9));
@@ -114,24 +111,21 @@ mod tests {
     #[test]
     fn high_priority_does_not_trigger_pause() {
         let pc = Arc::new(PauseController::new(Some(300)));
-        let handler = AutoPauseHandler::with_thresholds(
-            Arc::clone(&pc),
-            0.8,
-            AlertPriority::Critical,
-        );
+        let handler =
+            AutoPauseHandler::with_thresholds(Arc::clone(&pc), 0.8, AlertPriority::Critical);
 
         handler.on_alert(make_alert(AlertPriority::High, 0.9));
-        assert!(!pc.is_paused(), "High priority should not trigger pause when threshold is Critical");
+        assert!(
+            !pc.is_paused(),
+            "High priority should not trigger pause when threshold is Critical"
+        );
     }
 
     #[test]
     fn critical_alert_low_confidence_does_not_trigger_pause() {
         let pc = Arc::new(PauseController::new(Some(300)));
-        let handler = AutoPauseHandler::with_thresholds(
-            Arc::clone(&pc),
-            0.8,
-            AlertPriority::Critical,
-        );
+        let handler =
+            AutoPauseHandler::with_thresholds(Arc::clone(&pc), 0.8, AlertPriority::Critical);
 
         handler.on_alert(make_alert(AlertPriority::Critical, 0.5));
         assert!(!pc.is_paused(), "Low confidence should not trigger pause");

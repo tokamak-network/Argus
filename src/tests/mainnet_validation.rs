@@ -16,8 +16,8 @@ use std::sync::Arc;
 use bytes::Bytes;
 use ethrex_common::types::{EIP1559Transaction, LegacyTransaction, Transaction, TxKind};
 use ethrex_common::{H256, U256};
-use ethrex_levm::db::gen_db::GeneralizedDatabase;
 use ethrex_levm::Environment;
+use ethrex_levm::db::gen_db::GeneralizedDatabase;
 
 use crate::autopsy::classifier::AttackClassifier;
 use crate::autopsy::remote_db::RemoteVmDatabase;
@@ -156,7 +156,10 @@ fn analyze_tx(tx_hash_hex: &str) -> Vec<AttackPattern> {
 
     // 6. Classify attack patterns
     let patterns = AttackClassifier::classify(engine.trace().steps.as_slice());
-    eprintln!("[mainnet_validation] Detected {} patterns: {patterns:?}", patterns.len());
+    eprintln!(
+        "[mainnet_validation] Detected {} patterns: {patterns:?}",
+        patterns.len()
+    );
 
     patterns
 }
@@ -174,9 +177,10 @@ fn validate_dao_hack_reentrancy() {
     // The DAO hack (2016-06-17) — classic recursive reentrancy.
     // Attacker calls DAO.splitDAO() which sends ETH via fallback,
     // the attacker re-enters before balance update.
-    let patterns =
-        analyze_tx("0x0ec3f2488a93839524add10ea229e773f6bc891b4eb4794c3c0f6e629a1c5e69");
-    let has_reentrancy = patterns.iter().any(|p| matches!(p, AttackPattern::Reentrancy { .. }));
+    let patterns = analyze_tx("0x0ec3f2488a93839524add10ea229e773f6bc891b4eb4794c3c0f6e629a1c5e69");
+    let has_reentrancy = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::Reentrancy { .. }));
     assert!(
         has_reentrancy,
         "DAO hack should detect Reentrancy pattern, got: {patterns:?}"
@@ -189,9 +193,10 @@ fn validate_euler_flash_loan() {
     // Euler Finance (2023-03-13) — flash loan + donate attack.
     // Attacker borrows via Aave flash loan, exploits Euler's donate
     // mechanism to inflate collateral, then drains funds.
-    let patterns =
-        analyze_tx("0xc310a0affe2169d1f6feec1c63dbc7f7c62a887fa48795d327d4d2da2d6b111d");
-    let has_flash_loan = patterns.iter().any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
+    let patterns = analyze_tx("0xc310a0affe2169d1f6feec1c63dbc7f7c62a887fa48795d327d4d2da2d6b111d");
+    let has_flash_loan = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
     assert!(
         has_flash_loan,
         "Euler exploit should detect FlashLoan pattern, got: {patterns:?}"
@@ -204,10 +209,13 @@ fn validate_curve_reentrancy() {
     // Curve Finance (2023-07-30) — Vyper reentrancy bug.
     // Vyper compiler had a re-entrancy lock bug; attacker re-entered
     // remove_liquidity while add_liquidity was in progress.
-    let patterns =
-        analyze_tx("0xa84aa065ce61b1c9f5ab6fa15e5c01cc6948e0d3780deab8f1120046c0346763");
-    let has_reentrancy = patterns.iter().any(|p| matches!(p, AttackPattern::Reentrancy { .. }));
-    let has_flash_loan = patterns.iter().any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
+    let patterns = analyze_tx("0xa84aa065ce61b1c9f5ab6fa15e5c01cc6948e0d3780deab8f1120046c0346763");
+    let has_reentrancy = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::Reentrancy { .. }));
+    let has_flash_loan = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
     assert!(
         has_reentrancy || has_flash_loan,
         "Curve exploit should detect Reentrancy or FlashLoan pattern, got: {patterns:?}"
@@ -219,12 +227,13 @@ fn validate_curve_reentrancy() {
 fn validate_harvest_price_manipulation() {
     // Harvest Finance (2020-10-26) — price manipulation via flash loan.
     // Attacker manipulated Curve Y pool price to drain Harvest vaults.
-    let patterns =
-        analyze_tx("0x35f8d2f572fceaac9288e5d462117850ef2694786992a8c3f6d02612277b0877");
+    let patterns = analyze_tx("0x35f8d2f572fceaac9288e5d462117850ef2694786992a8c3f6d02612277b0877");
     let has_price_manipulation = patterns
         .iter()
         .any(|p| matches!(p, AttackPattern::PriceManipulation { .. }));
-    let has_flash_loan = patterns.iter().any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
+    let has_flash_loan = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
     assert!(
         has_price_manipulation || has_flash_loan,
         "Harvest exploit should detect PriceManipulation or FlashLoan, got: {patterns:?}"
@@ -237,9 +246,10 @@ fn validate_cream_flash_loan() {
     // Cream Finance (2021-10-27) — flash loan attack.
     // Attacker used flash loans to manipulate Cream's lending market,
     // repeatedly borrowing and exploiting price oracle lag.
-    let patterns =
-        analyze_tx("0x0fe2542079644e107cbf13690eb9c2c65963ccb1e944ccc479b6b58b44365eca");
-    let has_flash_loan = patterns.iter().any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
+    let patterns = analyze_tx("0x0fe2542079644e107cbf13690eb9c2c65963ccb1e944ccc479b6b58b44365eca");
+    let has_flash_loan = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
     assert!(
         has_flash_loan,
         "Cream exploit should detect FlashLoan pattern, got: {patterns:?}"
@@ -251,9 +261,10 @@ fn validate_cream_flash_loan() {
 fn validate_bzx_flash_loan() {
     // bZx (2020-02-15) — first major DeFi flash loan attack.
     // Attacker used dYdX flash loan to manipulate Compound+bZx positions.
-    let patterns =
-        analyze_tx("0xb5c8bd9430b6cc87a0e2fe110ece6bf527fa4f170a4bc8cd032f768fc5219838");
-    let has_flash_loan = patterns.iter().any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
+    let patterns = analyze_tx("0xb5c8bd9430b6cc87a0e2fe110ece6bf527fa4f170a4bc8cd032f768fc5219838");
+    let has_flash_loan = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
     let has_price_manipulation = patterns
         .iter()
         .any(|p| matches!(p, AttackPattern::PriceManipulation { .. }));
@@ -272,8 +283,7 @@ fn validate_ronin_bridge_transfer() {
     // This is a negative test: we verify replay works, not that we detect an attack.
     //
     // Using the actual bridge withdrawal TX:
-    let patterns =
-        analyze_tx("0xc28fad5e8d5e0ce6a2eaf67b6687be5d58a8c3f1f5c4b93b1f0d7e2a6e8c7d0");
+    let patterns = analyze_tx("0xc28fad5e8d5e0ce6a2eaf67b6687be5d58a8c3f1f5c4b93b1f0d7e2a6e8c7d0");
     eprintln!(
         "[ronin] Off-chain compromise — {} patterns detected (may be 0): {patterns:?}",
         patterns.len()
@@ -288,14 +298,11 @@ fn validate_nomad_bridge_access_control() {
     // Anyone could prove arbitrary messages because the zero root was accepted
     // as valid. This allows calling process() with crafted messages.
     // Using one of the first exploit TXs:
-    let patterns =
-        analyze_tx("0xa5fe9d044e4f3e5e2d20a8ce3a5b6793e66a6789c7e83ce8b3e0c5d9a3f8b2e1");
+    let patterns = analyze_tx("0xa5fe9d044e4f3e5e2d20a8ce3a5b6793e66a6789c7e83ce8b3e0c5d9a3f8b2e1");
     let has_access_control = patterns
         .iter()
         .any(|p| matches!(p, AttackPattern::AccessControlBypass { .. }));
-    eprintln!(
-        "[nomad] Access control detection: {has_access_control}, patterns: {patterns:?}"
-    );
+    eprintln!("[nomad] Access control detection: {has_access_control}, patterns: {patterns:?}");
     // Soft assertion: this is heuristic-based and may not always detect
 }
 
@@ -305,12 +312,11 @@ fn validate_beanstalk_flash_loan() {
     // Beanstalk (2022-04-17) — governance flash loan attack.
     // Attacker used Aave flash loan to acquire enough governance tokens
     // to pass a malicious BIP (Beanstalk Improvement Proposal).
-    let patterns =
-        analyze_tx("0xcd314668aaa9bbfebaf1a0bd2b6553d01dd58899c508d4729fa7311dc5d33ad7");
-    let has_flash_loan = patterns.iter().any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
-    eprintln!(
-        "[beanstalk] Flash loan detection: {has_flash_loan}, patterns: {patterns:?}"
-    );
+    let patterns = analyze_tx("0xcd314668aaa9bbfebaf1a0bd2b6553d01dd58899c508d4729fa7311dc5d33ad7");
+    let has_flash_loan = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
+    eprintln!("[beanstalk] Flash loan detection: {has_flash_loan}, patterns: {patterns:?}");
     // Flash loan patterns should be detectable via callback depth profile
 }
 
@@ -320,8 +326,7 @@ fn validate_parity_multisig_access_control() {
     // Parity Multisig (2017-11-06) — library self-destruct.
     // Attacker called initWallet() on the library contract itself (unprotected),
     // became owner, then called kill() to selfdestruct the library.
-    let patterns =
-        analyze_tx("0x05f71e1b2cb4f03e547739db15d080fd30c989eda04d37ce6264c5686c0722b9");
+    let patterns = analyze_tx("0x05f71e1b2cb4f03e547739db15d080fd30c989eda04d37ce6264c5686c0722b9");
     let has_access_control = patterns
         .iter()
         .any(|p| matches!(p, AttackPattern::AccessControlBypass { .. }));

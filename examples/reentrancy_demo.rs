@@ -10,8 +10,8 @@
 //!
 //! Run: cargo run -p argus --features "sentinel,autopsy" --example reentrancy_demo
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use bytes::Bytes;
 use ethrex_common::constants::EMPTY_TRIE_HASH;
@@ -20,8 +20,8 @@ use ethrex_common::types::{
     TxType,
 };
 use ethrex_common::{Address, U256};
-use ethrex_levm::db::gen_db::GeneralizedDatabase;
 use ethrex_levm::Environment;
+use ethrex_levm::db::gen_db::GeneralizedDatabase;
 use ethrex_storage::{EngineType, Store};
 use rustc_hash::FxHashMap;
 
@@ -121,12 +121,24 @@ fn main() {
     let sender_addr = Address::from_low_u64_be(0x100);
 
     println!("  Sender:   {sender_addr:?}");
-    println!("  Attacker: {attacker_addr:?}  ({} bytes)", attacker_bytecode(victim_addr).len());
-    println!("  Victim:   {victim_addr:?}  ({} bytes)", victim_bytecode().len());
+    println!(
+        "  Attacker: {attacker_addr:?}  ({} bytes)",
+        attacker_bytecode(victim_addr).len()
+    );
+    println!(
+        "  Victim:   {victim_addr:?}  ({} bytes)",
+        victim_bytecode().len()
+    );
 
     let accounts = vec![
-        (attacker_addr, Code::from_bytecode(Bytes::from(attacker_bytecode(victim_addr)))),
-        (victim_addr, Code::from_bytecode(Bytes::from(victim_bytecode()))),
+        (
+            attacker_addr,
+            Code::from_bytecode(Bytes::from(attacker_bytecode(victim_addr))),
+        ),
+        (
+            victim_addr,
+            Code::from_bytecode(Bytes::from(victim_bytecode())),
+        ),
         (sender_addr, Code::from_bytecode(Bytes::new())),
     ];
 
@@ -143,15 +155,17 @@ fn main() {
         ..Default::default()
     });
 
-    let engine = ReplayEngine::record(&mut db, env, &tx, ReplayConfig::default())
-        .expect("execution failed");
+    let engine =
+        ReplayEngine::record(&mut db, env, &tx, ReplayConfig::default()).expect("execution failed");
 
     let trace = engine.trace();
     let steps = engine.steps_range(0, engine.len());
 
-    println!("  Execution: {} (gas_used={})",
+    println!(
+        "  Execution: {} (gas_used={})",
         if trace.success { "SUCCESS" } else { "REVERTED" },
-        trace.gas_used);
+        trace.gas_used
+    );
     println!("  Opcode steps recorded: {}", engine.len());
     println!();
 
@@ -199,8 +213,9 @@ fn main() {
 
     for d in &detected {
         let name = match &d.pattern {
-            AttackPattern::Reentrancy { target_contract, .. } =>
-                format!("Reentrancy (target={target_contract:?})"),
+            AttackPattern::Reentrancy {
+                target_contract, ..
+            } => format!("Reentrancy (target={target_contract:?})"),
             AttackPattern::FlashLoan { .. } => "FlashLoan".to_string(),
             AttackPattern::PriceManipulation { .. } => "PriceManipulation".to_string(),
             AttackPattern::AccessControlBypass { .. } => "AccessControlBypass".to_string(),
@@ -212,13 +227,16 @@ fn main() {
         }
     }
 
-    let reentrancy = detected.iter()
+    let reentrancy = detected
+        .iter()
         .find(|d| matches!(d.pattern, AttackPattern::Reentrancy { .. }));
     assert!(reentrancy.is_some(), "classifier missed reentrancy");
     assert!(reentrancy.unwrap().confidence >= 0.7);
     println!();
-    println!("  Result: Reentrancy detected with {:.0}% confidence",
-        reentrancy.unwrap().confidence * 100.0);
+    println!(
+        "  Result: Reentrancy detected with {:.0}% confidence",
+        reentrancy.unwrap().confidence * 100.0
+    );
     println!();
 
     // ── Phase 4: Fund Flow ───────────────────────────────────────────────
@@ -229,15 +247,22 @@ fn main() {
     let eth_flows: Vec<_> = flows.iter().filter(|f| f.token.is_none()).collect();
     let erc20_flows: Vec<_> = flows.iter().filter(|f| f.token.is_some()).collect();
 
-    println!("  Total flows: {} (ETH: {}, ERC-20: {})",
-        flows.len(), eth_flows.len(), erc20_flows.len());
+    println!(
+        "  Total flows: {} (ETH: {}, ERC-20: {})",
+        flows.len(),
+        eth_flows.len(),
+        erc20_flows.len()
+    );
 
     for f in &eth_flows {
-        println!("    ETH  {:?} -> {:?}  ({} wei)  step #{}",
-            f.from, f.to, f.value, f.step_index);
+        println!(
+            "    ETH  {:?} -> {:?}  ({} wei)  step #{}",
+            f.from, f.to, f.value, f.step_index
+        );
     }
 
-    let victim_to_attacker = eth_flows.iter()
+    let victim_to_attacker = eth_flows
+        .iter()
         .any(|f| f.from == victim_addr && f.to == attacker_addr);
     assert!(victim_to_attacker, "no victim->attacker flow");
 
@@ -277,10 +302,15 @@ fn main() {
     };
     let tight_gas_limit = trace.gas_used + trace.gas_used / 20;
 
-    println!("  Receipt: succeeded={}, gas_used={}", trace.success, trace.gas_used);
-    println!("  TX gas_limit: {} (ratio: {:.1}%)",
+    println!(
+        "  Receipt: succeeded={}, gas_used={}",
+        trace.success, trace.gas_used
+    );
+    println!(
+        "  TX gas_limit: {} (ratio: {:.1}%)",
         tight_gas_limit,
-        trace.gas_used as f64 / tight_gas_limit as f64 * 100.0);
+        trace.gas_used as f64 / tight_gas_limit as f64 * 100.0
+    );
     println!("  Config: threshold=0.1, min_gas=50k, prefilter_alert_mode=true");
 
     let sentinel_tx = Transaction::EIP1559Transaction(EIP1559Transaction {
@@ -321,7 +351,10 @@ fn main() {
         println!("  Block:    #{}", alert.block_number);
         println!("  Priority: {:?}", alert.alert_priority);
         println!("  Score:    {:.2}", alert.suspicion_score);
-        println!("  Reasons:  {} suspicion reason(s)", alert.suspicion_reasons.len());
+        println!(
+            "  Reasons:  {} suspicion reason(s)",
+            alert.suspicion_reasons.len()
+        );
         for r in &alert.suspicion_reasons {
             println!("    - {r:?}");
         }

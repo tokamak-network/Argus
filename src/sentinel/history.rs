@@ -12,18 +12,13 @@ use serde::{Deserialize, Serialize};
 use super::types::{AlertPriority, SentinelAlert};
 
 /// Sort order for alert query results.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum SortOrder {
     /// Most recent block first (descending block_number).
+    #[default]
     Newest,
     /// Oldest block first (ascending block_number).
     Oldest,
-}
-
-impl Default for SortOrder {
-    fn default() -> Self {
-        Self::Newest
-    }
 }
 
 /// Parameters for querying historical alerts.

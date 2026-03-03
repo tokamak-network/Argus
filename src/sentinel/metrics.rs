@@ -294,16 +294,8 @@ impl fmt::Display for MetricsSnapshot {
             "  deep_analysis_total_ms: {}",
             self.deep_analysis_total_ms
         )?;
-        writeln!(
-            f,
-            "  mempool_txs_scanned:  {}",
-            self.mempool_txs_scanned
-        )?;
-        writeln!(
-            f,
-            "  mempool_txs_flagged:  {}",
-            self.mempool_txs_flagged
-        )?;
+        writeln!(f, "  mempool_txs_scanned:  {}", self.mempool_txs_scanned)?;
+        writeln!(f, "  mempool_txs_flagged:  {}", self.mempool_txs_flagged)?;
         writeln!(
             f,
             "  mempool_alerts_emitted: {}",
@@ -319,11 +311,7 @@ impl fmt::Display for MetricsSnapshot {
             "  pipeline_steps_dismissed: {}",
             self.pipeline_steps_dismissed
         )?;
-        write!(
-            f,
-            "  pipeline_duration_ms:   {}",
-            self.pipeline_duration_ms
-        )
+        write!(f, "  pipeline_duration_ms:   {}", self.pipeline_duration_ms)
     }
 }
 

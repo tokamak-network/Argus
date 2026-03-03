@@ -28,9 +28,7 @@ use argus::sentinel::alert::{
 use argus::sentinel::auto_pause::AutoPauseHandler;
 use argus::sentinel::config::{MempoolMonitorConfig, SentinelFullConfig};
 use argus::sentinel::service::{AlertHandler, SentinelService};
-use argus::sentinel::types::{
-    AlertPriority, AnalysisConfig, SentinelAlert, SentinelConfig,
-};
+use argus::sentinel::types::{AlertPriority, AnalysisConfig, SentinelAlert, SentinelConfig};
 
 // ── Collecting Alert Handler ─────────────────────────────────────────────
 
@@ -88,8 +86,7 @@ fn flash_loan_topic() -> H256 {
 
 /// Known Aave V2 lending pool address
 fn aave_v2_address() -> Address {
-    let bytes =
-        hex::decode("7d2768de32b0b80b7a3454c06bdac94a69ddc7a9").expect("valid hex address");
+    let bytes = hex::decode("7d2768de32b0b80b7a3454c06bdac94a69ddc7a9").expect("valid hex address");
     Address::from_slice(&bytes)
 }
 
@@ -255,8 +252,10 @@ fn demo_1_multi_tx_scanning() {
 
     let snap = service.metrics().snapshot();
     println!();
-    println!("    Metrics: scanned={} txs, flagged={}, alerts={}",
-        snap.txs_scanned, snap.txs_flagged, snap.alerts_emitted);
+    println!(
+        "    Metrics: scanned={} txs, flagged={}, alerts={}",
+        snap.txs_scanned, snap.txs_flagged, snap.alerts_emitted
+    );
 
     service.shutdown();
     println!();
@@ -341,7 +340,7 @@ fn demo_3_mempool_monitoring() {
     };
     let mempool_config = MempoolMonitorConfig {
         enabled: true,
-        min_value_eth: 0.1,  // Low threshold for demo
+        min_value_eth: 0.1, // Low threshold for demo
         min_gas: 100_000,
     };
 
@@ -418,8 +417,8 @@ fn demo_4_auto_pause() {
     let (collector, count, _alerts) = CollectingHandler::new();
     let auto_pause = AutoPauseHandler::with_thresholds(
         pause_controller.clone(),
-        0.7,                    // confidence threshold
-        AlertPriority::High,    // trigger on High or above
+        0.7,                 // confidence threshold
+        AlertPriority::High, // trigger on High or above
     );
     let mut dispatcher = AlertDispatcher::default();
     dispatcher.add_handler(Box::new(collector));
@@ -439,10 +438,7 @@ fn demo_4_auto_pause() {
     let service = SentinelService::new(store, config, analysis_config, Box::new(dispatcher));
 
     // Feed a block with a suspicious flash-loan TX (should score high enough)
-    let block = build_mixed_block(
-        19_000_000,
-        vec![flash_loan_tx()],
-    );
+    let block = build_mixed_block(19_000_000, vec![flash_loan_tx()]);
     let receipts = vec![flash_loan_receipt(2_500_000, 2_500_000)];
 
     println!("  Feeding suspicious block #19000000...");
@@ -457,8 +453,10 @@ fn demo_4_auto_pause() {
     println!("    Chain paused:    {paused_after}");
 
     if paused_after {
-        println!("    Auto-resume in:  {:?}s",
-            pause_controller.auto_resume_remaining());
+        println!(
+            "    Auto-resume in:  {:?}s",
+            pause_controller.auto_resume_remaining()
+        );
         println!();
         println!("  Simulating operator resume...");
         pause_controller.resume();
@@ -495,10 +493,7 @@ fn demo_5_prometheus_metrics() {
 
     // Feed a few blocks
     for block_num in 1..4 {
-        let block = build_mixed_block(
-            block_num,
-            vec![benign_tx(), flash_loan_tx()],
-        );
+        let block = build_mixed_block(block_num, vec![benign_tx(), flash_loan_tx()]);
         let receipts = vec![
             benign_receipt(21_000),
             flash_loan_receipt(2_521_000, 2_500_000),
@@ -523,7 +518,10 @@ fn demo_5_prometheus_metrics() {
     println!("    txs_flagged:          {}", snap.txs_flagged);
     println!("    alerts_emitted:       {}", snap.alerts_emitted);
     println!("    prefilter_total_us:   {}us", snap.prefilter_total_us);
-    println!("    deep_analysis_ms:     {}ms", snap.deep_analysis_total_ms);
+    println!(
+        "    deep_analysis_ms:     {}ms",
+        snap.deep_analysis_total_ms
+    );
 
     service.shutdown();
     println!();
@@ -585,23 +583,37 @@ priority_threshold = "Critical"
 
     println!();
     println!("  Converted SentinelConfig:");
-    println!("    suspicion_threshold: {}", sentinel_config.suspicion_threshold);
-    println!("    min_value_wei:       {} (= {} ETH)",
-        sentinel_config.min_value_wei,
-        config.prefilter.min_value_eth);
+    println!(
+        "    suspicion_threshold: {}",
+        sentinel_config.suspicion_threshold
+    );
+    println!(
+        "    min_value_wei:       {} (= {} ETH)",
+        sentinel_config.min_value_wei, config.prefilter.min_value_eth
+    );
     println!("    min_gas_used:        {}", sentinel_config.min_gas_used);
     println!();
     println!("  Converted AnalysisConfig:");
     println!("    max_steps:           {}", analysis_config.max_steps);
-    println!("    min_alert_confidence:{}", analysis_config.min_alert_confidence);
-    println!("    prefilter_alert_mode:{}", analysis_config.prefilter_alert_mode);
+    println!(
+        "    min_alert_confidence:{}",
+        analysis_config.min_alert_confidence
+    );
+    println!(
+        "    prefilter_alert_mode:{}",
+        analysis_config.prefilter_alert_mode
+    );
     println!();
-    println!("  Mempool: enabled={}, min_value={}ETH, min_gas={}",
-        config.mempool.enabled, config.mempool.min_value_eth, config.mempool.min_gas);
-    println!("  AutoPause: enabled={}, threshold={}, priority={}",
+    println!(
+        "  Mempool: enabled={}, min_value={}ETH, min_gas={}",
+        config.mempool.enabled, config.mempool.min_value_eth, config.mempool.min_gas
+    );
+    println!(
+        "  AutoPause: enabled={}, threshold={}, priority={}",
         config.auto_pause.enabled,
         config.auto_pause.confidence_threshold,
-        config.auto_pause.priority_threshold);
+        config.auto_pause.priority_threshold
+    );
     println!();
 }
 

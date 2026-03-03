@@ -1,5 +1,8 @@
 # Argus
 
+[![CI](https://github.com/tokamak-network/Argus/actions/workflows/ci.yml/badge.svg)](https://github.com/tokamak-network/Argus/actions/workflows/ci.yml)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
+
 **The Hundred-Eyed Guardian for Ethereum**
 
 Real-time attack detection, post-hack forensics, and time-travel debugging for EVM transactions.
@@ -50,7 +53,27 @@ cd Argus
 cargo run --example sentinel_realtime_demo
 ```
 
-This simulates a block containing both benign and malicious transactions, showing Sentinel's detection pipeline in action.
+This simulates a block containing both benign and malicious transactions, showing Sentinel's detection pipeline in action:
+
+```
+Demo 1  Multi-TX Block Scanning
+  TX 0: Simple ETH transfer (21k gas, success)
+  TX 1: Flash loan via Aave (2.5M gas, 6 ERC-20 transfers)
+  TX 2: 5 ETH transfer, reverted (950k gas)
+
+  Alert #2:
+    Priority: High
+    Score:    0.75
+    Summary:  Pre-filter alert: high-value-revert, unusual-gas, self-destruct
+    Reason:   HighValueWithRevert { value_wei: 5000000000000000000 }
+
+Demo 3  Mempool Pre-Filter (Pending TX Scanning)
+  Mempool TXs scanned:  4
+  Mempool TXs flagged:  3
+
+Demo 4  Auto-Pause Circuit Breaker
+  Critical alert → block processing HALTED
+```
 
 ### Run the Autopsy demo
 
@@ -58,7 +81,31 @@ This simulates a block containing both benign and malicious transactions, showin
 cargo run --example reentrancy_demo
 ```
 
-Deploys a vulnerable contract, executes a reentrancy attack, and generates a full forensic report.
+Deploys a vulnerable contract, executes a reentrancy attack, and generates a full forensic report:
+
+```
+Phase 1  Deploy & Execute
+  Execution: SUCCESS (gas_used=82107)
+  Opcode steps recorded: 80
+
+Phase 2  Verify Attack
+  Max call depth: 4  (need >= 3 for reentrancy)
+  CALL opcodes:   4
+  SSTORE opcodes: 4  (attacker counter writes)
+  Result: CONFIRMED — reentrancy pattern detected
+
+Phase 3  AttackClassifier
+  Reentrancy (target=0x...0043)
+    confidence: 90.0%
+    evidence: Re-entrant call at step 47
+    evidence: State modified at step 69
+    evidence: Value transfer during re-entry
+
+Phase 5  SentinelService Pipeline
+  Alert Priority: Critical
+  Score: 0.85
+  Summary: Likely reentrancy attack (confidence: 90%)
+```
 
 ---
 

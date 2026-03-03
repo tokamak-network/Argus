@@ -260,10 +260,12 @@ mod tests {
         let alert = filter
             .scan_transaction(&tx, test_sender(), test_hash())
             .expect("should flag");
-        assert!(alert
-            .reasons
-            .iter()
-            .any(|r| matches!(r, MempoolSuspicionReason::FlashLoanSelector { .. })));
+        assert!(
+            alert
+                .reasons
+                .iter()
+                .any(|r| matches!(r, MempoolSuspicionReason::FlashLoanSelector { .. }))
+        );
     }
 
     #[test]
@@ -274,10 +276,11 @@ mod tests {
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::FlashLoanSelector { .. })));
+            assert!(
+                !a.reasons
+                    .iter()
+                    .any(|r| matches!(r, MempoolSuspicionReason::FlashLoanSelector { .. }))
+            );
         }
     }
 
@@ -288,10 +291,11 @@ mod tests {
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::FlashLoanSelector { .. })));
+            assert!(
+                !a.reasons
+                    .iter()
+                    .any(|r| matches!(r, MempoolSuspicionReason::FlashLoanSelector { .. }))
+            );
         }
     }
 
@@ -302,10 +306,11 @@ mod tests {
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::FlashLoanSelector { .. })));
+            assert!(
+                !a.reasons
+                    .iter()
+                    .any(|r| matches!(r, MempoolSuspicionReason::FlashLoanSelector { .. }))
+            );
         }
     }
 
@@ -320,10 +325,12 @@ mod tests {
         let alert = filter
             .scan_transaction(&tx, test_sender(), test_hash())
             .expect("should flag");
-        assert!(alert
-            .reasons
-            .iter()
-            .any(|r| matches!(r, MempoolSuspicionReason::HighValueDeFi { .. })));
+        assert!(
+            alert
+                .reasons
+                .iter()
+                .any(|r| matches!(r, MempoolSuspicionReason::HighValueDeFi { .. }))
+        );
     }
 
     #[test]
@@ -335,10 +342,11 @@ mod tests {
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         // Should not flag for HighValueDeFi
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::HighValueDeFi { .. })));
+            assert!(
+                !a.reasons
+                    .iter()
+                    .any(|r| matches!(r, MempoolSuspicionReason::HighValueDeFi { .. }))
+            );
         }
     }
 
@@ -350,10 +358,11 @@ mod tests {
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::HighValueDeFi { .. })));
+            assert!(
+                !a.reasons
+                    .iter()
+                    .any(|r| matches!(r, MempoolSuspicionReason::HighValueDeFi { .. }))
+            );
         }
     }
 
@@ -367,10 +376,12 @@ mod tests {
         let alert = filter
             .scan_transaction(&tx, test_sender(), test_hash())
             .expect("should flag");
-        assert!(alert
-            .reasons
-            .iter()
-            .any(|r| matches!(r, MempoolSuspicionReason::HighGasKnownContract { .. })));
+        assert!(
+            alert
+                .reasons
+                .iter()
+                .any(|r| matches!(r, MempoolSuspicionReason::HighGasKnownContract { .. }))
+        );
     }
 
     #[test]
@@ -380,10 +391,11 @@ mod tests {
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::HighGasKnownContract { .. })));
+            assert!(
+                !a.reasons
+                    .iter()
+                    .any(|r| matches!(r, MempoolSuspicionReason::HighGasKnownContract { .. }))
+            );
         }
     }
 
@@ -394,10 +406,11 @@ mod tests {
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::HighGasKnownContract { .. })));
+            assert!(
+                !a.reasons
+                    .iter()
+                    .any(|r| matches!(r, MempoolSuspicionReason::HighGasKnownContract { .. }))
+            );
         }
     }
 
@@ -425,10 +438,12 @@ mod tests {
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::SuspiciousContractCreation { .. })));
+            assert!(
+                !a.reasons.iter().any(|r| matches!(
+                    r,
+                    MempoolSuspicionReason::SuspiciousContractCreation { .. }
+                ))
+            );
         }
     }
 
@@ -440,10 +455,12 @@ mod tests {
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::SuspiciousContractCreation { .. })));
+            assert!(
+                !a.reasons.iter().any(|r| matches!(
+                    r,
+                    MempoolSuspicionReason::SuspiciousContractCreation { .. }
+                ))
+            );
         }
     }
 
@@ -459,10 +476,12 @@ mod tests {
         let alert = filter
             .scan_transaction(&tx, test_sender(), test_hash())
             .expect("should flag");
-        assert!(alert
-            .reasons
-            .iter()
-            .any(|r| matches!(r, MempoolSuspicionReason::MulticallPattern { .. })));
+        assert!(
+            alert
+                .reasons
+                .iter()
+                .any(|r| matches!(r, MempoolSuspicionReason::MulticallPattern { .. }))
+        );
     }
 
     #[test]
@@ -473,10 +492,11 @@ mod tests {
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::MulticallPattern { .. })));
+            assert!(
+                !a.reasons
+                    .iter()
+                    .any(|r| matches!(r, MempoolSuspicionReason::MulticallPattern { .. }))
+            );
         }
     }
 
@@ -489,10 +509,11 @@ mod tests {
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         if let Some(a) = &alert {
-            assert!(!a
-                .reasons
-                .iter()
-                .any(|r| matches!(r, MempoolSuspicionReason::MulticallPattern { .. })));
+            assert!(
+                !a.reasons
+                    .iter()
+                    .any(|r| matches!(r, MempoolSuspicionReason::MulticallPattern { .. }))
+            );
         }
     }
 
@@ -516,12 +537,7 @@ mod tests {
     #[test]
     fn completely_benign_tx() {
         let filter = MempoolPreFilter::default();
-        let tx = make_call_tx(
-            unknown_contract(),
-            U256::from(100u64),
-            21_000,
-            vec![0; 4],
-        );
+        let tx = make_call_tx(unknown_contract(), U256::from(100u64), 21_000, vec![0; 4]);
 
         let alert = filter.scan_transaction(&tx, test_sender(), test_hash());
         assert!(alert.is_none());

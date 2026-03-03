@@ -24,7 +24,10 @@ use crate::types::ReplayConfig;
 
 /// Tokamak EVM time-travel debugger.
 #[derive(Parser)]
-#[command(name = "argus", about = "Ethereum attack detection and forensics toolkit")]
+#[command(
+    name = "argus",
+    about = "Ethereum attack detection and forensics toolkit"
+)]
 pub struct Args {
     #[command(subcommand)]
     pub command: InputMode,

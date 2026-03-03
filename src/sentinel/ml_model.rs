@@ -91,7 +91,11 @@ impl Default for StatisticalAnomalyDetector {
 impl AnomalyModel for StatisticalAnomalyDetector {
     fn predict(&self, features: &FeatureVector) -> f64 {
         let zscores = [
-            Self::zscore(features.total_steps, self.means.total_steps, self.stddevs.total_steps),
+            Self::zscore(
+                features.total_steps,
+                self.means.total_steps,
+                self.stddevs.total_steps,
+            ),
             Self::zscore(
                 features.unique_addresses,
                 self.means.unique_addresses,
@@ -107,8 +111,16 @@ impl AnomalyModel for StatisticalAnomalyDetector {
                 self.means.sstore_count,
                 self.stddevs.sstore_count,
             ),
-            Self::zscore(features.sload_count, self.means.sload_count, self.stddevs.sload_count),
-            Self::zscore(features.call_count, self.means.call_count, self.stddevs.call_count),
+            Self::zscore(
+                features.sload_count,
+                self.means.sload_count,
+                self.stddevs.sload_count,
+            ),
+            Self::zscore(
+                features.call_count,
+                self.means.call_count,
+                self.stddevs.call_count,
+            ),
             Self::zscore(
                 features.delegatecall_count,
                 self.means.delegatecall_count,
@@ -129,7 +141,11 @@ impl AnomalyModel for StatisticalAnomalyDetector {
                 self.means.selfdestruct_count,
                 self.stddevs.selfdestruct_count,
             ),
-            Self::zscore(features.log_count, self.means.log_count, self.stddevs.log_count),
+            Self::zscore(
+                features.log_count,
+                self.means.log_count,
+                self.stddevs.log_count,
+            ),
             Self::zscore(
                 features.revert_count,
                 self.means.revert_count,
@@ -145,7 +161,11 @@ impl AnomalyModel for StatisticalAnomalyDetector {
                 self.means.eth_transferred_wei,
                 self.stddevs.eth_transferred_wei,
             ),
-            Self::zscore(features.gas_ratio, self.means.gas_ratio, self.stddevs.gas_ratio),
+            Self::zscore(
+                features.gas_ratio,
+                self.means.gas_ratio,
+                self.stddevs.gas_ratio,
+            ),
             Self::zscore(
                 features.calldata_entropy,
                 self.means.calldata_entropy,
@@ -188,7 +208,10 @@ mod tests {
         };
         let score = detector.predict(&features);
         // Close to mean -> sigmoid near 0.5
-        assert!(score < 0.65, "benign features should score low, got {score}");
+        assert!(
+            score < 0.65,
+            "benign features should score low, got {score}"
+        );
     }
 
     #[test]

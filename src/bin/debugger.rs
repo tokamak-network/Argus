@@ -1,5 +1,5 @@
-use clap::Parser;
 use argus::cli::{Args, run};
+use clap::Parser;
 
 fn main() {
     let args = Args::parse();

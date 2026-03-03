@@ -96,8 +96,7 @@ impl SentinelFullConfig {
         if self.alert.rate_limit_per_minute == 0 {
             return Err("alert.rate_limit_per_minute must be > 0".to_string());
         }
-        if self.auto_pause.confidence_threshold < 0.0
-            || self.auto_pause.confidence_threshold > 1.0
+        if self.auto_pause.confidence_threshold < 0.0 || self.auto_pause.confidence_threshold > 1.0
         {
             return Err(format!(
                 "auto_pause.confidence_threshold must be in [0.0, 1.0], got {}",
@@ -259,8 +258,13 @@ pub fn load_config(path: Option<&PathBuf>) -> Result<SentinelFullConfig, String>
         return Ok(SentinelFullConfig::default());
     };
 
-    let contents = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read sentinel config from {}: {}", path.display(), e))?;
+    let contents = std::fs::read_to_string(path).map_err(|e| {
+        format!(
+            "Failed to read sentinel config from {}: {}",
+            path.display(),
+            e
+        )
+    })?;
 
     let wrapper: TomlWrapper = toml::from_str(&contents)
         .map_err(|e| format!("Failed to parse sentinel TOML config: {e}"))?;

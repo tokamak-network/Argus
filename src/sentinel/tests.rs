@@ -2398,8 +2398,8 @@ mod reentrancy_sentinel_e2e_tests {
 
 #[cfg(feature = "autopsy")]
 mod live_reentrancy_pipeline_tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use bytes::Bytes;
     use ethrex_common::constants::EMPTY_TRIE_HASH;
@@ -2408,8 +2408,8 @@ mod live_reentrancy_pipeline_tests {
         TxKind, TxType,
     };
     use ethrex_common::{Address, U256};
-    use ethrex_levm::db::gen_db::GeneralizedDatabase;
     use ethrex_levm::Environment;
+    use ethrex_levm::db::gen_db::GeneralizedDatabase;
     use ethrex_storage::{EngineType, Store};
     use rustc_hash::FxHashMap;
 
@@ -2428,15 +2428,13 @@ mod live_reentrancy_pipeline_tests {
     }
 
     fn make_test_db(accounts: Vec<(Address, Code)>) -> GeneralizedDatabase {
-        let store =
-            Store::new("", EngineType::InMemory).expect("in-memory store");
+        let store = Store::new("", EngineType::InMemory).expect("in-memory store");
         let header = BlockHeader {
             state_root: *EMPTY_TRIE_HASH,
             ..Default::default()
         };
         let vm_db: ethrex_vm::DynVmDatabase = Box::new(
-            ethrex_blockchain::vm::StoreVmDatabase::new(store, header)
-                .expect("StoreVmDatabase"),
+            ethrex_blockchain::vm::StoreVmDatabase::new(store, header).expect("StoreVmDatabase"),
         );
 
         let balance = big_balance();
@@ -2471,25 +2469,38 @@ mod live_reentrancy_pipeline_tests {
     fn attacker_bytecode(victim_addr: Address) -> Vec<u8> {
         let victim_byte = victim_addr.as_bytes()[19];
         vec![
-            0x60, 0x00, // PUSH1 0 (slot)
+            0x60,
+            0x00, // PUSH1 0 (slot)
             0x54, // SLOAD(0)
             0x80, // DUP1
-            0x60, 0x02, // PUSH1 2
+            0x60,
+            0x02, // PUSH1 2
             0x11, // GT
             0x15, // ISZERO
-            0x60, 0x23, // PUSH1 0x23
+            0x60,
+            0x23, // PUSH1 0x23
             0x57, // JUMPI
-            0x60, 0x01, // PUSH1 1
+            0x60,
+            0x01, // PUSH1 1
             0x01, // ADD
-            0x60, 0x00, // PUSH1 0
+            0x60,
+            0x00, // PUSH1 0
             0x55, // SSTORE
-            0x60, 0x00, // PUSH1 0 (retLen)
-            0x60, 0x00, // PUSH1 0 (retOff)
-            0x60, 0x00, // PUSH1 0 (argsLen)
-            0x60, 0x00, // PUSH1 0 (argsOff)
-            0x60, 0x00, // PUSH1 0 (value)
-            0x60, victim_byte, // PUSH1 victim
-            0x61, 0xFF, 0xFF, // PUSH2 0xFFFF (gas)
+            0x60,
+            0x00, // PUSH1 0 (retLen)
+            0x60,
+            0x00, // PUSH1 0 (retOff)
+            0x60,
+            0x00, // PUSH1 0 (argsLen)
+            0x60,
+            0x00, // PUSH1 0 (argsOff)
+            0x60,
+            0x00, // PUSH1 0 (value)
+            0x60,
+            victim_byte, // PUSH1 victim
+            0x61,
+            0xFF,
+            0xFF, // PUSH2 0xFFFF (gas)
             0xF1, // CALL
             0x50, // POP
             0x00, // STOP
@@ -2648,8 +2659,7 @@ mod live_reentrancy_pipeline_tests {
             ..Default::default()
         };
 
-        let service =
-            SentinelService::new(store, config, analysis_config, Box::new(handler));
+        let service = SentinelService::new(store, config, analysis_config, Box::new(handler));
 
         // Build receipt from real execution results
         let receipt = Receipt {
