@@ -56,6 +56,8 @@ pub struct RpcBlockHeader {
 /// Subset of transaction fields returned by `eth_getTransactionByHash`.
 #[derive(Debug, Clone)]
 pub struct RpcTransaction {
+    /// Transaction hash (may be zero-hash for legacy transactions without hash field).
+    pub hash: H256,
     pub from: Address,
     pub to: Option<Address>,
     pub value: U256,
@@ -66,6 +68,32 @@ pub struct RpcTransaction {
     pub max_priority_fee_per_gas: Option<u64>,
     pub nonce: u64,
     pub block_number: Option<u64>,
+}
+
+/// Full block with transactions returned by `eth_getBlockByNumber` with `full=true`.
+#[derive(Debug, Clone)]
+pub struct RpcBlock {
+    pub header: RpcBlockHeader,
+    pub transactions: Vec<RpcTransaction>,
+}
+
+/// Transaction receipt returned by `eth_getTransactionReceipt`.
+#[derive(Debug, Clone)]
+pub struct RpcReceipt {
+    pub status: bool,
+    pub cumulative_gas_used: u64,
+    pub logs: Vec<RpcLog>,
+    pub transaction_hash: H256,
+    pub transaction_index: u64,
+    pub gas_used: u64,
+}
+
+/// Log entry from a transaction receipt.
+#[derive(Debug, Clone)]
+pub struct RpcLog {
+    pub address: Address,
+    pub topics: Vec<H256>,
+    pub data: Vec<u8>,
 }
 
 impl EthRpcClient {
@@ -159,6 +187,31 @@ impl EthRpcClient {
     /// Fetch the target block header (at the client's configured block_tag).
     pub fn eth_get_target_block(&self) -> Result<RpcBlockHeader, DebuggerError> {
         self.eth_get_block_by_number(self.block_number())
+    }
+
+    /// Fetch the latest block number from `eth_blockNumber`.
+    pub fn eth_block_number(&self) -> Result<u64, DebuggerError> {
+        let result = self.rpc_call("eth_blockNumber", json!([]))?;
+        parse_u64(&result)
+    }
+
+    /// Fetch a full block including all transactions via `eth_getBlockByNumber` with `full=true`.
+    pub fn eth_get_block_by_number_with_txs(
+        &self,
+        block_number: u64,
+    ) -> Result<RpcBlock, DebuggerError> {
+        let tag = format!("0x{block_number:x}");
+        let result = self.rpc_call("eth_getBlockByNumber", json!([tag, true]))?;
+        parse_rpc_block(&result)
+    }
+
+    /// Fetch a transaction receipt via `eth_getTransactionReceipt`.
+    pub fn eth_get_transaction_receipt(&self, tx_hash: H256) -> Result<RpcReceipt, DebuggerError> {
+        let result = self.rpc_call(
+            "eth_getTransactionReceipt",
+            json!([format!("0x{tx_hash:x}")]),
+        )?;
+        parse_rpc_receipt(&result)
     }
 
     /// Execute a JSON-RPC call with retry and backoff.
@@ -449,6 +502,10 @@ fn parse_transaction(val: &Value) -> Result<RpcTransaction, DebuggerError> {
         .into());
     }
     Ok(RpcTransaction {
+        hash: val
+            .get("hash")
+            .and_then(|v| parse_h256(v).ok())
+            .unwrap_or_else(H256::zero),
         from: parse_address(val.get("from").ok_or_else(|| {
             DebuggerError::from(RpcError::ParseError {
                 method: "eth_getTransactionByHash".into(),
@@ -497,6 +554,129 @@ fn parse_transaction(val: &Value) -> Result<RpcTransaction, DebuggerError> {
             })
         })?)?,
         block_number: val.get("blockNumber").and_then(|v| parse_u64(v).ok()),
+    })
+}
+
+fn parse_rpc_block(val: &Value) -> Result<RpcBlock, DebuggerError> {
+    if val.is_null() {
+        return Err(RpcError::ParseError {
+            method: "eth_getBlockByNumber".into(),
+            field: "result".into(),
+            cause: "block not found".into(),
+        }
+        .into());
+    }
+    let header = parse_block_header(val)?;
+    let transactions = val
+        .get("transactions")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(parse_transaction)
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+    Ok(RpcBlock {
+        header,
+        transactions,
+    })
+}
+
+fn parse_rpc_receipt(val: &Value) -> Result<RpcReceipt, DebuggerError> {
+    if val.is_null() {
+        return Err(RpcError::ParseError {
+            method: "eth_getTransactionReceipt".into(),
+            field: "result".into(),
+            cause: "receipt not found".into(),
+        }
+        .into());
+    }
+    let status_val = val.get("status").ok_or_else(|| {
+        DebuggerError::from(RpcError::ParseError {
+            method: "eth_getTransactionReceipt".into(),
+            field: "status".into(),
+            cause: "missing".into(),
+        })
+    })?;
+    let status = parse_u64(status_val)? != 0;
+
+    let cumulative_gas_used = parse_u64(val.get("cumulativeGasUsed").ok_or_else(|| {
+        DebuggerError::from(RpcError::ParseError {
+            method: "eth_getTransactionReceipt".into(),
+            field: "cumulativeGasUsed".into(),
+            cause: "missing".into(),
+        })
+    })?)?;
+
+    let gas_used = parse_u64(val.get("gasUsed").ok_or_else(|| {
+        DebuggerError::from(RpcError::ParseError {
+            method: "eth_getTransactionReceipt".into(),
+            field: "gasUsed".into(),
+            cause: "missing".into(),
+        })
+    })?)?;
+
+    let transaction_hash = parse_h256(val.get("transactionHash").ok_or_else(|| {
+        DebuggerError::from(RpcError::ParseError {
+            method: "eth_getTransactionReceipt".into(),
+            field: "transactionHash".into(),
+            cause: "missing".into(),
+        })
+    })?)?;
+
+    let transaction_index = parse_u64(val.get("transactionIndex").ok_or_else(|| {
+        DebuggerError::from(RpcError::ParseError {
+            method: "eth_getTransactionReceipt".into(),
+            field: "transactionIndex".into(),
+            cause: "missing".into(),
+        })
+    })?)?;
+
+    let logs = val
+        .get("logs")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().map(parse_rpc_log).collect::<Result<Vec<_>, _>>())
+        .transpose()?
+        .unwrap_or_default();
+
+    Ok(RpcReceipt {
+        status,
+        cumulative_gas_used,
+        logs,
+        transaction_hash,
+        transaction_index,
+        gas_used,
+    })
+}
+
+fn parse_rpc_log(val: &Value) -> Result<RpcLog, DebuggerError> {
+    let address = parse_address(val.get("address").ok_or_else(|| {
+        DebuggerError::from(RpcError::ParseError {
+            method: "eth_getTransactionReceipt".into(),
+            field: "log.address".into(),
+            cause: "missing".into(),
+        })
+    })?)?;
+
+    let topics = val
+        .get("topics")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().map(parse_h256).collect::<Result<Vec<_>, _>>())
+        .transpose()?
+        .unwrap_or_default();
+
+    let data = val
+        .get("data")
+        .and_then(|v| v.as_str())
+        .map(hex_decode)
+        .transpose()?
+        .unwrap_or_default();
+
+    Ok(RpcLog {
+        address,
+        topics,
+        data,
     })
 }
 
@@ -743,5 +923,197 @@ mod tests {
         assert_eq!(client.config().timeout, Duration::from_secs(5));
         assert_eq!(client.config().max_retries, 1);
         assert_eq!(client.block_number(), 100);
+    }
+
+    // --- Cycle 1: RpcBlock / RpcReceipt / RpcLog parsing tests ---
+
+    #[test]
+    fn test_parse_rpc_block() {
+        let block = json!({
+            "hash": "0x000000000000000000000000000000000000000000000000000000000000abcd",
+            "number": "0xa",
+            "timestamp": "0x5f5e100",
+            "gasLimit": "0x1c9c380",
+            "baseFeePerGas": "0x3b9aca00",
+            "miner": "0x0000000000000000000000000000000000000001",
+            "transactions": [
+                {
+                    "from": "0x0000000000000000000000000000000000000100",
+                    "to": "0x0000000000000000000000000000000000000042",
+                    "value": "0x0",
+                    "input": "0xdeadbeef",
+                    "gas": "0x5208",
+                    "gasPrice": "0x3b9aca00",
+                    "nonce": "0x5",
+                    "blockNumber": "0xa"
+                }
+            ]
+        });
+        let rpc_block = parse_rpc_block(&block).unwrap();
+        assert_eq!(rpc_block.header.number, 10);
+        assert_eq!(rpc_block.transactions.len(), 1);
+        assert_eq!(rpc_block.transactions[0].nonce, 5);
+        assert_eq!(rpc_block.transactions[0].gas, 21000);
+    }
+
+    #[test]
+    fn test_parse_rpc_block_empty_txs() {
+        let block = json!({
+            "hash": "0x000000000000000000000000000000000000000000000000000000000000abcd",
+            "number": "0x1",
+            "timestamp": "0x1",
+            "gasLimit": "0x1c9c380",
+            "miner": "0x0000000000000000000000000000000000000001",
+            "transactions": []
+        });
+        let rpc_block = parse_rpc_block(&block).unwrap();
+        assert_eq!(rpc_block.transactions.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_rpc_block_null() {
+        let result = parse_rpc_block(&json!(null));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_rpc_receipt() {
+        let receipt = json!({
+            "status": "0x1",
+            "cumulativeGasUsed": "0x5208",
+            "gasUsed": "0x5208",
+            "transactionHash": "0x000000000000000000000000000000000000000000000000000000000000abcd",
+            "transactionIndex": "0x0",
+            "logs": []
+        });
+        let parsed = parse_rpc_receipt(&receipt).unwrap();
+        assert!(parsed.status);
+        assert_eq!(parsed.cumulative_gas_used, 21000);
+        assert_eq!(parsed.gas_used, 21000);
+        assert_eq!(parsed.transaction_index, 0);
+        assert!(parsed.logs.is_empty());
+    }
+
+    #[test]
+    fn test_parse_rpc_receipt_failed_tx() {
+        let receipt = json!({
+            "status": "0x0",
+            "cumulativeGasUsed": "0x5208",
+            "gasUsed": "0x5208",
+            "transactionHash": "0x000000000000000000000000000000000000000000000000000000000000abcd",
+            "transactionIndex": "0x1",
+            "logs": []
+        });
+        let parsed = parse_rpc_receipt(&receipt).unwrap();
+        assert!(!parsed.status);
+    }
+
+    #[test]
+    fn test_parse_rpc_receipt_null() {
+        let result = parse_rpc_receipt(&json!(null));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_rpc_log() {
+        let log = json!({
+            "address": "0x0000000000000000000000000000000000000042",
+            "topics": [
+                "0x000000000000000000000000000000000000000000000000000000000000002a",
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
+            ],
+            "data": "0xdeadbeef"
+        });
+        let parsed = parse_rpc_log(&log).unwrap();
+        assert_eq!(parsed.address, Address::from_low_u64_be(0x42));
+        assert_eq!(parsed.topics.len(), 2);
+        assert_eq!(parsed.topics[0][31], 0x2a);
+        assert_eq!(parsed.data, vec![0xde, 0xad, 0xbe, 0xef]);
+    }
+
+    #[test]
+    fn test_parse_rpc_log_empty_topics_and_data() {
+        let log = json!({
+            "address": "0x0000000000000000000000000000000000000001",
+            "topics": [],
+            "data": "0x"
+        });
+        let parsed = parse_rpc_log(&log).unwrap();
+        assert!(parsed.topics.is_empty());
+        assert!(parsed.data.is_empty());
+    }
+
+    #[test]
+    fn test_parse_rpc_receipt_with_logs() {
+        let receipt = json!({
+            "status": "0x1",
+            "cumulativeGasUsed": "0x10000",
+            "gasUsed": "0x8000",
+            "transactionHash": "0x000000000000000000000000000000000000000000000000000000000000abcd",
+            "transactionIndex": "0x2",
+            "logs": [
+                {
+                    "address": "0x0000000000000000000000000000000000000042",
+                    "topics": [
+                        "0x000000000000000000000000000000000000000000000000000000000000002a"
+                    ],
+                    "data": "0x1234"
+                }
+            ]
+        });
+        let parsed = parse_rpc_receipt(&receipt).unwrap();
+        assert_eq!(parsed.logs.len(), 1);
+        assert_eq!(parsed.logs[0].address, Address::from_low_u64_be(0x42));
+        assert_eq!(parsed.transaction_index, 2);
+    }
+
+    // --- Live RPC tests (require network + ALCHEMY_API_KEY env var) ---
+
+    #[test]
+    #[ignore]
+    fn test_eth_block_number_live() {
+        let url = std::env::var("ETH_RPC_URL")
+            .or_else(|_| {
+                std::env::var("ALCHEMY_API_KEY")
+                    .map(|k| format!("https://eth-mainnet.g.alchemy.com/v2/{k}"))
+            })
+            .expect("ETH_RPC_URL or ALCHEMY_API_KEY must be set");
+        let client = EthRpcClient::new(&url, 0);
+        let block_num = client.eth_block_number().unwrap();
+        assert!(block_num > 0, "block number should be > 0");
+    }
+
+    #[test]
+    #[ignore]
+    fn test_eth_get_block_with_txs_live() {
+        let url = std::env::var("ETH_RPC_URL")
+            .or_else(|_| {
+                std::env::var("ALCHEMY_API_KEY")
+                    .map(|k| format!("https://eth-mainnet.g.alchemy.com/v2/{k}"))
+            })
+            .expect("ETH_RPC_URL or ALCHEMY_API_KEY must be set");
+        let client = EthRpcClient::new(&url, 0);
+        // Block 1 — genesis-adjacent, always available
+        let block = client.eth_get_block_by_number_with_txs(1).unwrap();
+        assert_eq!(block.header.number, 1);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_eth_get_receipt_live() {
+        let url = std::env::var("ETH_RPC_URL")
+            .or_else(|_| {
+                std::env::var("ALCHEMY_API_KEY")
+                    .map(|k| format!("https://eth-mainnet.g.alchemy.com/v2/{k}"))
+            })
+            .expect("ETH_RPC_URL or ALCHEMY_API_KEY must be set");
+        let client = EthRpcClient::new(&url, 0);
+        // DAO hack tx — mainnet block 1718497
+        let tx_hash_hex = "0x34b3bb78a56bd3bb2e2d08fbe3b03c97bf1da62e7432c73aaedde48f628879f8";
+        let bytes = hex_decode(tx_hash_hex).unwrap();
+        let tx_hash = H256::from_slice(&bytes);
+        let receipt = client.eth_get_transaction_receipt(tx_hash).unwrap();
+        // DAO hack tx succeeded
+        assert!(receipt.status);
     }
 }

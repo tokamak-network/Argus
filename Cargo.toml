@@ -96,5 +96,9 @@ required-features = ["sentinel"]
 name = "sentinel_dashboard_demo"
 required-features = ["sentinel"]
 
+[[example]]
+name = "sentinel_rpc_demo"
+required-features = ["sentinel", "autopsy"]
+
 [lints.clippy]
 redundant_clone = "warn"
