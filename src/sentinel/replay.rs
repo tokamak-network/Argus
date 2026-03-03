@@ -22,6 +22,7 @@ use crate::types::{ReplayConfig, ReplayTrace};
 use super::types::{AnalysisConfig, SentinelError};
 
 /// Result of replaying a single transaction with opcode recording.
+#[derive(Debug)]
 pub struct ReplayResult {
     /// The full opcode trace.
     pub trace: ReplayTrace,
