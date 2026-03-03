@@ -19,3 +19,9 @@ mod stress_tests;
 
 #[cfg(feature = "autopsy")]
 mod mainnet_validation;
+
+#[cfg(feature = "autopsy")]
+mod exploit_fixtures;
+
+#[cfg(feature = "autopsy")]
+mod exploit_smoke_tests;

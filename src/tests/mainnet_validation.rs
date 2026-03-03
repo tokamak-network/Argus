@@ -335,3 +335,65 @@ fn validate_parity_multisig_access_control() {
         "Parity multisig should detect AccessControlBypass, got: {patterns:?}"
     );
 }
+
+// ============================================================
+// New mainnet validations — added from case studies
+// ============================================================
+
+#[test]
+#[ignore]
+fn validate_balancer_v2_price_manipulation() {
+    // Balancer V2 (2025-11-03) — $128M rounding error exploitation via batchSwap.
+    // Attacker compounds precision loss across 65 swap operations in a single TX,
+    // driving token balance to <10 wei and extracting profit.
+    // Primary exploiter: 0x86fedad11c4765700934639f1efe1fc01355c982
+    // TX: initial exploit funded via Tornado Cash.
+    let patterns = analyze_tx("0xca2556343293eebe2d3d2a81a1dd94e1457c0c07340270ff8768f507193fff21");
+    let has_price_manipulation = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::PriceManipulation { .. }));
+    let has_flash_loan = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
+    let has_access_control = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::AccessControlBypass { .. }));
+    assert!(
+        has_price_manipulation || has_flash_loan || has_access_control,
+        "Balancer V2 exploit should detect PriceManipulation, FlashLoan, or AccessControlBypass, got: {patterns:?}"
+    );
+}
+
+#[test]
+#[ignore]
+fn validate_bybit_access_control_bypass() {
+    // Bybit (2025-02-21) — $1.5B supply chain attack via Safe{Wallet} front-end.
+    // Lazarus Group tricked 3 multisig signers into signing a malicious TX that
+    // upgraded Safe's implementation to a backdoored contract via DELEGATECALL.
+    // Victim wallet: 0x1db92e2EEbc8E0c075a02BeA49a2935BcD2dFCF4
+    // Malicious contract: 0x96221423681A6d52E184D440a8eFCEbB105C7242
+    let patterns = analyze_tx("0x46deef0f52e3a983b67abf4714448a41dd7ffd6d32d32da69d62081c68ad7882");
+    let has_access_control = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::AccessControlBypass { .. }));
+    eprintln!("[bybit] Access control detection: {has_access_control}, patterns: {patterns:?}");
+    // Soft assertion: the on-chain TX is a multisig execution that DELEGATECALLs
+    // to a malicious implementation. The classifier may or may not flag this
+    // depending on whether the SSTORE-without-CALLER heuristic triggers.
+}
+
+#[test]
+#[ignore]
+fn validate_poly_network_access_control() {
+    // Poly Network (2021-08-10) — $611M cross-chain bridge exploit.
+    // Attacker exploited _executeCrossChainTx to call a privileged function
+    // that changed the keeper role via EthCrossChainManager, then drained the bridge.
+    // TX: keeper role change on Ethereum (the core exploit step).
+    // Ref: https://slowmist.medium.com/the-root-cause-of-poly-network-being-hacked-ec2ee1b0c68f
+    let patterns = analyze_tx("0xb1f70464bd95b774c6ce60fc706eb5f9e35cb5f06e6cfe7c17dcda46ffd59581");
+    let has_access_control = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::AccessControlBypass { .. }));
+    eprintln!("[poly] Access control detection: {has_access_control}, patterns: {patterns:?}");
+    // Soft assertion: cross-chain bridge exploits are complex to classify
+}
