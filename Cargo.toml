@@ -1,0 +1,100 @@
+[package]
+name = "argus"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Real-time Ethereum attack detection and post-hack forensics toolkit"
+repository = "https://github.com/tokamak-network/Argus"
+keywords = ["ethereum", "security", "attack-detection", "forensics", "evm"]
+categories = ["cryptography::cryptocurrencies", "command-line-utilities"]
+
+[features]
+default = ["sentinel", "autopsy"]
+cli = [
+    "dep:clap",
+    "dep:rustyline",
+    "dep:hex",
+    "dep:ethrex-storage",
+    "dep:ethrex-blockchain",
+    "dep:ethrex-vm",
+    "dep:rustc-hash",
+    "sentinel",
+    "autopsy",
+]
+autopsy = [
+    "dep:reqwest",
+    "dep:sha3",
+    "dep:serde_json",
+    "dep:rustc-hash",
+]
+sentinel = [
+    "dep:rustc-hash",
+    "dep:hex",
+    "dep:ethrex-storage",
+    "dep:ethrex-blockchain",
+    "dep:ethrex-vm",
+    "dep:serde_json",
+    "dep:toml",
+    "dep:axum",
+    "dep:tower-http",
+    "dep:tokio",
+]
+
+[dependencies]
+# Core ethrex dependencies (git)
+ethrex-levm = { git = "https://github.com/tokamak-network/ethrex", rev = "03fc1858", features = ["tokamak-debugger"] }
+ethrex-common = { git = "https://github.com/tokamak-network/ethrex", rev = "03fc1858", default-features = false }
+
+# Optional ethrex dependencies
+ethrex-storage = { git = "https://github.com/tokamak-network/ethrex", rev = "03fc1858", optional = true }
+ethrex-blockchain = { git = "https://github.com/tokamak-network/ethrex", rev = "03fc1858", optional = true }
+ethrex-vm = { git = "https://github.com/tokamak-network/ethrex", rev = "03fc1858", optional = true }
+
+# External dependencies
+bytes = { version = "1.6.0", features = ["serde"] }
+serde = { version = "1.0.203", features = ["derive", "rc"] }
+thiserror = "2.0.9"
+
+# CLI (optional)
+clap = { version = "4.3", features = ["derive", "env"], optional = true }
+rustyline = { version = "15", optional = true }
+hex = { version = "0.4.3", optional = true }
+rustc-hash = { version = "2.1.1", optional = true }
+
+# Autopsy (optional)
+reqwest = { version = "0.12.7", features = ["blocking", "json"], optional = true }
+sha3 = { version = "0.10.8", optional = true }
+serde_json = { version = "1.0.117", optional = true }
+
+# Sentinel (optional)
+toml = { version = "0.8", optional = true }
+axum = { version = "0.8.1", features = ["ws"], optional = true }
+tower-http = { version = "0.6.2", features = ["cors"], optional = true }
+tokio = { version = "1.41.1", features = ["full"], optional = true }
+
+[dev-dependencies]
+ethrex-storage = { git = "https://github.com/tokamak-network/ethrex", rev = "03fc1858" }
+ethrex-blockchain = { git = "https://github.com/tokamak-network/ethrex", rev = "03fc1858" }
+ethrex-vm = { git = "https://github.com/tokamak-network/ethrex", rev = "03fc1858" }
+rustc-hash = "2.1.1"
+serde_json = "1.0.117"
+
+[[bin]]
+name = "argus"
+path = "src/bin/debugger.rs"
+required-features = ["cli"]
+
+[[example]]
+name = "reentrancy_demo"
+required-features = ["sentinel", "autopsy"]
+
+[[example]]
+name = "sentinel_realtime_demo"
+required-features = ["sentinel"]
+
+[[example]]
+name = "sentinel_dashboard_demo"
+required-features = ["sentinel"]
+
+[lints.clippy]
+redundant_clone = "warn"

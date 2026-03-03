@@ -1,0 +1,9 @@
+/target
+Cargo.lock
+*.swp
+*.swo
+.DS_Store
+.env
+dashboard/node_modules/
+dashboard/dist/
+dashboard/fixtures/
