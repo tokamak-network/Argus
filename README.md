@@ -14,6 +14,8 @@ Real-time attack detection, post-hack forensics, and time-travel debugging for E
 
 ## What Argus Does
 
+> All features below have been implemented and tested in synthetic/demo environments. Production validation is in progress — see [Roadmap](docs/ROADMAP.md).
+
 ### Sentinel — Real-Time Attack Detection
 
 A 2-stage detection pipeline integrated at the block processing level:
@@ -109,29 +111,27 @@ Phase 5  SentinelService Pipeline
 
 ---
 
-## Real-World Case Study
+## Case Studies — Retroactive Analysis
 
-**[How Argus Would Have Detected the $128M Balancer V2 Exploit](docs/analysis-balancer-v2-exploit.md)**
+> **Note:** These are retroactive analyses of past exploits, not real-time detections. Argus has no production detection track record yet. We include these to demonstrate the detection logic, not to claim operational results.
 
-On November 3, 2025, an attacker exploited a rounding error in Balancer V2's `batchSwap` to drain $128M across 6 chains in under 30 minutes. The community didn't notice for 42 minutes.
+**[Retroactive Analysis: $128M Balancer V2 Exploit](docs/analysis-balancer-v2-exploit.md)**
 
-Argus's Sentinel would have:
-1. **Pre-filter**: Flagged the transaction in the mempool (3M gas + 4.2KB calldata + Balancer Vault interaction)
-2. **Deep Analyzer**: Classified as price manipulation (82% confidence) after opcode replay
-3. **Auto-pause**: Halted block processing within seconds of the first attack transaction
-4. **Autopsy**: Generated a full forensic report with fund flow tracing
+On November 3, 2025, an attacker exploited a rounding error in Balancer V2's `batchSwap` to drain $128M across 6 chains in under 30 minutes. We analyzed this transaction through Argus's detection pipeline:
+
+1. **Pre-filter**: Flags the transaction pattern (3M gas + 4.2KB calldata + Balancer Vault interaction)
+2. **Deep Analyzer**: Classifies as price manipulation (82% confidence) after opcode replay
+3. **Autopsy**: Generates a forensic report with fund flow tracing
 
 Read the full analysis: [docs/analysis-balancer-v2-exploit.md](docs/analysis-balancer-v2-exploit.md)
 
-### [How Argus Would Have Detected the $1.5B Bybit Exploit](docs/analysis-bybit-1.4b-exploit.md)
+**[Retroactive Analysis: $1.5B Bybit Exploit](docs/analysis-bybit-1.4b-exploit.md)**
 
 On February 21, 2025, North Korea's Lazarus Group executed the largest crypto theft in history — $1.5B drained from Bybit's cold wallet via a supply chain attack on Safe{Wallet}'s front-end.
 
-Argus's Sentinel would have:
-1. **Pre-filter**: Flagged the transaction for unusual DELEGATECALL to an unverified contract
-2. **Deep Analyzer**: Classified as access control bypass (95% confidence) — proxy implementation overwritten
-3. **Auto-pause**: Halted block processing within seconds
-4. **Autopsy**: Traced fund flow across 40+ intermediary wallets
+1. **Pre-filter**: Flags the transaction for unusual DELEGATECALL to an unverified contract
+2. **Deep Analyzer**: Classifies as access control bypass (95% confidence) — proxy implementation overwritten
+3. **Autopsy**: Traces fund flow across 40+ intermediary wallets
 
 Read the full analysis: [docs/analysis-bybit-1.4b-exploit.md](docs/analysis-bybit-1.4b-exploit.md)
 
@@ -139,16 +139,17 @@ Read the full analysis: [docs/analysis-bybit-1.4b-exploit.md](docs/analysis-bybi
 
 ## How It Compares
 
-| | Argus | Forta | OpenZeppelin Defender | Tenderly |
-|---|---|---|---|---|
-| Runtime detection | Yes | Yes (bot network) | Yes (monitors) | Partial (alerts) |
-| L1 node integration | **Yes** | No | No | No |
-| Mempool pre-detection | **Yes** | No | No | No |
-| Auto-pause circuit breaker | **Yes** | No | No | No |
-| Post-hack forensics | **Yes** | No | No | Partial |
-| Attack classification | **Automatic** | Bot-dependent | Manual rules | Manual |
-| Open source | **Fully** | Partial | No | No |
-| Self-hosted | **Yes** | No (SaaS) | No (SaaS) | No (SaaS) |
+| | Argus | Forta | Phalcon | Tenderly | Hexagate |
+|---|---|---|---|---|---|
+| Runtime detection | Yes | Yes (bot network) | Yes | Partial (alerts) | Yes |
+| Mempool pre-detection | Yes | No | Yes | Yes | Yes |
+| Post-hack forensics | **Yes** | No | No | Partial | No |
+| Open source | **Fully** | Partial | No | No | No |
+| Self-hosted | **Yes** | No (SaaS) | No (SaaS) | No (SaaS) | No (SaaS) |
+| Multi-chain | No | Yes (7+) | Yes | Yes (109) | Yes |
+| Production track record | **None yet** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
+
+> Argus is early-stage. Its primary differentiator today is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
 
 ---
 
@@ -216,22 +217,27 @@ cargo build --all-features
 
 ### Docker
 
+> Docker Hub image is not yet published. For now, build locally:
+
 ```bash
+# Build locally
+docker build -t argus-demo .
+
 # Run the Sentinel demo
-docker run tokamak/argus-demo
+docker run argus-demo
 
 # Run the Autopsy demo
-docker run tokamak/argus-demo reentrancy_demo
+docker run argus-demo reentrancy_demo
 
 # Run the Dashboard demo
-docker run tokamak/argus-demo sentinel_dashboard_demo
+docker run argus-demo sentinel_dashboard_demo
 ```
 
 ---
 
 ## Powered By
 
-Argus uses [ethrex](https://github.com/lambdaclass/ethrex) LEVM as its EVM execution engine — a minimal, fast Ethereum Virtual Machine implementation in Rust.
+Argus uses [ethrex](https://github.com/lambdaclass/ethrex) LEVM as its EVM execution engine — a minimal, fast Ethereum Virtual Machine implementation in Rust. Argus depends on [Tokamak Network's fork](https://github.com/tokamak-network/ethrex) which includes the `tokamak-debugger` feature.
 
 ---
 

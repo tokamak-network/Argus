@@ -2,6 +2,13 @@
 //!
 //! `AutoPauseHandler` implements `AlertHandler` and pauses block processing
 //! via a shared `PauseController` when a sufficiently severe alert is detected.
+//!
+//! # Validator Warning
+//!
+//! Enabling auto-pause on a validator node may cause missed attestations,
+//! leading to slashing penalties. The default configuration is `enabled: false`
+//! (alert-only mode). Operators should understand this trade-off before
+//! enabling auto-pause in production.
 
 use std::sync::Arc;
 
@@ -16,6 +23,10 @@ use super::types::{AlertPriority, SentinelAlert};
 /// Acts as a circuit breaker: when an alert meets both the confidence threshold
 /// and priority threshold, the handler calls `PauseController::pause()` to halt
 /// block ingestion until an operator (or auto-resume timer) resumes it.
+///
+/// **Warning:** On validator nodes, halting block processing causes missed
+/// attestations and potential slashing. Use alert-only mode (default) unless
+/// the slashing trade-off is explicitly accepted.
 pub struct AutoPauseHandler {
     controller: Arc<PauseController>,
     confidence_threshold: f64,

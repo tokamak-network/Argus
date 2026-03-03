@@ -6,8 +6,11 @@
 
 use super::pipeline::FeatureVector;
 
-/// Traceability: placeholder means/stddevs were calibrated against
-/// mainnet blocks 18_000_000..19_000_000 (approximate normal TX profile).
+/// Reference block range for the placeholder mean/stddev values below.
+/// These values are **NOT** derived from actual mainnet data analysis.
+/// They are conservative hand-tuned defaults approximating a typical TX
+/// profile in this block range. Replace with real calibration data when
+/// available.
 pub const CALIBRATION_BLOCK_RANGE: (u64, u64) = (18_000_000, 19_000_000);
 
 /// Anomaly scoring model that maps a `FeatureVector` to a suspicion score.
