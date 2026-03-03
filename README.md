@@ -109,6 +109,22 @@ Phase 5  SentinelService Pipeline
 
 ---
 
+## Real-World Case Study
+
+**[How Argus Would Have Detected the $128M Balancer V2 Exploit](docs/analysis-balancer-v2-exploit.md)**
+
+On November 3, 2025, an attacker exploited a rounding error in Balancer V2's `batchSwap` to drain $128M across 6 chains in under 30 minutes. The community didn't notice for 42 minutes.
+
+Argus's Sentinel would have:
+1. **Pre-filter**: Flagged the transaction in the mempool (3M gas + 4.2KB calldata + Balancer Vault interaction)
+2. **Deep Analyzer**: Classified as price manipulation (82% confidence) after opcode replay
+3. **Auto-pause**: Halted block processing within seconds of the first attack transaction
+4. **Autopsy**: Generated a full forensic report with fund flow tracing
+
+Read the full analysis: [docs/analysis-balancer-v2-exploit.md](docs/analysis-balancer-v2-exploit.md)
+
+---
+
 ## How It Compares
 
 | | Argus | Forta | OpenZeppelin Defender | Tenderly |
