@@ -27,12 +27,18 @@ Ethereum 실시간 공격 탐지 + 사후 포렌식 + 타임트래블 디버거.
 ### 미완료 (우선순위 순)
 
 - [ ] **데모 GIF 녹화** → README에 삽입 (시각적 임팩트, 스타 전환율 핵심)
-- [ ] **awesome-ethereum-security PR** 제출 (https://github.com/crytic/awesome-ethereum-security)
-- [ ] **유통**: Balancer 분석 콘텐츠를 Twitter/Reddit/HN에 게시
-- [ ] **추가 Case Study**: Bybit $1.4B (supply chain), Unleash $3.9M 등
-- [ ] **Docker Hub 이미지** 퍼블리시 (`docker run tokamak/argus-demo`)
-- [ ] **CLAUDE.md** 작성 (개발 가이드, 빌드 명령어, 아키텍처 설명)
+- [ ] **awesome-ethereum-security PR 제출** → 초안 준비됨 (`docs/awesome-ethereum-security-pr.md`)
+- [ ] **유통**: Balancer/Bybit 분석 콘텐츠를 Twitter/Reddit/HN에 게시
+- [ ] **추가 Case Study**: Unleash $3.9M 등 (Bybit 완료)
+- [ ] **Docker Hub 시크릿 설정** → 가이드 준비됨 (`docs/docker-hub-setup.md`), GitHub Secrets 등록 필요
 - [ ] ethrex upstream 변경 시 git dep rev 업데이트 전략
+
+### 완료 (이번 세션)
+
+- [x] **CLAUDE.md** 작성 완료
+- [x] **Bybit $1.5B Case Study** 작성 완료 (`docs/analysis-bybit-1.4b-exploit.md`)
+- [x] **awesome-ethereum-security PR 초안** 작성 완료 (`docs/awesome-ethereum-security-pr.md`)
+- [x] **Docker Hub publish workflow** 작성 완료 (`.github/workflows/docker-publish.yml`)
 
 ## 기술 구조
 

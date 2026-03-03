@@ -123,6 +123,18 @@ Argus's Sentinel would have:
 
 Read the full analysis: [docs/analysis-balancer-v2-exploit.md](docs/analysis-balancer-v2-exploit.md)
 
+### [How Argus Would Have Detected the $1.5B Bybit Exploit](docs/analysis-bybit-1.4b-exploit.md)
+
+On February 21, 2025, North Korea's Lazarus Group executed the largest crypto theft in history — $1.5B drained from Bybit's cold wallet via a supply chain attack on Safe{Wallet}'s front-end.
+
+Argus's Sentinel would have:
+1. **Pre-filter**: Flagged the transaction for unusual DELEGATECALL to an unverified contract
+2. **Deep Analyzer**: Classified as access control bypass (95% confidence) — proxy implementation overwritten
+3. **Auto-pause**: Halted block processing within seconds
+4. **Autopsy**: Traced fund flow across 40+ intermediary wallets
+
+Read the full analysis: [docs/analysis-bybit-1.4b-exploit.md](docs/analysis-bybit-1.4b-exploit.md)
+
 ---
 
 ## How It Compares
@@ -201,6 +213,19 @@ cargo build --all-features
 ```
 
 **Requirements**: Rust 1.85+ (edition 2024)
+
+### Docker
+
+```bash
+# Run the Sentinel demo
+docker run tokamak/argus-demo
+
+# Run the Autopsy demo
+docker run tokamak/argus-demo reentrancy_demo
+
+# Run the Dashboard demo
+docker run tokamak/argus-demo sentinel_dashboard_demo
+```
 
 ---
 
