@@ -9,7 +9,7 @@ Built with Rust, powered by ethrex LEVM.
 
 ```bash
 cargo check                                    # Compile check
-cargo test                                     # Run 283 tests
+cargo test                                     # Run 366 tests
 cargo clippy --all-features -- -D warnings     # Lint (warnings = errors)
 cargo fmt --check                              # Format check
 
@@ -17,6 +17,7 @@ cargo fmt --check                              # Format check
 cargo run --example sentinel_realtime_demo     # Sentinel pipeline demo
 cargo run --example reentrancy_demo            # Reentrancy attack demo
 cargo run --example sentinel_dashboard_demo    # Dashboard integration demo
+cargo run --example sentinel_rpc_demo          # RPC-mode Sentinel (any RPC endpoint)
 
 # CLI debugger
 cargo run --bin argus --features cli
@@ -37,13 +38,17 @@ src/
 ├── recorder.rs         # DebugRecorder — opcode step capture
 ├── types.rs            # ReplayTrace, StepRecord, ReplayConfig
 ├── error.rs            # DebuggerError, RpcError
-├── sentinel/           # Real-time detection (8,756 LoC)
+├── sentinel/           # Real-time detection (~10,500 LoC)
 │   ├── types.rs        #   Alert types, SuspicionReason
 │   ├── pre_filter.rs   #   Receipt heuristics (~10-50μs/tx)
 │   ├── pipeline.rs     #   Adaptive multi-step analysis
 │   ├── analyzer.rs     #   Deep opcode-level analyzer
 │   ├── alert.rs        #   Dispatcher, dedup, rate limiter
-│   ├── service.rs      #   Background worker thread
+│   ├── service.rs      #   Background worker (Store mode)
+│   ├── rpc_service.rs  #   RPC-mode Sentinel service
+│   ├── rpc_poller.rs   #   Async block poller (any RPC)
+│   ├── rpc_replay.rs   #   RemoteVmDatabase TX replay
+│   ├── rpc_types.rs    #   RPC → ethrex type conversion
 │   ├── mempool_filter.rs   Pre-execution calldata scan
 │   ├── webhook.rs      #   Slack/Discord/PagerDuty
 │   ├── ws_broadcaster.rs  WebSocket streaming
@@ -61,10 +66,10 @@ src/
 │   ├── abi_decoder.rs  #   Function/event decoding
 │   └── enrichment.rs   #   Contract label enrichment
 ├── cli/                # Interactive GDB-style debugger
-└── tests/              # Test suite (283 tests)
+└── tests/              # Test suite (366 tests)
 
 dashboard/              # Web UI (Astro + React + Recharts)
-examples/               # 3 runnable demos
+examples/               # 4 runnable demos
 docs/                   # Case studies
 ```
 
@@ -86,11 +91,12 @@ docs/                   # Case studies
 ## Detection Pipeline
 
 ```
-Mempool → Pre-Filter (10-50μs) → Deep Analyzer (opcode replay) → Alert Dispatcher
-                                                                      │
-                                              ┌───────────────────────┼────────┐
-                                              │        │        │     │        │
-                                           JSONL   Webhook    WS  Prometheus  Auto-Pause
+Store mode:   Mempool → Pre-Filter (10-50μs) → Deep Analyzer → Alert Dispatcher
+RPC mode:     Poller → Pre-Filter → Optional RPC Replay → Alert Channel
+                                                                │
+                                        ┌───────────────────────┼────────┐
+                                        │        │        │     │        │
+                                     JSONL   Webhook    WS  Prometheus  Auto-Pause
 ```
 
 ## Coding Conventions
