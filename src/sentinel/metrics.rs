@@ -6,6 +6,8 @@
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use serde::Serialize;
+
 /// Thread-safe counters for the sentinel pipeline.
 ///
 /// All fields are atomic and can be incremented concurrently from any thread.
@@ -167,7 +169,7 @@ const _: fn() = || {
 };
 
 /// Non-atomic snapshot of all sentinel metrics at a point in time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct MetricsSnapshot {
     pub blocks_scanned: u64,
     pub txs_scanned: u64,

@@ -1,0 +1,28 @@
+---
+import SentinelLayout from "../../layouts/SentinelLayout.astro";
+import SentinelHeader from "../../components/sentinel/SentinelHeader";
+import SentinelFooter from "../../components/sentinel/SentinelFooter";
+import { AlertHistoryTable } from "../../components/sentinel/AlertHistoryTable";
+
+const sentinelApi = import.meta.env.PUBLIC_SENTINEL_API || '';
+---
+
+<SentinelLayout title="Argus Sentinel — Alert History" currentPath="/sentinel/history">
+  <SentinelHeader currentPath="/sentinel/history" slot="header" />
+
+  <!-- Header Section -->
+  <div>
+    <h1 class="text-3xl font-black text-slate-100 tracking-tight mb-2">Alert History</h1>
+    <p class="text-slate-400 text-sm max-w-2xl">
+      Review and analyze past blockchain security incidents across monitored protocols and networks.
+    </p>
+  </div>
+
+  <!-- Full History Table with filters, pagination, stats -->
+  <AlertHistoryTable
+    client:load
+    {...(sentinelApi ? { apiBase: `${sentinelApi}/sentinel/history` } : {})}
+  />
+
+  <SentinelFooter slot="footer" />
+</SentinelLayout>

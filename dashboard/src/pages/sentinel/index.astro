@@ -1,0 +1,52 @@
+---
+import SentinelLayout from "../../layouts/SentinelLayout.astro";
+import SentinelHeader from "../../components/sentinel/SentinelHeader";
+import SentinelFooter from "../../components/sentinel/SentinelFooter";
+import { SentinelMetricsPanel } from "../../components/sentinel/SentinelMetricsPanel";
+import { AlertFeed } from "../../components/sentinel/AlertFeed";
+import { AlertHistoryTable } from "../../components/sentinel/AlertHistoryTable";
+
+const sentinelApi = import.meta.env.PUBLIC_SENTINEL_API || '';
+const sentinelWs = import.meta.env.PUBLIC_SENTINEL_WS || '';
+---
+
+<SentinelLayout title="Argus Sentinel — Dashboard" currentPath="/sentinel">
+  <SentinelHeader currentPath="/sentinel" slot="header" />
+
+  <!-- Section Title -->
+  <div>
+    <h1 class="text-2xl font-bold text-white flex items-center gap-2 mb-4">
+      <span class="material-symbols-outlined text-sentinel-primary">security</span>
+      Security Network Overview
+    </h1>
+  </div>
+
+  <!-- Top Row: Metric Cards -->
+  <SentinelMetricsPanel
+    client:load
+    {...(sentinelApi ? { apiBase: `${sentinelApi}/sentinel/metrics` } : {})}
+  />
+
+  <!-- Real-time Alert Feed (full width) -->
+  <div class="pt-6">
+    <AlertFeed
+      client:load
+      {...(sentinelWs ? { wsUrl: `${sentinelWs}/sentinel/ws` } : {})}
+    />
+  </div>
+
+  <!-- Recent Alert History (full width, compact) -->
+  <section class="pt-6 space-y-4">
+    <h2 class="text-xl font-bold flex items-center gap-2 text-white mb-4">
+      <span class="material-symbols-outlined text-sentinel-primary">history</span>
+      Recent Alert History
+    </h2>
+    <AlertHistoryTable
+      client:load
+      compact={true}
+      {...(sentinelApi ? { apiBase: `${sentinelApi}/sentinel/history` } : {})}
+    />
+  </section>
+
+  <SentinelFooter slot="footer" />
+</SentinelLayout>

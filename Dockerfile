@@ -23,6 +23,9 @@ COPY --from=builder /app/target/release/examples/sentinel_realtime_demo /usr/loc
 COPY --from=builder /app/target/release/examples/reentrancy_demo /usr/local/bin/
 COPY --from=builder /app/target/release/examples/sentinel_dashboard_demo /usr/local/bin/
 
+RUN mkdir -p /var/log/sentinel
+COPY sentinel_alerts_backup.jsonl /var/log/sentinel/alerts.jsonl
+
 EXPOSE 9090
 
 ENV ARGUS_RPC_URL=""

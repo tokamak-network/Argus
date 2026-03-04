@@ -596,6 +596,9 @@ async fn run_sentinel_async(
         prefilter_config: Some(prefilter_config),
     };
 
+    // Clone alert_file path for the HTTP history endpoint before it's consumed
+    let alert_file_for_history = alert_file.clone();
+
     // Build AlertDispatcher: stdout always, optional file + webhook
     let mut dispatcher = AlertDispatcher::default();
     dispatcher.add_handler(Box::new(StdoutAlertHandler));
@@ -618,13 +621,21 @@ async fn run_sentinel_async(
     let service = RpcSentinelService::start(sentinel_config, alert_tx).await;
     let metrics = service.metrics();
 
-    // Spawn HTTP metrics server (/metrics + /health)
+    // Spawn HTTP metrics server (/metrics + /health + /sentinel/*)
     {
         use crate::sentinel::http_metrics::start_metrics_server;
         let metrics_clone = metrics.clone();
         eprintln!("[sentinel] Metrics server on http://0.0.0.0:{metrics_port}/metrics");
         tokio::spawn(async move {
-            if let Err(e) = start_metrics_server(metrics_clone, metrics_port, start_time).await {
+            if let Err(e) = start_metrics_server(
+                metrics_clone,
+                metrics_port,
+                start_time,
+                alert_file_for_history,
+                None,
+            )
+            .await
+            {
                 eprintln!("[sentinel] Metrics server error: {e}");
             }
         });

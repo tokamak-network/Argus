@@ -1,0 +1,170 @@
+---
+import SentinelLayout from "@/layouts/SentinelLayout.astro";
+import SentinelHeader from "@/components/sentinel/SentinelHeader";
+import SentinelFooter from "@/components/sentinel/SentinelFooter";
+import SuspicionScoreGauge from "@/components/sentinel/SuspicionScoreGauge";
+import DetectedPatterns from "@/components/sentinel/DetectedPatterns";
+
+const DEMO_ALERT = {
+  id: "19234567",
+  block_number: 19234567,
+  tx_hash: "0x4e3a8f2b1c9d5e7f0a2b4c6d8e0f2a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d4e6f",
+  alert_priority: "Critical" as const,
+  suspicion_score: 0.87,
+  summary:
+    "Flash loan attack detected: rapid borrow-swap-repay cycle targeting Aave V3 liquidity pool with abnormal price impact.",
+  total_value_at_risk: "4,200,000",
+  total_steps: 12847,
+  suspicion_reasons: [
+    { type: "FlashLoanSignature", details: "Detected AAVE V3 flash loan borrow callback" },
+    { type: "PriceManipulation", details: "Uniswap V3 USDC/ETH pool price moved 3.2%" },
+    { type: "LargeValueTransfer", details: "4.2M USDC transferred in single TX" },
+  ],
+  fund_flows: [
+    { from: "0xA0b8...f5E4 (Aave V3)", to: "0x1F98...0000 (Uniswap V3)", value: "4,200,000 USDC" },
+    { from: "0x1F98...0000 (Uniswap V3)", to: "0xDeaD...f1c3 (Attacker)", value: "3.8 ETH" },
+    { from: "0xDeaD...f1c3 (Attacker)", to: "0xA0b8...f5E4 (Aave V3)", value: "4,200,000 USDC" },
+  ],
+  detected_patterns: ["Flash Loan", "Price Manipulation"],
+};
+
+const PRIORITY_BADGE_STYLES = {
+  Critical: "bg-sentinel-critical/15 text-sentinel-critical border-sentinel-critical/30",
+  High: "bg-sentinel-high/15 text-sentinel-high border-sentinel-high/30",
+  Medium: "bg-sentinel-medium/15 text-sentinel-medium border-sentinel-medium/30",
+} as const;
+
+const priorityStyle = PRIORITY_BADGE_STYLES[DEMO_ALERT.alert_priority];
+---
+
+<SentinelLayout title="Alert Analysis — Argus Sentinel" currentPath="/sentinel/history">
+  <SentinelHeader slot="header" currentPath="/sentinel/history" client:load />
+
+  <!-- Breadcrumbs -->
+  <nav class="mb-6 flex items-center gap-2 text-sm text-slate-500">
+    <a href="/sentinel/history" class="hover:text-sentinel-primary transition-colors">Alerts</a>
+    <span>/</span>
+    <span class="text-white">Alert Analysis #{DEMO_ALERT.id}</span>
+  </nav>
+
+  <!-- Alert Header Card -->
+  <div class="mb-8 rounded-xl border border-sentinel-border bg-sentinel-card p-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center gap-3">
+          <span
+            class={`rounded-full border px-3 py-1 text-xs font-semibold ${priorityStyle}`}
+          >
+            {DEMO_ALERT.alert_priority}
+          </span>
+          <span class="text-4xl font-bold text-white">
+            Block #{DEMO_ALERT.block_number.toLocaleString()}
+          </span>
+        </div>
+        <span class="font-mono text-sm text-sentinel-primary" title={DEMO_ALERT.tx_hash}>
+          {DEMO_ALERT.tx_hash}
+        </span>
+      </div>
+      <div class="flex flex-col items-end gap-1 text-right">
+        <span class="text-xs text-slate-500">Value at Risk</span>
+        <span class="text-2xl font-bold text-sentinel-critical">
+          ${DEMO_ALERT.total_value_at_risk}
+        </span>
+      </div>
+    </div>
+    <p class="mt-4 text-sm text-slate-400">{DEMO_ALERT.summary}</p>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="grid gap-6 lg:grid-cols-3">
+
+    <!-- Left Column (span 2) -->
+    <div class="flex flex-col gap-6 lg:col-span-2">
+
+      <!-- Suspicion Score Gauge -->
+      <SuspicionScoreGauge score={DEMO_ALERT.suspicion_score} client:load />
+
+      <!-- Analysis Summary -->
+      <div class="rounded-xl border border-sentinel-border bg-sentinel-card p-5">
+        <p class="mb-3 text-sm font-medium text-slate-400">Analysis Summary</p>
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div>
+            <p class="text-xs text-slate-500">EVM Steps</p>
+            <p class="text-xl font-bold text-white">{DEMO_ALERT.total_steps.toLocaleString()}</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-500">Detection Score</p>
+            <p class="text-xl font-bold text-sentinel-critical">{DEMO_ALERT.suspicion_score.toFixed(2)}</p>
+          </div>
+          <div>
+            <p class="text-xs text-slate-500">Patterns Found</p>
+            <p class="text-xl font-bold text-white">{DEMO_ALERT.detected_patterns.length}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detected Patterns -->
+      <DetectedPatterns patterns={DEMO_ALERT.detected_patterns} client:load />
+
+    </div>
+
+    <!-- Right Column -->
+    <div class="flex flex-col gap-6">
+
+      <!-- Suspicion Reasons -->
+      <div class="rounded-xl border border-sentinel-border bg-sentinel-card p-5">
+        <p class="mb-3 text-sm font-medium text-slate-400">Suspicion Reasons</p>
+        <ul class="flex flex-col gap-3">
+          {DEMO_ALERT.suspicion_reasons.map((reason) => (
+            <li class="flex flex-col gap-1 rounded-lg border border-sentinel-border bg-sentinel-bg p-3">
+              <span class="text-sm font-semibold text-sentinel-primary">{reason.type}</span>
+              {reason.details && (
+                <span class="text-xs text-slate-400">{reason.details}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <!-- Fund Flows -->
+      <div class="rounded-xl border border-sentinel-border bg-sentinel-card p-5">
+        <p class="mb-3 text-sm font-medium text-slate-400">Fund Flows</p>
+        <ul class="flex flex-col gap-3">
+          {DEMO_ALERT.fund_flows.map((flow, i) => (
+            <li class="flex flex-col gap-1 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-sentinel-primary/20 text-sentinel-primary font-bold">
+                  {i + 1}
+                </span>
+                <span class="font-mono text-slate-300">{flow.value}</span>
+              </div>
+              <div class="ml-7 flex flex-col gap-0.5 text-slate-500">
+                <span>From: {flow.from}</span>
+                <span>To: {flow.to}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="mt-8 flex flex-wrap items-center gap-3">
+    <button
+      type="button"
+      class="rounded-lg border border-sentinel-border px-5 py-2.5 text-sm font-semibold text-slate-300 transition-colors hover:border-sentinel-borderLight hover:text-white"
+    >
+      Mark as False Positive
+    </button>
+    <button
+      type="button"
+      class="rounded-lg bg-sentinel-primary px-5 py-2.5 text-sm font-semibold text-sentinel-bg transition-opacity hover:opacity-90"
+    >
+      Initiate Incident Response
+    </button>
+  </div>
+
+  <SentinelFooter slot="footer" client:load />
+</SentinelLayout>
