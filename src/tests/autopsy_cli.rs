@@ -45,7 +45,6 @@ fn make_trace(steps: usize, gas_used: u64, success: bool) -> ReplayTrace {
 
 // ─── Clap arg parsing ─────────────────────────────────────────────────────────
 
-#[cfg(feature = "autopsy")]
 mod arg_parsing {
     use clap::Parser;
 
@@ -184,7 +183,6 @@ mod arg_parsing {
 
 // ─── format_autopsy_summary ──────────────────────────────────────────────────
 
-#[cfg(feature = "autopsy")]
 mod fmt_summary {
     use ethrex_common::{Address, U256};
 

@@ -8,3 +8,4 @@ dashboard/node_modules/
 dashboard/dist/
 dashboard/fixtures/
 docs/awesome-ethereum-security-pr.md
+autopsy-*.md
