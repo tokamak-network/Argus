@@ -8,12 +8,12 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use clap::{Parser, Subcommand};
+#[cfg(not(feature = "sentinel"))]
+use ethrex_common::types::LegacyTransaction;
 use ethrex_common::{
     Address, U256,
     constants::EMPTY_TRIE_HASH,
-    types::{
-        Account, BlockHeader, Code, EIP1559Transaction, LegacyTransaction, Transaction, TxKind,
-    },
+    types::{Account, BlockHeader, Code, EIP1559Transaction, Transaction, TxKind},
 };
 use ethrex_levm::{Environment, db::gen_db::GeneralizedDatabase};
 use rustc_hash::FxHashMap;
@@ -53,11 +53,11 @@ pub enum InputMode {
     #[command(name = "autopsy")]
     Autopsy {
         /// Transaction hash to analyze
-        #[arg(long)]
+        #[arg(long = "tx-hash", alias = "tx", short = 't')]
         tx_hash: String,
 
         /// Ethereum archive node RPC URL
-        #[arg(long)]
+        #[arg(long = "rpc-url", alias = "rpc", short = 'r')]
         rpc_url: String,
 
         /// Block number (auto-detected from tx if omitted)
@@ -83,6 +83,10 @@ pub enum InputMode {
         /// Suppress metrics output (default: false)
         #[arg(long, default_value = "false")]
         quiet: bool,
+
+        /// After autopsy analysis, drop into the GDB-style debugger REPL
+        #[arg(long, short = 'i', default_value = "false")]
+        interactive: bool,
     },
 }
 
@@ -100,6 +104,7 @@ pub fn run(args: Args) -> Result<(), DebuggerError> {
             rpc_timeout,
             rpc_retries,
             quiet,
+            interactive,
         } => run_autopsy(
             &tx_hash,
             &rpc_url,
@@ -109,6 +114,7 @@ pub fn run(args: Args) -> Result<(), DebuggerError> {
             rpc_timeout,
             rpc_retries,
             quiet,
+            interactive,
         ),
     }
 }
@@ -197,6 +203,7 @@ fn run_autopsy(
     rpc_timeout: u64,
     rpc_retries: u32,
     _quiet: bool,
+    interactive: bool,
 ) -> Result<(), DebuggerError> {
     use std::time::Duration;
 
@@ -270,56 +277,65 @@ fn run_autopsy(
         DebuggerError::Rpc(crate::error::RpcError::simple(format!("fetch block: {e}")))
     })?;
 
-    // Build environment with proper gas fields
-    let base_fee = block_header.base_fee_per_gas.unwrap_or(0);
-    let effective_gas_price = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
-        // EIP-1559: min(max_fee, base_fee + max_priority_fee)
-        let priority = rpc_tx.max_priority_fee_per_gas.unwrap_or(0);
-        std::cmp::min(max_fee, base_fee + priority)
-    } else {
-        // Legacy: gas_price
-        rpc_tx.gas_price.unwrap_or(0)
+    // Build environment and transaction using shared rpc_types helpers (DRY)
+    #[cfg(feature = "sentinel")]
+    let (env, tx) = {
+        use crate::sentinel::rpc_types::{build_env_from_rpc, rpc_tx_to_ethrex};
+        let env = build_env_from_rpc(&rpc_tx, &block_header);
+        let tx = rpc_tx_to_ethrex(&rpc_tx)
+            .map_err(|e| DebuggerError::Rpc(crate::error::RpcError::simple(format!("{e}"))))?;
+        (env, tx)
     };
 
-    let env = Environment {
-        origin: rpc_tx.from,
-        gas_limit: rpc_tx.gas,
-        block_gas_limit: block_header.gas_limit,
-        block_number: block_header.number.into(),
-        coinbase: block_header.coinbase,
-        timestamp: block_header.timestamp.into(),
-        base_fee_per_gas: U256::from(base_fee),
-        gas_price: U256::from(effective_gas_price),
-        tx_max_fee_per_gas: rpc_tx.max_fee_per_gas.map(U256::from),
-        tx_max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.map(U256::from),
-        tx_nonce: rpc_tx.nonce,
-        ..Default::default()
-    };
-
-    // Build transaction — detect legacy vs EIP-1559 by checking max_fee_per_gas
-    let tx_to = rpc_tx.to.map(TxKind::Call).unwrap_or(TxKind::Create);
-    let tx_data = Bytes::from(rpc_tx.input);
-    let tx = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
-        Transaction::EIP1559Transaction(EIP1559Transaction {
-            to: tx_to,
-            data: tx_data,
-            value: rpc_tx.value,
-            nonce: rpc_tx.nonce,
+    // Fallback for sentinel-less builds: inline env + tx construction
+    #[cfg(not(feature = "sentinel"))]
+    let (env, tx) = {
+        let base_fee = block_header.base_fee_per_gas.unwrap_or(0);
+        let effective_gas_price = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
+            let priority = rpc_tx.max_priority_fee_per_gas.unwrap_or(0);
+            std::cmp::min(max_fee, base_fee + priority)
+        } else {
+            rpc_tx.gas_price.unwrap_or(0)
+        };
+        let env = Environment {
+            origin: rpc_tx.from,
             gas_limit: rpc_tx.gas,
-            max_fee_per_gas: max_fee,
-            max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.unwrap_or(0),
+            block_gas_limit: block_header.gas_limit,
+            block_number: block_header.number.into(),
+            coinbase: block_header.coinbase,
+            timestamp: block_header.timestamp.into(),
+            base_fee_per_gas: U256::from(base_fee),
+            gas_price: U256::from(effective_gas_price),
+            tx_max_fee_per_gas: rpc_tx.max_fee_per_gas.map(U256::from),
+            tx_max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.map(U256::from),
+            tx_nonce: rpc_tx.nonce,
             ..Default::default()
-        })
-    } else {
-        Transaction::LegacyTransaction(LegacyTransaction {
-            to: tx_to,
-            data: tx_data,
-            value: rpc_tx.value,
-            nonce: rpc_tx.nonce,
-            gas: rpc_tx.gas,
-            gas_price: U256::from(rpc_tx.gas_price.unwrap_or(0)),
-            ..Default::default()
-        })
+        };
+        let tx_to = rpc_tx.to.map(TxKind::Call).unwrap_or(TxKind::Create);
+        let tx_data = Bytes::from(rpc_tx.input.clone());
+        let tx = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
+            Transaction::EIP1559Transaction(EIP1559Transaction {
+                to: tx_to,
+                data: tx_data,
+                value: rpc_tx.value,
+                nonce: rpc_tx.nonce,
+                gas_limit: rpc_tx.gas,
+                max_fee_per_gas: max_fee,
+                max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.unwrap_or(0),
+                ..Default::default()
+            })
+        } else {
+            Transaction::LegacyTransaction(LegacyTransaction {
+                to: tx_to,
+                data: tx_data,
+                value: rpc_tx.value,
+                nonce: rpc_tx.nonce,
+                gas: rpc_tx.gas,
+                gas_price: U256::from(rpc_tx.gas_price.unwrap_or(0)),
+                ..Default::default()
+            })
+        };
+        (env, tx)
     };
 
     eprintln!("[autopsy] Replaying transaction...");
@@ -329,8 +345,8 @@ fn run_autopsy(
 
     eprintln!("[autopsy] Recorded {} steps. Analyzing...", engine.len());
 
-    // Enrich storage writes with old_value
-    let mut trace = engine.into_trace();
+    // Clone trace so the engine stays alive for optional interactive mode
+    let mut trace = engine.trace().clone();
     let slots = collect_sstore_slots(&trace.steps);
     let mut initial_values = rustc_hash::FxHashMap::default();
 
@@ -363,10 +379,15 @@ fn run_autopsy(
         tx_hash,
         block_num,
         &trace.steps,
-        patterns,
-        flows,
+        patterns.clone(),
+        flows.clone(),
         storage_diffs,
     );
+
+    // Print terminal summary to stderr
+    let summary =
+        formatter::format_autopsy_summary(&patterns, &flows, &trace, tx_hash_hex, block_num);
+    eprintln!("{summary}");
 
     // Render output
     let (content, ext) = match output_format {
@@ -396,5 +417,12 @@ fn run_autopsy(
         .map_err(|e| DebuggerError::Report(format!("write {file_path}: {e}")))?;
 
     eprintln!("[autopsy] Report saved to {file_path}");
+
+    // Enter interactive debugger REPL if requested
+    if interactive {
+        eprintln!("[autopsy] Entering interactive debugger...");
+        repl::start(engine)?;
+    }
+
     Ok(())
 }

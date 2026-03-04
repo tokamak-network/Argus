@@ -25,3 +25,6 @@ mod exploit_fixtures;
 
 #[cfg(feature = "autopsy")]
 mod exploit_smoke_tests;
+
+#[cfg(feature = "autopsy")]
+mod autopsy_cli;
