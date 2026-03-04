@@ -113,7 +113,7 @@ Phase 5  SentinelService Pipeline
 
 ## Case Studies — Retroactive Analysis
 
-> **Note:** These are retroactive analyses of past exploits, not real-time detections. Argus has no production detection track record yet. We include these to demonstrate the detection logic, not to claim operational results.
+> **Note:** These are retroactive analyses of past exploits, not real-time detections from the live pipeline. Argus is currently scanning Ethereum mainnet via AWS ECS Fargate (since March 2026). We include these to demonstrate the detection logic on known exploits.
 
 **[Retroactive Analysis: $128M Balancer V2 Exploit](docs/analysis-balancer-v2-exploit.md)**
 
@@ -147,9 +147,9 @@ Read the full analysis: [docs/analysis-bybit-1.4b-exploit.md](docs/analysis-bybi
 | Open source | **Fully** | Partial | No | No | No |
 | Self-hosted | **Yes** | No (SaaS) | No (SaaS) | No (SaaS) | No (SaaS) |
 | Multi-chain | No | Yes (7+) | Yes | Yes (109) | Yes |
-| Production track record | **None yet** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
+| Production track record | **Mainnet scanning (since Mar 2026)** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
 
-> Argus is early-stage. Its primary differentiator today is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
+> Argus is early-stage but running on Ethereum mainnet via AWS ECS Fargate. Its primary differentiator is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
 
 ---
 
