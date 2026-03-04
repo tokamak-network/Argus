@@ -4,6 +4,7 @@ pub mod commands;
 pub mod formatter;
 pub mod repl;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::Bytes;
@@ -88,6 +89,39 @@ pub enum InputMode {
         #[arg(long, short = 'i', default_value = "false")]
         interactive: bool,
     },
+
+    /// Monitor Ethereum in real time via JSON-RPC (no local node required)
+    #[cfg(all(feature = "sentinel", feature = "autopsy"))]
+    #[command(name = "sentinel")]
+    Sentinel {
+        /// Ethereum RPC endpoint URL (e.g. https://eth-mainnet.g.alchemy.com/v2/KEY)
+        #[arg(long = "rpc-url", alias = "rpc", short = 'r')]
+        rpc_url: String,
+
+        /// Optional TOML config file path (overridden by CLI flags)
+        #[arg(long, short)]
+        config: Option<PathBuf>,
+
+        /// Append alerts as JSON lines to this file
+        #[arg(long = "alert-file")]
+        alert_file: Option<PathBuf>,
+
+        /// Skip deep opcode replay — pre-filter heuristics only (works with any full node)
+        #[arg(long, default_value = "false")]
+        prefilter_only: bool,
+
+        /// Port for HTTP metrics/health server
+        #[arg(long, default_value = "9090")]
+        metrics_port: u16,
+
+        /// Webhook URL for HTTP POST alert notifications
+        #[arg(long)]
+        webhook_url: Option<String>,
+
+        /// Block polling interval in seconds
+        #[arg(long, default_value = "2")]
+        poll_interval: u64,
+    },
 }
 
 /// Run the debugger CLI.
@@ -115,6 +149,24 @@ pub fn run(args: Args) -> Result<(), DebuggerError> {
             rpc_retries,
             quiet,
             interactive,
+        ),
+        #[cfg(all(feature = "sentinel", feature = "autopsy"))]
+        InputMode::Sentinel {
+            rpc_url,
+            config,
+            alert_file,
+            prefilter_only,
+            metrics_port,
+            webhook_url,
+            poll_interval,
+        } => run_sentinel(
+            &rpc_url,
+            config,
+            alert_file,
+            prefilter_only,
+            metrics_port,
+            webhook_url,
+            poll_interval,
         ),
     }
 }
@@ -425,4 +477,283 @@ fn run_autopsy(
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Sentinel subcommand
+// ---------------------------------------------------------------------------
+
+#[cfg(all(feature = "sentinel", feature = "autopsy"))]
+#[allow(clippy::too_many_arguments)]
+fn run_sentinel(
+    rpc_url: &str,
+    _config: Option<PathBuf>,
+    alert_file: Option<PathBuf>,
+    prefilter_only: bool,
+    metrics_port: u16,
+    webhook_url: Option<String>,
+    poll_interval: u64,
+) -> Result<(), DebuggerError> {
+    let rt = tokio::runtime::Runtime::new()
+        .map_err(|e| DebuggerError::Cli(format!("Failed to create tokio runtime: {e}")))?;
+    rt.block_on(run_sentinel_async(
+        rpc_url,
+        alert_file,
+        prefilter_only,
+        metrics_port,
+        webhook_url,
+        poll_interval,
+    ))
+}
+
+#[cfg(all(feature = "sentinel", feature = "autopsy"))]
+async fn run_sentinel_async(
+    rpc_url: &str,
+    alert_file: Option<PathBuf>,
+    prefilter_only: bool,
+    metrics_port: u16,
+    webhook_url: Option<String>,
+    poll_interval: u64,
+) -> Result<(), DebuggerError> {
+    use std::time::{Duration, Instant};
+
+    use tokio::sync::mpsc;
+
+    use crate::sentinel::{
+        alert::{AlertDispatcher, JsonlFileAlertHandler, StdoutAlertHandler},
+        rpc_poller::RpcPollerConfig,
+        rpc_service::{RpcSentinelConfig, RpcSentinelService},
+        service::AlertHandler,
+        types::{AnalysisConfig, SentinelAlert},
+    };
+
+    let start_time = Instant::now();
+
+    // Mask the URL for display (hide API keys embedded in paths)
+    let masked_url = if rpc_url.len() > 40 {
+        format!(
+            "{}...{}",
+            &rpc_url[..40],
+            &rpc_url[rpc_url.len().saturating_sub(4)..]
+        )
+    } else {
+        rpc_url.to_string()
+    };
+    eprintln!("[sentinel] Starting on {masked_url}");
+    eprintln!(
+        "[sentinel] prefilter_only={prefilter_only}  poll_interval={poll_interval}s  metrics_port={metrics_port}"
+    );
+    eprintln!("[sentinel] Press Ctrl+C to stop.");
+
+    // Build RpcSentinelConfig
+    let sentinel_config = RpcSentinelConfig {
+        rpc_url: rpc_url.to_string(),
+        poller_config: RpcPollerConfig {
+            rpc_url: rpc_url.to_string(),
+            poll_interval: Duration::from_secs(poll_interval),
+            rpc_config: crate::autopsy::rpc_client::RpcConfig::default(),
+        },
+        analysis_config: AnalysisConfig {
+            prefilter_alert_mode: true,
+            ..Default::default()
+        },
+        prefilter_only,
+    };
+
+    // Build AlertDispatcher: stdout always, optional file + webhook
+    let mut dispatcher = AlertDispatcher::default();
+    dispatcher.add_handler(Box::new(StdoutAlertHandler));
+    if let Some(path) = alert_file {
+        eprintln!("[sentinel] Logging alerts to {}", path.display());
+        dispatcher.add_handler(Box::new(JsonlFileAlertHandler::new(path)));
+    }
+    if let Some(url) = webhook_url {
+        use crate::sentinel::webhook::{WebhookAlertHandler, WebhookConfig};
+        eprintln!("[sentinel] Webhook notifications -> {url}");
+        dispatcher.add_handler(Box::new(WebhookAlertHandler::new(WebhookConfig {
+            url,
+            ..WebhookConfig::default()
+        })));
+    }
+
+    let (alert_tx, mut alert_rx) = mpsc::channel::<SentinelAlert>(256);
+
+    // Start the RPC sentinel service
+    let service = RpcSentinelService::start(sentinel_config, alert_tx).await;
+    let metrics = service.metrics();
+
+    // Spawn HTTP metrics server (/metrics + /health)
+    {
+        use crate::sentinel::http_metrics::start_metrics_server;
+        let metrics_clone = metrics.clone();
+        eprintln!("[sentinel] Metrics server on http://0.0.0.0:{metrics_port}/metrics");
+        tokio::spawn(async move {
+            if let Err(e) = start_metrics_server(metrics_clone, metrics_port, start_time).await {
+                eprintln!("[sentinel] Metrics server error: {e}");
+            }
+        });
+    }
+
+    // Spawn alert consumer task
+    let alert_task = tokio::spawn(async move {
+        while let Some(alert) = alert_rx.recv().await {
+            dispatcher.on_alert(alert);
+        }
+    });
+
+    // Wait for Ctrl+C or SIGTERM
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut sigterm = signal(SignalKind::terminate())
+            .map_err(|e| DebuggerError::Cli(format!("SIGTERM handler: {e}")))?;
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {},
+            _ = sigterm.recv() => {},
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        tokio::signal::ctrl_c()
+            .await
+            .map_err(|e| DebuggerError::Cli(format!("Ctrl+C handler: {e}")))?;
+    }
+
+    eprintln!("[sentinel] Shutting down...");
+
+    // Shutdown service and collect final metrics
+    let final_metrics = metrics.snapshot();
+    service.shutdown().await;
+    alert_task.abort();
+
+    // Print metrics summary
+    let uptime = start_time.elapsed();
+    let total_secs = uptime.as_secs();
+    let days = total_secs / 86400;
+    let hours = (total_secs % 86400) / 3600;
+    let mins = (total_secs % 3600) / 60;
+    let secs = total_secs % 60;
+    let uptime_str = if days > 0 {
+        format!("{days}d {hours}h {mins}m {secs}s")
+    } else if hours > 0 {
+        format!("{hours}h {mins}m {secs}s")
+    } else {
+        format!("{mins}m {secs}s")
+    };
+
+    eprintln!("[sentinel] Shutdown complete.");
+    eprintln!(
+        "[sentinel] blocks_scanned: {}",
+        final_metrics.blocks_scanned
+    );
+    eprintln!("[sentinel] txs_scanned: {}", final_metrics.txs_scanned);
+    eprintln!("[sentinel] txs_flagged: {}", final_metrics.txs_flagged);
+    eprintln!(
+        "[sentinel] alerts_emitted: {}",
+        final_metrics.alerts_emitted
+    );
+    eprintln!("[sentinel] uptime: {uptime_str}");
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(all(test, feature = "sentinel", feature = "autopsy"))]
+mod sentinel_cli_tests {
+    use super::{Args, InputMode};
+    use clap::Parser;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_sentinel_args_basic() {
+        let args = Args::try_parse_from(["argus", "sentinel", "--rpc", "http://localhost:8545"])
+            .expect("basic sentinel args should parse");
+        let InputMode::Sentinel {
+            rpc_url,
+            prefilter_only,
+            metrics_port,
+            poll_interval,
+            alert_file,
+            webhook_url,
+            ..
+        } = args.command
+        else {
+            panic!("expected Sentinel variant");
+        };
+        assert_eq!(rpc_url, "http://localhost:8545");
+        assert!(!prefilter_only);
+        assert_eq!(metrics_port, 9090);
+        assert_eq!(poll_interval, 2);
+        assert!(alert_file.is_none());
+        assert!(webhook_url.is_none());
+    }
+
+    #[test]
+    fn test_sentinel_args_defaults() {
+        let args = Args::try_parse_from([
+            "argus",
+            "sentinel",
+            "--rpc-url",
+            "https://mainnet.infura.io",
+        ])
+        .expect("sentinel args with --rpc-url alias should parse");
+        let InputMode::Sentinel {
+            rpc_url,
+            prefilter_only,
+            metrics_port,
+            poll_interval,
+            ..
+        } = args.command
+        else {
+            panic!("expected Sentinel variant");
+        };
+        assert_eq!(rpc_url, "https://mainnet.infura.io");
+        assert!(!prefilter_only);
+        assert_eq!(metrics_port, 9090);
+        assert_eq!(poll_interval, 2);
+    }
+
+    #[test]
+    fn test_sentinel_args_all_options() {
+        let args = Args::try_parse_from([
+            "argus",
+            "sentinel",
+            "--rpc",
+            "https://eth.example.com",
+            "--alert-file",
+            "/tmp/alerts.jsonl",
+            "--prefilter-only",
+            "--metrics-port",
+            "9100",
+            "--webhook-url",
+            "https://hooks.slack.com/services/XXX",
+            "--poll-interval",
+            "5",
+        ])
+        .expect("sentinel args with all options should parse");
+        let InputMode::Sentinel {
+            rpc_url,
+            alert_file,
+            prefilter_only,
+            metrics_port,
+            webhook_url,
+            poll_interval,
+            ..
+        } = args.command
+        else {
+            panic!("expected Sentinel variant");
+        };
+        assert_eq!(rpc_url, "https://eth.example.com");
+        assert_eq!(alert_file, Some(PathBuf::from("/tmp/alerts.jsonl")));
+        assert!(prefilter_only);
+        assert_eq!(metrics_port, 9100);
+        assert_eq!(
+            webhook_url.as_deref(),
+            Some("https://hooks.slack.com/services/XXX")
+        );
+        assert_eq!(poll_interval, 5);
+    }
 }

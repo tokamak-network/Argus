@@ -8,6 +8,8 @@ pub mod analyzer;
 pub mod auto_pause;
 pub mod config;
 pub mod history;
+#[cfg(all(feature = "sentinel", feature = "autopsy"))]
+pub mod http_metrics;
 pub mod mempool_filter;
 pub mod metrics;
 pub mod ml_model;
