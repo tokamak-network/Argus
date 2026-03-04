@@ -14,7 +14,7 @@ Real-time attack detection, post-hack forensics, and time-travel debugging for E
 
 ## What Argus Does
 
-> All features below have been implemented and tested in synthetic/demo environments. Production validation is in progress — see [Roadmap](docs/ROADMAP.md).
+> All features below have been implemented and tested. Argus is currently running on **Ethereum mainnet** via AWS ECS Fargate — see [Deployment Guide](docs/deployment.md) and [Roadmap](docs/ROADMAP.md).
 
 ### Sentinel — Real-Time Attack Detection
 
@@ -217,21 +217,22 @@ cargo build --all-features
 
 ### Docker
 
-> Docker Hub image is not yet published. For now, build locally:
-
 ```bash
-# Build locally
+# Pull pre-built image
+docker pull tokamak-network/argus:v0.1.3
+
+# Run Sentinel on mainnet
+docker run -d \
+  -e ARGUS_RPC_URL="https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY" \
+  -p 9090:9090 \
+  tokamak-network/argus:v0.1.3
+
+# Or build locally
 docker build -t argus-demo .
-
-# Run the Sentinel demo
 docker run argus-demo
-
-# Run the Autopsy demo
-docker run argus-demo reentrancy_demo
-
-# Run the Dashboard demo
-docker run argus-demo sentinel_dashboard_demo
 ```
+
+For production deployment on AWS ECS Fargate, see [Deployment Guide](docs/deployment.md).
 
 ---
 

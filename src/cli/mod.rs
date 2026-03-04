@@ -94,9 +94,14 @@ pub enum InputMode {
     #[cfg(all(feature = "sentinel", feature = "autopsy"))]
     #[command(name = "sentinel")]
     Sentinel {
-        /// Ethereum RPC endpoint URL (e.g. https://eth-mainnet.g.alchemy.com/v2/KEY)
+        /// Ethereum RPC endpoint URL for block polling (e.g. https://eth.llamarpc.com)
         #[arg(long = "rpc-url", alias = "rpc", short = 'r')]
         rpc_url: String,
+
+        /// Optional archive RPC URL for deep opcode replay (e.g. Alchemy).
+        /// If not set, uses --rpc for both polling and replay.
+        #[arg(long = "archive-rpc")]
+        archive_rpc_url: Option<String>,
 
         /// Optional TOML config file path (overridden by CLI flags)
         #[arg(long, short)]
@@ -153,6 +158,7 @@ pub fn run(args: Args) -> Result<(), DebuggerError> {
         #[cfg(all(feature = "sentinel", feature = "autopsy"))]
         InputMode::Sentinel {
             rpc_url,
+            archive_rpc_url,
             config,
             alert_file,
             prefilter_only,
@@ -161,6 +167,7 @@ pub fn run(args: Args) -> Result<(), DebuggerError> {
             poll_interval,
         } => run_sentinel(
             &rpc_url,
+            archive_rpc_url,
             config,
             alert_file,
             prefilter_only,
@@ -487,33 +494,43 @@ fn run_autopsy(
 #[allow(clippy::too_many_arguments)]
 fn run_sentinel(
     rpc_url: &str,
-    _config: Option<PathBuf>,
+    archive_rpc_url: Option<String>,
+    config: Option<PathBuf>,
     alert_file: Option<PathBuf>,
     prefilter_only: bool,
     metrics_port: u16,
     webhook_url: Option<String>,
     poll_interval: u64,
 ) -> Result<(), DebuggerError> {
+    // Load TOML config (or defaults if no path given)
+    let full_config = crate::sentinel::config::load_config(config.as_ref())
+        .map_err(|e| DebuggerError::Cli(format!("Config error: {e}")))?;
+
     let rt = tokio::runtime::Runtime::new()
         .map_err(|e| DebuggerError::Cli(format!("Failed to create tokio runtime: {e}")))?;
     rt.block_on(run_sentinel_async(
         rpc_url,
+        archive_rpc_url,
         alert_file,
         prefilter_only,
         metrics_port,
         webhook_url,
         poll_interval,
+        full_config,
     ))
 }
 
 #[cfg(all(feature = "sentinel", feature = "autopsy"))]
+#[allow(clippy::too_many_arguments)]
 async fn run_sentinel_async(
     rpc_url: &str,
+    archive_rpc_url: Option<String>,
     alert_file: Option<PathBuf>,
     prefilter_only: bool,
     metrics_port: u16,
     webhook_url: Option<String>,
     poll_interval: u64,
+    full_config: crate::sentinel::config::SentinelFullConfig,
 ) -> Result<(), DebuggerError> {
     use std::time::{Duration, Instant};
 
@@ -524,7 +541,7 @@ async fn run_sentinel_async(
         rpc_poller::RpcPollerConfig,
         rpc_service::{RpcSentinelConfig, RpcSentinelService},
         service::AlertHandler,
-        types::{AnalysisConfig, SentinelAlert},
+        types::SentinelAlert,
     };
 
     let start_time = Instant::now();
@@ -545,19 +562,38 @@ async fn run_sentinel_async(
     );
     eprintln!("[sentinel] Press Ctrl+C to stop.");
 
-    // Build RpcSentinelConfig
+    // Build RpcSentinelConfig from loaded TOML config
+    let analysis_config = full_config.to_analysis_config();
+    let prefilter_config = full_config.to_sentinel_config();
+    eprintln!(
+        "[sentinel] config: suspicion_threshold={:.2}  min_erc20={} prefilter_alert_mode={}",
+        prefilter_config.suspicion_threshold,
+        prefilter_config.min_erc20_transfers,
+        analysis_config.prefilter_alert_mode,
+    );
+    if let Some(ref archive_url) = archive_rpc_url {
+        let masked = if archive_url.len() > 40 {
+            format!(
+                "{}...{}",
+                &archive_url[..40],
+                &archive_url[archive_url.len().saturating_sub(4)..]
+            )
+        } else {
+            archive_url.clone()
+        };
+        eprintln!("[sentinel] archive RPC (deep replay): {masked}");
+    }
     let sentinel_config = RpcSentinelConfig {
         rpc_url: rpc_url.to_string(),
+        archive_rpc_url,
         poller_config: RpcPollerConfig {
             rpc_url: rpc_url.to_string(),
             poll_interval: Duration::from_secs(poll_interval),
             rpc_config: crate::autopsy::rpc_client::RpcConfig::default(),
         },
-        analysis_config: AnalysisConfig {
-            prefilter_alert_mode: true,
-            ..Default::default()
-        },
+        analysis_config,
         prefilter_only,
+        prefilter_config: Some(prefilter_config),
     };
 
     // Build AlertDispatcher: stdout always, optional file + webhook

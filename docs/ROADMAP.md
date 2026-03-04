@@ -78,14 +78,14 @@ Argus의 코드 품질은 높지만, 외부 경쟁력에는 구조적 문제가 
 
 | # | 항목 | 설명 |
 |---|------|------|
-| 2-1 | **Holesky 테스트넷 14일 연속 운영** | RPC 모드로 Holesky에 연결, Sentinel을 14일간 구동. 스캔 블록 수, 의심 TX 수, 탐지 결과 기록 |
-| 2-2 | **탐지 실적 문서화** | "2026년 Q2, Holesky에서 X개 블록 스캔, Y건 의심 TX 탐지, Z건 확인" — 첫 실적 보고서 |
+| 2-1 | **메인넷 14일 연속 운영** | AWS ECS Fargate에서 RPC 모드 Sentinel을 메인넷에 연결, 14일간 구동. 스캔 블록 수, 의심 TX 수, 탐지 결과 기록. [배포 가이드](deployment.md) 참조 |
+| 2-2 | **탐지 실적 문서화** | "2026년 Q2, 메인넷에서 X개 블록 스캔, Y건 의심 TX 탐지, Z건 확인" — 첫 실적 보고서 |
 | 2-3 | **과거 해킹 TX 체계적 리플레이 검증** | Balancer, Bybit, Euler 등 5건 이상의 유명 해킹 TX를 Autopsy에서 실행, 정량 결과(탐지율, 신뢰도, 지연 시간)를 보고서로 작성. Phase 0-6 스모크 테스트와 달리 체계적 벤치마크 |
 | 2-4 | **지연 벤치마크(Latency Benchmark)** | Pre-filter μs/tx, Deep Analyzer ms/tx 수치 측정 및 공개 |
 
 ### 성공 기준
 
-- "Argus detected X suspicious transactions on Holesky testnet over 14 days" — 이 한 문장을 README에 쓸 수 있으면 Phase 2 완료
+- "Argus detected X suspicious transactions on Ethereum mainnet over 14 days" — 이 한 문장을 README에 쓸 수 있으면 Phase 2 완료
 
 ---
 

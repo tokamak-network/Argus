@@ -38,8 +38,12 @@ use super::types::{
 /// Configuration for the RPC-mode sentinel service.
 #[derive(Debug, Clone)]
 pub struct RpcSentinelConfig {
-    /// Ethereum RPC endpoint URL.
+    /// Ethereum RPC endpoint URL (used for block polling and receipt fetching).
     pub rpc_url: String,
+    /// Optional separate archive RPC URL for deep opcode replay.
+    /// When `None`, falls back to `rpc_url`. Use this to keep polling on a free
+    /// public node while routing expensive replay queries to an archive endpoint.
+    pub archive_rpc_url: Option<String>,
     /// Block poller configuration (poll interval, timeouts, retries).
     pub poller_config: RpcPollerConfig,
     /// Deep analysis configuration (step limits, confidence thresholds).
@@ -47,6 +51,9 @@ pub struct RpcSentinelConfig {
     /// When true, skip deep RPC replay and emit alerts from pre-filter results only.
     /// Use this with standard full nodes that don't have archive state.
     pub prefilter_only: bool,
+    /// Pre-filter heuristic thresholds (suspicion threshold, min ERC-20 transfers, etc.).
+    /// When `None`, uses `SentinelConfig::default()`.
+    pub prefilter_config: Option<SentinelConfig>,
 }
 
 impl RpcSentinelConfig {
@@ -56,12 +63,14 @@ impl RpcSentinelConfig {
         let poller_config = RpcPollerConfig::new(rpc_url.clone());
         Self {
             rpc_url,
+            archive_rpc_url: None,
             poller_config,
             analysis_config: AnalysisConfig {
                 prefilter_alert_mode: true, // emit alerts even without deep analysis
                 ..Default::default()
             },
             prefilter_only: false,
+            prefilter_config: None,
         }
     }
 }
@@ -133,9 +142,13 @@ async fn service_loop(
     let poller = RpcBlockPoller::new(config.poller_config);
     let mut block_rx = poller.start().await;
 
-    let sentinel_config = SentinelConfig::default();
+    let sentinel_config = config.prefilter_config.clone().unwrap_or_default();
     let pre_filter = PreFilter::new(sentinel_config);
-    let rpc_url = config.rpc_url.clone();
+    // Use archive_rpc_url for deep replay if provided, otherwise fall back to rpc_url
+    let replay_rpc_url = config
+        .archive_rpc_url
+        .clone()
+        .unwrap_or_else(|| config.rpc_url.clone());
     let analysis_config = config.analysis_config.clone();
     let prefilter_only = config.prefilter_only;
 
@@ -157,7 +170,7 @@ async fn service_loop(
                     &rpc_receipts,
                     ProcessContext {
                         pre_filter: &pre_filter,
-                        rpc_url: &rpc_url,
+                        rpc_url: &replay_rpc_url,
                         analysis_config: &analysis_config,
                         prefilter_only,
                         alert_tx: &alert_tx,
@@ -209,12 +222,20 @@ async fn process_rpc_block(
 
     // Stage 1: Pre-filter (receipt-based heuristics)
     let prefilter_start = Instant::now();
-    let suspicious_txs = pre_filter.scan_block(
+    let mut suspicious_txs = pre_filter.scan_block(
         &ethrex_block.body.transactions,
         &ethrex_receipts,
         &ethrex_block.header,
     );
     let prefilter_us = prefilter_start.elapsed().as_micros() as u64;
+
+    // Fix TX hashes: ethrex recomputes hash from RLP (missing v/r/s signatures),
+    // so we overwrite with the original hash from the RPC response.
+    for suspicion in &mut suspicious_txs {
+        if let Some(rpc_tx) = rpc_block.transactions.get(suspicion.tx_index) {
+            suspicion.tx_hash = rpc_tx.hash;
+        }
+    }
     metrics.add_prefilter_us(prefilter_us);
     metrics.increment_txs_flagged(suspicious_txs.len() as u64);
 

@@ -9,7 +9,7 @@ Built with Rust, powered by ethrex LEVM.
 
 ```bash
 cargo check                                    # Compile check
-cargo test                                     # Run 366 tests
+cargo test                                     # Run 397 tests
 cargo clippy --all-features -- -D warnings     # Lint (warnings = errors)
 cargo fmt --check                              # Format check
 
@@ -22,9 +22,16 @@ cargo run --example sentinel_rpc_demo          # RPC-mode Sentinel (any RPC endp
 # CLI debugger
 cargo run --bin argus --features cli
 
+# Sentinel with dual-RPC (polling on free node, deep replay on archive)
+cargo run --bin argus --features cli -- sentinel \
+  --rpc https://mainnet.infura.io/v3/KEY \
+  --archive-rpc https://eth-mainnet.g.alchemy.com/v2/KEY
+
 # Docker
 docker build -t argus-demo .
 docker run argus-demo
+
+# ECS Fargate deployment — see docs/deployment.md
 ```
 
 **Rust 1.85+ required** (edition 2024).
@@ -66,7 +73,7 @@ src/
 │   ├── abi_decoder.rs  #   Function/event decoding
 │   └── enrichment.rs   #   Contract label enrichment
 ├── cli/                # Interactive GDB-style debugger
-└── tests/              # Test suite (366 tests)
+└── tests/              # Test suite (397 tests)
 
 dashboard/              # Web UI (Astro + React + Recharts)
 examples/               # 4 runnable demos

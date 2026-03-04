@@ -36,6 +36,7 @@ async fn main() {
 
     let config = RpcSentinelConfig {
         rpc_url: rpc_url.clone(),
+        archive_rpc_url: None,
         poller_config: RpcPollerConfig {
             rpc_url: rpc_url.clone(),
             poll_interval: Duration::from_secs(2),
@@ -46,6 +47,7 @@ async fn main() {
             ..Default::default()
         },
         prefilter_only: true, // safe default — works with any node type
+        prefilter_config: None,
     };
 
     let (alert_tx, mut alert_rx) = mpsc::channel::<SentinelAlert>(64);
