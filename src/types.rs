@@ -76,7 +76,7 @@ impl StepRecord {
 }
 
 /// Complete execution trace from a transaction replay.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ReplayTrace {
     /// All recorded steps.
     pub steps: Vec<StepRecord>,
