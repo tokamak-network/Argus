@@ -151,6 +151,7 @@ impl AnalysisContext {
             #[cfg(feature = "autopsy")]
             fund_flows: self.fund_flows.clone(),
             total_value_at_risk,
+            whitelist_matches: suspicion.whitelist_matches,
             summary,
             total_steps,
             feature_vector: self.features.clone(),
@@ -879,6 +880,7 @@ mod tests {
             reasons: vec![],
             score: 0.5,
             priority: AlertPriority::Medium,
+            whitelist_matches: 0,
         };
         let config = AnalysisConfig::default();
 
@@ -959,6 +961,7 @@ mod tests {
             reasons: vec![],
             score: 0.5,
             priority: AlertPriority::Medium,
+            whitelist_matches: 0,
         };
         let config = AnalysisConfig {
             min_alert_confidence: 0.0,
@@ -1010,6 +1013,7 @@ mod tests {
             reasons: vec![],
             score: 0.5,
             priority: AlertPriority::Medium,
+            whitelist_matches: 0,
         };
         let config = AnalysisConfig {
             min_alert_confidence: 0.0,
@@ -1037,6 +1041,7 @@ mod tests {
             reasons: vec![],
             score: 0.8,
             priority: AlertPriority::High,
+            whitelist_matches: 0,
         };
         let config = AnalysisConfig::default();
         let store = Store::new("test-conf", EngineType::InMemory).unwrap();
@@ -1110,6 +1115,7 @@ mod tests {
             reasons: vec![],
             score: 0.5,
             priority: AlertPriority::Medium,
+            whitelist_matches: 0,
         };
         let config = AnalysisConfig {
             min_alert_confidence: 0.0,
@@ -1176,6 +1182,7 @@ mod tests {
             reasons: vec![],
             score: 0.5,
             priority: AlertPriority::Medium,
+            whitelist_matches: 0,
         };
         let config = AnalysisConfig::default();
 

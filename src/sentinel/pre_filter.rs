@@ -8,6 +8,7 @@ use ethrex_common::{Address, U256};
 use rustc_hash::FxHashSet;
 
 use super::types::*;
+use super::whitelist::WhitelistEngine;
 
 /// ERC-20 Transfer(address,address,uint256) event topic prefix (first 4 bytes).
 const TRANSFER_TOPIC_PREFIX: [u8; 4] = [0xdd, 0xf2, 0x52, 0xad];
@@ -131,11 +132,18 @@ pub struct PreFilter {
     address_labels: Vec<(Address, &'static str)>,
     oracle_addresses: FxHashSet<Address>,
     dex_addresses: FxHashSet<Address>,
+    /// DeFi protocol whitelist for false-positive reduction.
+    whitelist: WhitelistEngine,
 }
 
 impl PreFilter {
-    /// Create a new pre-filter with the given configuration.
+    /// Create a new pre-filter with the given configuration and an empty whitelist.
     pub fn new(config: SentinelConfig) -> Self {
+        Self::with_whitelist(config, WhitelistEngine::empty())
+    }
+
+    /// Create a new pre-filter with the given configuration and whitelist engine.
+    pub fn with_whitelist(config: SentinelConfig, whitelist: WhitelistEngine) -> Self {
         let flash_loan_prefixes = vec![FLASH_LOAN_AAVE, FLASH_LOAN_BALANCER, FLASH_LOAN_UNISWAP_V3];
 
         let db = known_address_db();
@@ -161,6 +169,7 @@ impl PreFilter {
             address_labels,
             oracle_addresses,
             dex_addresses,
+            whitelist,
         }
     }
 
@@ -240,7 +249,31 @@ impl PreFilter {
             return None;
         }
 
-        let score: f64 = reasons.iter().map(|r| r.score()).sum();
+        let base_score: f64 = reasons.iter().map(|r| r.score()).sum();
+
+        // --- Whitelist layer ---
+        // Collect all addresses involved in this TX (target + log emitters)
+        let mut involved_addresses = Vec::new();
+        if let TxKind::Call(to_addr) = tx.to() {
+            involved_addresses.push(to_addr);
+        }
+        for log in &receipt.logs {
+            involved_addresses.push(log.address);
+        }
+
+        let (wl_matches, wl_modifier) = self.whitelist.check_addresses(&involved_addresses);
+        let whitelist_match_count = wl_matches.len() as u32;
+
+        let score = (base_score + wl_modifier).clamp(0.0, 1.0);
+
+        // FlashLoanSignature alone cannot trigger alert — requires at least
+        // one other reason type to produce a meaningful signal
+        let only_flash_loan =
+            reasons.len() == 1 && matches!(reasons[0], SuspicionReason::FlashLoanSignature { .. });
+        if only_flash_loan {
+            return None;
+        }
+
         if score < self.config.suspicion_threshold {
             return None;
         }
@@ -252,6 +285,7 @@ impl PreFilter {
             reasons,
             score,
             priority,
+            whitelist_matches: whitelist_match_count,
         })
     }
 

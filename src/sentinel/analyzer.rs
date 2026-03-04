@@ -120,6 +120,7 @@ impl DeepAnalyzer {
             #[cfg(feature = "autopsy")]
             fund_flows,
             total_value_at_risk,
+            whitelist_matches: suspicion.whitelist_matches,
             summary,
             total_steps,
             feature_vector: None,

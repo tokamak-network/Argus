@@ -34,6 +34,7 @@ use super::rpc_types::{rpc_block_to_ethrex, rpc_receipt_to_ethrex};
 use super::types::{
     AlertPriority, AnalysisConfig, SentinelAlert, SentinelConfig, SuspicionReason, SuspiciousTx,
 };
+use super::whitelist::WhitelistEngine;
 
 /// Configuration for the RPC-mode sentinel service.
 #[derive(Debug, Clone)]
@@ -54,6 +55,9 @@ pub struct RpcSentinelConfig {
     /// Pre-filter heuristic thresholds (suspicion threshold, min ERC-20 transfers, etc.).
     /// When `None`, uses `SentinelConfig::default()`.
     pub prefilter_config: Option<SentinelConfig>,
+    /// DeFi protocol whitelist engine for false-positive reduction.
+    /// When `None`, no whitelist is applied.
+    pub whitelist: Option<WhitelistEngine>,
 }
 
 impl RpcSentinelConfig {
@@ -71,6 +75,7 @@ impl RpcSentinelConfig {
             },
             prefilter_only: false,
             prefilter_config: None,
+            whitelist: None,
         }
     }
 }
@@ -143,7 +148,10 @@ async fn service_loop(
     let mut block_rx = poller.start().await;
 
     let sentinel_config = config.prefilter_config.clone().unwrap_or_default();
-    let pre_filter = PreFilter::new(sentinel_config);
+    let pre_filter = match config.whitelist.clone() {
+        Some(engine) => PreFilter::with_whitelist(sentinel_config, engine),
+        None => PreFilter::new(sentinel_config),
+    };
     // Use archive_rpc_url for deep replay if provided, otherwise fall back to rpc_url
     let replay_rpc_url = config
         .archive_rpc_url
@@ -351,6 +359,7 @@ fn build_alert_base(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelA
         #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: ethrex_common::U256::zero(),
+        whitelist_matches: suspicion.whitelist_matches,
         summary: String::new(),
         total_steps: 0,
         feature_vector: None,
@@ -597,6 +606,7 @@ mod tests {
             reasons: vec![SuspicionReason::SelfDestructDetected],
             score: 0.8,
             priority: AlertPriority::High,
+            whitelist_matches: 0,
         };
 
         let alert = build_prefilter_alert(&rpc_block, &suspicion);
@@ -617,6 +627,7 @@ mod tests {
             reasons: vec![SuspicionReason::MultipleErc20Transfers { count: 10 }],
             score: 0.75,
             priority: AlertPriority::High,
+            whitelist_matches: 0,
         };
 
         let alert = build_deep_alert(&rpc_block, &suspicion, 5000, true);

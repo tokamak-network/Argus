@@ -28,6 +28,7 @@ pub mod service;
 pub mod types;
 #[cfg(feature = "autopsy")]
 pub mod webhook;
+pub mod whitelist;
 pub mod ws_broadcaster;
 
 #[cfg(test)]

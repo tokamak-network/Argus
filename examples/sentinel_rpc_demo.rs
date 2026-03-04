@@ -48,6 +48,7 @@ async fn main() {
         },
         prefilter_only: true, // safe default — works with any node type
         prefilter_config: None,
+        whitelist: None,
     };
 
     let (alert_tx, mut alert_rx) = mpsc::channel::<SentinelAlert>(64);

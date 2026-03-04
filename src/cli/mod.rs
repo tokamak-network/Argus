@@ -583,6 +583,13 @@ async fn run_sentinel_async(
         };
         eprintln!("[sentinel] archive RPC (deep replay): {masked}");
     }
+    // Build whitelist engine from TOML config
+    let whitelist_engine = full_config.to_whitelist_engine();
+    let wl_count = whitelist_engine.len();
+    if wl_count > 0 {
+        eprintln!("[sentinel] Loaded {wl_count} whitelist entries");
+    }
+
     let sentinel_config = RpcSentinelConfig {
         rpc_url: rpc_url.to_string(),
         archive_rpc_url,
@@ -594,6 +601,11 @@ async fn run_sentinel_async(
         analysis_config,
         prefilter_only,
         prefilter_config: Some(prefilter_config),
+        whitelist: if whitelist_engine.is_empty() {
+            None
+        } else {
+            Some(whitelist_engine)
+        },
     };
 
     // Clone alert_file path for the HTTP history endpoint before it's consumed

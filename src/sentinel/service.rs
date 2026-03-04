@@ -187,6 +187,7 @@ impl SentinelService {
                         #[cfg(feature = "autopsy")]
                         fund_flows: vec![],
                         total_value_at_risk: ethrex_common::U256::zero(),
+                        whitelist_matches: 0,
                         summary: format!(
                             "Mempool alert: {} reasons (score={:.2})",
                             alert.reasons.len(),
@@ -293,6 +294,7 @@ impl SentinelService {
             #[cfg(feature = "autopsy")]
             fund_flows: vec![],
             total_value_at_risk: ethrex_common::U256::zero(),
+            whitelist_matches: suspicion.whitelist_matches,
             summary: format!(
                 "Pre-filter alert: {} (score={:.2})",
                 reason_names.join(", "),

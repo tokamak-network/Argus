@@ -101,6 +101,7 @@ mod tests {
             #[cfg(feature = "autopsy")]
             fund_flows: vec![],
             total_value_at_risk: U256::zero(),
+            whitelist_matches: 0,
             summary: "test alert".to_string(),
             total_steps: 0,
             feature_vector: None,

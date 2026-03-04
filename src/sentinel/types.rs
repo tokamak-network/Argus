@@ -42,6 +42,9 @@ pub struct SuspiciousTx {
     pub reasons: Vec<SuspicionReason>,
     pub score: f64,
     pub priority: AlertPriority,
+    /// Number of whitelist entries that matched addresses in this TX.
+    #[serde(default)]
+    pub whitelist_matches: u32,
 }
 
 /// Reason why a transaction was flagged.
@@ -87,19 +90,19 @@ impl SuspicionReason {
 /// Alert priority derived from combined suspicion score.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum AlertPriority {
-    /// Score >= 0.3 but < 0.5
+    /// Score >= 0.3 but < 0.65
     Medium,
-    /// Score >= 0.5 but < 0.8
+    /// Score >= 0.65 but < 0.85
     High,
-    /// Score >= 0.8
+    /// Score >= 0.85
     Critical,
 }
 
 impl AlertPriority {
     pub fn from_score(score: f64) -> Self {
-        if score >= 0.8 {
+        if score >= 0.85 {
             Self::Critical
-        } else if score >= 0.5 {
+        } else if score >= 0.65 {
             Self::High
         } else {
             Self::Medium
@@ -151,6 +154,9 @@ pub struct SentinelAlert {
     pub fund_flows: Vec<FundFlow>,
     /// Total value at risk across all fund flows.
     pub total_value_at_risk: U256,
+    /// Number of whitelist matches that contributed to score reduction.
+    #[serde(default)]
+    pub whitelist_matches: u32,
     /// Human-readable summary.
     pub summary: String,
     /// Number of opcode steps recorded during replay.
