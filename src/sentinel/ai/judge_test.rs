@@ -128,7 +128,6 @@ mod tests {
                 fail_on_call: Some(fail_on),
             }
         }
-
     }
 
     impl AiClient for CountingMockClient {
