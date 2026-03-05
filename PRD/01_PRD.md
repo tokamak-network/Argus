@@ -61,11 +61,13 @@ TX 수신 → Pre-Filter → 화이트리스트 체크 → 다단계 매핑 → 
 
 ### 상세 흐름
 1. **Pre-Filter (기존)**: receipt 기반 휴리스틱 (flash loan, ERC20 전송, gas 패턴)
-2. **화이트리스트 체크 (신규)**: TOML에 등록된 DeFi 주소와 매칭 → score_modifier 적용
-3. **다단계 매핑 (신규)**: 각 suspicion_reason을 AttackStage에 매핑, 확인된 단계 수로 priority 재계산
-4. **Profit 분석 (신규)**: fund_flow에서 자금 순환 패턴 분석 → circular(arb)이면 감점, drain이면 가점
+2. **화이트리스트 체크 (Phase 1 구현 완료)**: TOML에 등록된 DeFi 주소와 매칭 → score_modifier 적용
+3. **다단계 매핑 (Phase 2 예정)**: 각 suspicion_reason을 AttackStage에 매핑, 확인된 단계 수로 priority 재계산
+4. **Profit 분석 (Phase 2 예정)**: fund_flow에서 자금 순환 패턴 분석 → circular(arb)이면 감점, drain이면 가점
 5. **Score 재계산**: 화이트리스트 감점 + 단계 수 + profit 분석 → 최종 suspicion_score
 6. **Alert 발행**: threshold(0.85) 이상만 Critical로 발행
+
+> Scoring 알고리즘 상세: [04_PROJECT_SPEC.md](./04_PROJECT_SPEC.md#scoring-알고리즘-변경-후)
 
 ---
 
@@ -92,10 +94,19 @@ TX 수신 → Pre-Filter → 화이트리스트 체크 → 다단계 매핑 → 
 
 ---
 
-## 7. [NEEDS CLARIFICATION]
+## 7. 결정 완료 사항 (Phase 1)
 
-> 아직 결정되지 않은 사항. 개발 전에 정해야 합니다.
+> Phase 1 구현 시 결정된 항목.
 
-- [ ] Balancer Vault 외에 초기 화이트리스트에 포함할 프로토콜 목록 (Aave V3, Uniswap V3, Curve, Compound?)
-- [ ] score_modifier 값 결정: -0.3 (소폭 감점) vs -0.5 (강한 감점) vs 프로토콜별 차등
+- [x] **초기 화이트리스트 프로토콜**: TOML 설정 기반. 운영자가 자유롭게 추가/제거 가능. 예시: Balancer Vault, Aave V3, Uniswap SwapRouter02
+- [x] **score_modifier 방식**: 프로토콜별 차등 (TOML `score_modifier` 필드, -1.0 ~ 0.0 범위). 예: Balancer -0.4, Uniswap -0.3
+- [x] **FlashLoan 단독 트리거 제거**: FlashLoanSignature만으로는 알림 발생하지 않음 (최소 1개 추가 reason 필요)
+- [x] **AlertPriority 임계값 상향**: Critical >= 0.85, High >= 0.65
+
+## 8. [NEEDS CLARIFICATION] (Phase 2-3)
+
+> Phase 2-3에서 결정할 사항.
+
 - [ ] Historical labeling용 "정상 TX" 데이터셋 수집 범위 (최근 7일? 30일?)
+- [ ] 다단계 매핑의 stage_multiplier 값 (초기값 0.6/1.0/1.3 — 백테스트 후 조정 예정)
+- [ ] ProfitFlow에서 "circular" 판정의 hop depth 제한 (1-hop? 3-hop?)

@@ -151,7 +151,7 @@ impl SentinelFullConfig {
             }
             if !matches!(
                 entry.category.as_str(),
-                "FlashLoan" | "DEX" | "Lending" | "Bridge"
+                "FlashLoan" | "DEX" | "Dex" | "Lending" | "Bridge"
             ) {
                 return Err(format!(
                     "whitelist.entries[{}].category must be one of FlashLoan/DEX/Lending/Bridge, got '{}'",
@@ -206,6 +206,12 @@ impl WhitelistEntryToml {
     /// Returns an error string if the address hex is invalid or the category
     /// is not recognised.
     fn to_whitelist_entry(&self) -> Result<WhitelistEntry, String> {
+        if self.score_modifier > 0.0 || self.score_modifier < -1.0 {
+            return Err(format!(
+                "score_modifier must be in [-1.0, 0.0], got {}",
+                self.score_modifier
+            ));
+        }
         let address = parse_hex_address(&self.address)?;
         let category = parse_whitelist_category(&self.category)?;
         Ok(WhitelistEntry {
@@ -896,5 +902,45 @@ suspicion_threshold = 0.5
         let config = SentinelFullConfig::default();
         let engine = config.to_whitelist_engine();
         assert!(engine.is_empty());
+    }
+
+    #[test]
+    fn to_whitelist_engine_rejects_positive_score_modifier() {
+        let config = SentinelFullConfig {
+            whitelist: WhitelistTomlConfig {
+                entries: vec![WhitelistEntryToml {
+                    address: "0xBA12222222228d8Ba445958a75a0704d566BF2C8".to_string(),
+                    protocol: "Bad Modifier".to_string(),
+                    category: "FlashLoan".to_string(),
+                    score_modifier: 0.5, // positive — should be rejected
+                }],
+            },
+            ..Default::default()
+        };
+
+        let engine = config.to_whitelist_engine();
+        assert!(
+            engine.is_empty(),
+            "Positive score_modifier entry should be skipped"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_dex_lowercase_variant() {
+        let config = SentinelFullConfig {
+            whitelist: WhitelistTomlConfig {
+                entries: vec![WhitelistEntryToml {
+                    address: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45".to_string(),
+                    protocol: "Uniswap".to_string(),
+                    category: "Dex".to_string(),
+                    score_modifier: -0.3,
+                }],
+            },
+            ..Default::default()
+        };
+        assert!(
+            config.validate().is_ok(),
+            "'Dex' should be accepted by validate()"
+        );
     }
 }

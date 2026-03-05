@@ -350,6 +350,7 @@ fn demo_3_mempool_monitoring() {
         analysis_config,
         Box::new(handler),
         Some(mempool_config),
+        argus::sentinel::whitelist::WhitelistEngine::empty(),
     );
 
     let sender = Address::from_low_u64_be(0xABCD);

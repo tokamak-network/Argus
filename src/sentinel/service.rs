@@ -24,6 +24,7 @@ use super::analyzer::DeepAnalyzer;
 use super::metrics::SentinelMetrics;
 use super::pre_filter::PreFilter;
 use super::types::{AlertPriority, AnalysisConfig, SentinelAlert, SentinelConfig, SuspiciousTx};
+use super::whitelist::WhitelistEngine;
 
 use super::types::MempoolAlert;
 
@@ -87,16 +88,24 @@ impl SentinelService {
         analysis_config: AnalysisConfig,
         alert_handler: Box<dyn AlertHandler>,
     ) -> Self {
-        Self::with_mempool(store, config, analysis_config, alert_handler, None)
+        Self::with_mempool(
+            store,
+            config,
+            analysis_config,
+            alert_handler,
+            None,
+            WhitelistEngine::empty(),
+        )
     }
 
-    /// Create a sentinel service with optional mempool monitoring.
+    /// Create a sentinel service with optional mempool monitoring and whitelist.
     pub fn with_mempool(
         store: Store,
         config: SentinelConfig,
         analysis_config: AnalysisConfig,
         alert_handler: Box<dyn AlertHandler>,
         mempool_config: Option<MempoolMonitorConfig>,
+        whitelist: WhitelistEngine,
     ) -> Self {
         let (sender, receiver) = mpsc::channel();
         let metrics = Arc::new(SentinelMetrics::new());
@@ -112,6 +121,7 @@ impl SentinelService {
                     analysis_config,
                     alert_handler,
                     worker_metrics,
+                    whitelist,
                 );
             })
             .expect("Failed to spawn sentinel worker thread");
@@ -153,8 +163,9 @@ impl SentinelService {
         analysis_config: AnalysisConfig,
         alert_handler: Box<dyn AlertHandler>,
         metrics: Arc<SentinelMetrics>,
+        whitelist: WhitelistEngine,
     ) {
-        let pre_filter = PreFilter::new(config);
+        let pre_filter = PreFilter::with_whitelist(config, whitelist);
         let pipeline = super::pipeline::AnalysisPipeline::default_pipeline();
 
         while let Ok(msg) = receiver.recv() {

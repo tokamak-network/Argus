@@ -144,6 +144,7 @@ elif len(stages_confirmed) == 2:
     stage_multiplier = 1.0   # 2단계 → 유지
 elif len(stages_confirmed) >= 3:
     stage_multiplier = 1.3   # 3단계+ → 가점
+# NOTE: 초기값. Phase 3 Historical Labeling 백테스트 결과로 조정 예정.
 
 # Phase 2: Profit 보정
 if profit_flow.is_circular:
@@ -163,8 +164,13 @@ else:                     Medium
 
 ---
 
-## [NEEDS CLARIFICATION]
+## 결정 완료 (Phase 1)
 
-- [ ] 화이트리스트 로드 시점: Sentinel 시작 시 1회 vs 주기적 리로드
+- [x] 화이트리스트 로드 시점: **Sentinel 시작 시 1회** (TOML → WhitelistEngine 변환)
+- [x] 화이트리스트 로드 실패 시: 개별 entry skip + eprintln 경고, 전체 실패하지 않음
+
+## [NEEDS CLARIFICATION] (Phase 2-3)
+
+- [ ] 주기적 화이트리스트 리로드 (hot reload) 필요 여부
 - [ ] ProfitFlow에서 "circular" 판정의 hop depth 제한 (1-hop? 3-hop?)
 - [ ] Stage 매핑이 확정되지 않은 새 SuspicionReason 타입이 추가될 때의 기본 stage

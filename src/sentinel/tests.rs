@@ -2924,9 +2924,15 @@ mod whitelist_integration_tests {
         let tx = call_tx_wl(attacker_wl(), U256::zero(), 1_000_000);
 
         let result = filter.scan_tx(&tx, &receipt, 0, &header_wl(20_000_000));
-        assert!(result.is_some(), "Unknown attacker flash loan must remain flagged");
+        assert!(
+            result.is_some(),
+            "Unknown attacker flash loan must remain flagged"
+        );
         let stx = result.unwrap();
-        assert_eq!(stx.whitelist_matches, 0, "No whitelist matches for unknown address");
+        assert_eq!(
+            stx.whitelist_matches, 0,
+            "No whitelist matches for unknown address"
+        );
     }
 
     // Test 3: FlashLoanSignature alone never triggers alert
@@ -3029,7 +3035,10 @@ mod whitelist_integration_tests {
         let tx = call_tx_wl(attacker_wl(), U256::zero(), 1_000_000);
 
         let result = filter.scan_tx(&tx, &receipt, 0, &header_wl(20_000_000));
-        assert!(result.is_some(), "Empty whitelist fallback must not prevent normal detection");
+        assert!(
+            result.is_some(),
+            "Empty whitelist fallback must not prevent normal detection"
+        );
         assert_eq!(result.unwrap().whitelist_matches, 0);
     }
 
@@ -3045,7 +3054,9 @@ mod whitelist_integration_tests {
             }],
         });
 
-        let m = engine.check_address(&balancer_vault_wl()).expect("must match");
+        let m = engine
+            .check_address(&balancer_vault_wl())
+            .expect("must match");
         assert_eq!(m.category, WhitelistCategory::FlashLoan);
         assert_eq!(m.protocol, "Balancer Vault");
         assert!((m.score_modifier - (-0.4)).abs() < f64::EPSILON);
@@ -3063,7 +3074,9 @@ mod whitelist_integration_tests {
             }],
         });
 
-        let m = engine.check_address(&uniswap_router_wl()).expect("must match");
+        let m = engine
+            .check_address(&uniswap_router_wl())
+            .expect("must match");
         assert_eq!(m.category, WhitelistCategory::DEX);
         assert!((m.score_modifier - (-0.3)).abs() < f64::EPSILON);
     }
@@ -3116,7 +3129,10 @@ mod whitelist_integration_tests {
         let tx = call_tx_wl(attacker_wl(), U256::zero(), 1_000_000);
 
         let result = filter.scan_tx(&tx, &receipt, 0, &header_wl(20_000_000));
-        assert!(result.is_none(), "Score clamped to 0.0 must not produce alert");
+        assert!(
+            result.is_none(),
+            "Score clamped to 0.0 must not produce alert"
+        );
     }
 
     // Test 11: score cannot exceed 1.0 (upper clamp)
@@ -3143,7 +3159,11 @@ mod whitelist_integration_tests {
         let result = filter.scan_tx(&tx, &receipt, 0, &header_wl(20_000_000));
         assert!(result.is_some(), "High-signal TX should be flagged");
         let stx = result.unwrap();
-        assert!(stx.score <= 1.0, "Score must not exceed 1.0, got {}", stx.score);
+        assert!(
+            stx.score <= 1.0,
+            "Score must not exceed 1.0, got {}",
+            stx.score
+        );
     }
 
     // Test 12: TOML parsing — spec format parsed correctly
@@ -3200,13 +3220,35 @@ entries = [
         let tx = call_tx_wl(balancer_vault_wl(), U256::zero(), 1_000_000);
 
         let result = filter.scan_tx(&tx, &receipt, 0, &header_wl(20_000_000));
-        if let Some(stx) = result {
-            assert_eq!(
-                stx.whitelist_matches, 2,
-                "Should count 2 unique whitelisted addresses (Balancer + Aave)"
-            );
+        // With threshold 0.01, the whitelist reduction may drop score below threshold.
+        // Either way, verify the outcome is deterministic:
+        match result {
+            Some(stx) => {
+                assert_eq!(
+                    stx.whitelist_matches, 2,
+                    "Should count 2 unique whitelisted addresses (Balancer + Aave)"
+                );
+            }
+            None => {
+                // Score reduced below threshold by whitelist — verify by running
+                // without whitelist to confirm the TX is inherently suspicious.
+                let bare_filter = PreFilter::new(SentinelConfig {
+                    suspicion_threshold: 0.01,
+                    min_erc20_transfers: 1,
+                    ..Default::default()
+                });
+                let flash_log2 = log_wl(balancer_vault_wl(), vec![balancer_flash_wl()]);
+                let aave2a = erc20_log_wl(aave_v3_wl());
+                let aave2b = erc20_log_wl(aave_v3_wl());
+                let receipt2 = receipt_wl(true, 500_000, vec![flash_log2, aave2a, aave2b]);
+                let tx2 = call_tx_wl(balancer_vault_wl(), U256::zero(), 1_000_000);
+                let bare_result = bare_filter.scan_tx(&tx2, &receipt2, 0, &header_wl(20_000_000));
+                assert!(
+                    bare_result.is_some(),
+                    "TX should be suspicious without whitelist — confirms whitelist reduced score"
+                );
+            }
         }
-        // If None: score reduced below threshold — whitelist is working correctly
     }
 
     // Test 15: SuspiciousTx with whitelist_matches serializes correctly
@@ -3226,8 +3268,14 @@ entries = [
         };
 
         let json = serde_json::to_string(&stx).expect("SuspiciousTx should serialize");
-        assert!(json.contains("whitelist_matches"), "whitelist_matches must appear in JSON");
-        assert!(json.contains("FlashLoanSignature"), "reason must be preserved");
+        assert!(
+            json.contains("whitelist_matches"),
+            "whitelist_matches must appear in JSON"
+        );
+        assert!(
+            json.contains("FlashLoanSignature"),
+            "reason must be preserved"
+        );
 
         let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
         assert_eq!(parsed["whitelist_matches"], 3);
@@ -3253,7 +3301,8 @@ entries = [
             "Old JSON without whitelist_matches must deserialize successfully"
         );
         assert_eq!(
-            result.unwrap().whitelist_matches, 0,
+            result.unwrap().whitelist_matches,
+            0,
             "Missing whitelist_matches must default to 0 via #[serde(default)]"
         );
     }
