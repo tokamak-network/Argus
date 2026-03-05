@@ -7,6 +7,7 @@ pub mod abi_decoder;
 pub mod classifier;
 pub mod enrichment;
 pub mod fund_flow;
+pub mod labels;
 pub mod metrics;
 pub mod remote_db;
 pub mod report;
