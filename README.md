@@ -178,7 +178,7 @@ Read the full analysis: [docs/analysis-bybit-1.4b-exploit.md](docs/analysis-bybi
 | Multi-chain | No | Yes (7+) | Yes | Yes (109) | Yes |
 | Production track record | **Mainnet scanning (since Mar 2026)** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
 
-> Argus is early-stage but running on Ethereum mainnet via AWS ECS Fargate. Its primary differentiator is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
+> Argus is early-stage but running on Ethereum mainnet via AWS ECS Fargate. 14-day validation: ~100K blocks, ~20M TXs scanned, zero downtime, $7/month — see [operations report](docs/mainnet-report-march-2026.md). Its primary differentiator is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
 
 ---
 
