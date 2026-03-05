@@ -286,6 +286,7 @@ mod tests {
                 storage_writes: None,
                 log_topics: None,
                 log_data: None,
+                call_input_selector: None,
             }],
             config: ReplayConfig::default(),
             gas_used: 21_000,

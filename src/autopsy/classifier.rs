@@ -6,19 +6,26 @@
 use ethrex_common::{Address, U256};
 use rustc_hash::FxHashMap;
 
+use crate::opcodes::{
+    OP_CALL, OP_CALLCODE, OP_CALLER, OP_DELEGATECALL, OP_LOG3, OP_SLOAD, OP_SSTORE, OP_STATICCALL,
+};
 use crate::types::StepRecord;
 
 use super::types::{AttackPattern, DetectedPattern};
 
-// Opcode constants
-const OP_SLOAD: u8 = 0x54;
-const OP_SSTORE: u8 = 0x55;
-const OP_CALL: u8 = 0xF1;
-const OP_CALLCODE: u8 = 0xF2;
-const OP_DELEGATECALL: u8 = 0xF4;
-const OP_STATICCALL: u8 = 0xFA;
-const OP_CALLER: u8 = 0x33;
-const OP_LOG3: u8 = 0xA3;
+// ── Threshold & confidence constants ─────────────────────────────────
+
+/// Minimum fraction of steps at depth > entry+1 to trigger callback-based
+/// flash loan detection (Strategy 3). Lowered from 0.6 to 0.4 based on
+/// Balancer mainnet profiles where setup/cleanup dilutes the deep ratio.
+const CALLBACK_DEPTH_THRESHOLD: f64 = 0.4;
+
+/// Confidence tiers for flash loan scoring.
+const CONFIDENCE_AMOUNT_AND_SSTORE: f64 = 0.9;
+const CONFIDENCE_TOKEN_PROVIDER_SSTORE: f64 = 0.85;
+const CONFIDENCE_PROVIDER_SSTORE: f64 = 0.8;
+const CONFIDENCE_SSTORE_ONLY: f64 = 0.6;
+const CONFIDENCE_NO_EVIDENCE: f64 = 0.4;
 
 /// Stateless attack pattern classifier.
 pub struct AttackClassifier;
@@ -173,7 +180,17 @@ impl AttackClassifier {
         patterns.extend(Self::detect_flash_loan_erc20(steps));
 
         // === Strategy 3: Callback-based flash loan ===
-        patterns.extend(Self::detect_flash_loan_callback(steps));
+        // Only add callback patterns if they don't overlap with an existing
+        // detection. Two patterns "overlap" when their borrow→repay ranges
+        // intersect, meaning they describe the same logical flash loan.
+        for candidate in Self::detect_flash_loan_callback(steps) {
+            let dominated = patterns
+                .iter()
+                .any(|existing| flash_loan_ranges_overlap(existing, &candidate));
+            if !dominated {
+                patterns.push(candidate);
+            }
+        }
 
         patterns
     }
@@ -183,7 +200,7 @@ impl AttackClassifier {
     fn detect_flash_loan_erc20(steps: &[StepRecord]) -> Vec<AttackPattern> {
         let mut patterns = Vec::new();
 
-        // Collect all ERC-20 Transfer events
+        // Collect all ERC-20 Transfer events with amounts from log_data
         let transfers: Vec<Erc20Transfer> = steps
             .iter()
             .filter(|s| s.opcode == OP_LOG3)
@@ -198,17 +215,29 @@ impl AttackClassifier {
                 let from = address_from_topic(&topics[1]);
                 let to = address_from_topic(&topics[2]);
                 let token = s.code_address;
+                // Extract transfer amount from log_data (ABI-encoded uint256)
+                let amount = s
+                    .log_data
+                    .as_ref()
+                    .filter(|d| d.len() >= 32)
+                    .map(|d| U256::from_big_endian(&d[..32]))
+                    .unwrap_or(U256::zero());
                 Some(Erc20Transfer {
                     step_index: s.step_index,
                     token,
                     from,
                     to,
+                    amount,
                 })
             })
             .collect();
 
         // For each incoming transfer (token → address X), look for a matching
         // outgoing transfer (address X → token) later in the trace.
+        //
+        // Borrow must be in the first half of the trace. Repay must come after
+        // the borrow and be in the second half. This captures the standard
+        // flash loan pattern: borrow early, operate, repay late.
         let total = steps.len();
         let half = total / 2;
 
@@ -230,9 +259,9 @@ impl AttackClassifier {
             if let Some(repay) = outgoing {
                 patterns.push(AttackPattern::FlashLoan {
                     borrow_step: incoming.step_index,
-                    borrow_amount: U256::zero(), // Amount in log data, not captured
+                    borrow_amount: incoming.amount,
                     repay_step: repay.step_index,
-                    repay_amount: U256::zero(),
+                    repay_amount: repay.amount,
                     provider: Some(incoming.from),
                     token: Some(token),
                 });
@@ -251,8 +280,10 @@ impl AttackClassifier {
     /// - Most operations execute at this deeper depth
     /// - Return to shallow depth
     ///
-    /// If >60% of operations happen at depth > entry_depth + 1, this indicates
-    /// a callback wrapper pattern typical of flash loans.
+    /// If >40% of operations happen at depth > entry_depth + 1, this indicates
+    /// a callback wrapper pattern typical of flash loans. Real-world flash loan
+    /// TXs often have significant setup/cleanup phases that dilute the deep ratio,
+    /// so 40% captures more true positives than the previous 60% threshold.
     fn detect_flash_loan_callback(steps: &[StepRecord]) -> Vec<AttackPattern> {
         let mut patterns = Vec::new();
         let total = steps.len();
@@ -277,8 +308,8 @@ impl AttackClassifier {
 
         let deep_ratio = deep_steps as f64 / total as f64;
 
-        // If >60% of steps are deep, this is a callback pattern
-        if deep_ratio < 0.6 {
+        // If >CALLBACK_DEPTH_THRESHOLD of steps are deep, this is a callback pattern
+        if deep_ratio < CALLBACK_DEPTH_THRESHOLD {
             return patterns;
         }
 
@@ -297,16 +328,15 @@ impl AttackClassifier {
         let callback_exit = steps.iter().rev().find(|s| s.depth > entry_depth + 1);
 
         if let (Some(entry), Some(exit)) = (callback_entry, callback_exit) {
-            // Count state-modifying ops inside the callback to confirm it's non-trivial
+            // Count SSTORE ops inside the callback to confirm non-trivial state modification.
+            // Require >= 2 to avoid false positives from normal callbacks (e.g., Uniswap V3
+            // swap callbacks that do a single SSTORE for position tracking).
             let inner_sstores = steps
                 .iter()
-                .filter(|s| {
-                    s.depth > entry_depth + 1
-                        && matches!(s.opcode, OP_SSTORE | OP_CALL | OP_DELEGATECALL)
-                })
+                .filter(|s| s.depth > entry_depth + 1 && s.opcode == OP_SSTORE)
                 .count();
 
-            if inner_sstores >= 1 {
+            if inner_sstores >= 2 {
                 patterns.push(AttackPattern::FlashLoan {
                     borrow_step: flash_loan_call
                         .map(|s| s.step_index)
@@ -588,13 +618,15 @@ impl AttackClassifier {
         }
 
         let confidence = if has_amount && inner_sstores > 0 {
-            0.9
+            CONFIDENCE_AMOUNT_AND_SSTORE
+        } else if has_token && has_provider && inner_sstores > 0 {
+            CONFIDENCE_TOKEN_PROVIDER_SSTORE
         } else if has_provider && inner_sstores > 0 {
-            0.8
+            CONFIDENCE_PROVIDER_SSTORE
         } else if inner_sstores > 0 {
-            0.6
+            CONFIDENCE_SSTORE_ONLY
         } else {
-            0.4
+            CONFIDENCE_NO_EVIDENCE
         };
 
         (confidence, evidence)
@@ -702,10 +734,36 @@ fn address_from_topic(topic: &ethrex_common::H256) -> Address {
     Address::from_slice(&topic.as_bytes()[12..])
 }
 
+/// Check whether two FlashLoan patterns describe the same logical flash loan
+/// by testing if their borrow→repay step ranges overlap.
+fn flash_loan_ranges_overlap(a: &AttackPattern, b: &AttackPattern) -> bool {
+    let (a_borrow, a_repay) = match a {
+        AttackPattern::FlashLoan {
+            borrow_step,
+            repay_step,
+            ..
+        } => (*borrow_step, *repay_step),
+        _ => return false,
+    };
+    let (b_borrow, b_repay) = match b {
+        AttackPattern::FlashLoan {
+            borrow_step,
+            repay_step,
+            ..
+        } => (*borrow_step, *repay_step),
+        _ => return false,
+    };
+    // Two ranges [a_borrow, a_repay] and [b_borrow, b_repay] overlap when
+    // neither ends before the other begins.
+    a_borrow <= b_repay && b_borrow <= a_repay
+}
+
 /// Parsed ERC-20 Transfer event.
 struct Erc20Transfer {
     step_index: usize,
     token: Address,
     from: Address,
     to: Address,
+    /// Transfer amount decoded from log_data (uint256). Zero if log_data is absent.
+    amount: U256,
 }

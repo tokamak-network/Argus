@@ -23,6 +23,7 @@ fn make_step(opcode: u8, depth: usize, addr: Address) -> crate::types::StepRecor
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 

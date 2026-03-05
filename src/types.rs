@@ -66,6 +66,11 @@ pub struct StepRecord {
     /// Log data bytes for LOG0-LOG4 opcodes (capped at 256 bytes).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub log_data: Option<Vec<u8>>,
+
+    /// First 4 bytes of CALL/DELEGATECALL/STATICCALL/CALLCODE input (function selector).
+    /// None if the opcode is not a call, or if input length < 4 bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub call_input_selector: Option<[u8; 4]>,
 }
 
 impl StepRecord {

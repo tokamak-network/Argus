@@ -41,6 +41,32 @@ pub struct SentinelMetrics {
     pipeline_steps_dismissed: AtomicU64,
     /// Cumulative pipeline duration in milliseconds.
     pipeline_duration_ms: AtomicU64,
+
+    // ── AI Agent metrics (ai_agent feature) ──────────────────────────────
+    /// Total AI screening requests (tier-1 model).
+    #[cfg(feature = "ai_agent")]
+    ai_screening_requests: AtomicU64,
+    /// Total AI escalation requests (tier-2 model).
+    #[cfg(feature = "ai_agent")]
+    ai_escalation_requests: AtomicU64,
+    /// Cumulative AI request latency in milliseconds.
+    #[cfg(feature = "ai_agent")]
+    ai_request_latency_total_ms: AtomicU64,
+    /// Number of AI request latency observations (for computing average).
+    #[cfg(feature = "ai_agent")]
+    ai_request_latency_count: AtomicU64,
+    /// Cumulative AI cost in micro-USD (1e-6 USD) for atomic accuracy.
+    #[cfg(feature = "ai_agent")]
+    ai_cost_micro_usd_total: AtomicU64,
+    /// Total attacks detected by AI analysis.
+    #[cfg(feature = "ai_agent")]
+    ai_attacks_detected: AtomicU64,
+    /// Total escalations from screening to deep model.
+    #[cfg(feature = "ai_agent")]
+    ai_escalations_total: AtomicU64,
+    /// Circuit breaker state: 0 = closed, 1 = open.
+    #[cfg(feature = "ai_agent")]
+    ai_circuit_breaker_open: AtomicU64,
 }
 
 impl SentinelMetrics {
@@ -61,6 +87,23 @@ impl SentinelMetrics {
             pipeline_steps_executed: AtomicU64::new(0),
             pipeline_steps_dismissed: AtomicU64::new(0),
             pipeline_duration_ms: AtomicU64::new(0),
+
+            #[cfg(feature = "ai_agent")]
+            ai_screening_requests: AtomicU64::new(0),
+            #[cfg(feature = "ai_agent")]
+            ai_escalation_requests: AtomicU64::new(0),
+            #[cfg(feature = "ai_agent")]
+            ai_request_latency_total_ms: AtomicU64::new(0),
+            #[cfg(feature = "ai_agent")]
+            ai_request_latency_count: AtomicU64::new(0),
+            #[cfg(feature = "ai_agent")]
+            ai_cost_micro_usd_total: AtomicU64::new(0),
+            #[cfg(feature = "ai_agent")]
+            ai_attacks_detected: AtomicU64::new(0),
+            #[cfg(feature = "ai_agent")]
+            ai_escalations_total: AtomicU64::new(0),
+            #[cfg(feature = "ai_agent")]
+            ai_circuit_breaker_open: AtomicU64::new(0),
         }
     }
 
@@ -124,6 +167,49 @@ impl SentinelMetrics {
         self.pipeline_duration_ms.fetch_add(ms, Ordering::Relaxed);
     }
 
+    // -- AI Agent helpers (ai_agent feature) --
+
+    #[cfg(feature = "ai_agent")]
+    pub fn increment_ai_screening_requests(&self) {
+        self.ai_screening_requests.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[cfg(feature = "ai_agent")]
+    pub fn increment_ai_escalation_requests(&self) {
+        self.ai_escalation_requests.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[cfg(feature = "ai_agent")]
+    pub fn add_ai_request_latency_ms(&self, ms: u64) {
+        self.ai_request_latency_total_ms
+            .fetch_add(ms, Ordering::Relaxed);
+        self.ai_request_latency_count
+            .fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[cfg(feature = "ai_agent")]
+    pub fn add_ai_cost_usd(&self, cost_usd: f64) {
+        let micro_usd = (cost_usd * 1_000_000.0) as u64;
+        self.ai_cost_micro_usd_total
+            .fetch_add(micro_usd, Ordering::Relaxed);
+    }
+
+    #[cfg(feature = "ai_agent")]
+    pub fn increment_ai_attacks_detected(&self) {
+        self.ai_attacks_detected.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[cfg(feature = "ai_agent")]
+    pub fn increment_ai_escalations_total(&self) {
+        self.ai_escalations_total.fetch_add(1, Ordering::Relaxed);
+    }
+
+    #[cfg(feature = "ai_agent")]
+    pub fn set_ai_circuit_breaker_open(&self, open: bool) {
+        self.ai_circuit_breaker_open
+            .store(u64::from(open), Ordering::Relaxed);
+    }
+
     // -- Snapshot / export --
 
     /// Read all counters into a non-atomic snapshot.
@@ -147,6 +233,23 @@ impl SentinelMetrics {
             pipeline_steps_executed: self.pipeline_steps_executed.load(Ordering::Relaxed),
             pipeline_steps_dismissed: self.pipeline_steps_dismissed.load(Ordering::Relaxed),
             pipeline_duration_ms: self.pipeline_duration_ms.load(Ordering::Relaxed),
+
+            #[cfg(feature = "ai_agent")]
+            ai_screening_requests: self.ai_screening_requests.load(Ordering::Relaxed),
+            #[cfg(feature = "ai_agent")]
+            ai_escalation_requests: self.ai_escalation_requests.load(Ordering::Relaxed),
+            #[cfg(feature = "ai_agent")]
+            ai_request_latency_total_ms: self.ai_request_latency_total_ms.load(Ordering::Relaxed),
+            #[cfg(feature = "ai_agent")]
+            ai_request_latency_count: self.ai_request_latency_count.load(Ordering::Relaxed),
+            #[cfg(feature = "ai_agent")]
+            ai_cost_micro_usd_total: self.ai_cost_micro_usd_total.load(Ordering::Relaxed),
+            #[cfg(feature = "ai_agent")]
+            ai_attacks_detected: self.ai_attacks_detected.load(Ordering::Relaxed),
+            #[cfg(feature = "ai_agent")]
+            ai_escalations_total: self.ai_escalations_total.load(Ordering::Relaxed),
+            #[cfg(feature = "ai_agent")]
+            ai_circuit_breaker_open: self.ai_circuit_breaker_open.load(Ordering::Relaxed),
         }
     }
 
@@ -185,6 +288,24 @@ pub struct MetricsSnapshot {
     pub pipeline_steps_executed: u64,
     pub pipeline_steps_dismissed: u64,
     pub pipeline_duration_ms: u64,
+
+    // ── AI Agent metrics ─────────────────────────────────────────────────
+    #[cfg(feature = "ai_agent")]
+    pub ai_screening_requests: u64,
+    #[cfg(feature = "ai_agent")]
+    pub ai_escalation_requests: u64,
+    #[cfg(feature = "ai_agent")]
+    pub ai_request_latency_total_ms: u64,
+    #[cfg(feature = "ai_agent")]
+    pub ai_request_latency_count: u64,
+    #[cfg(feature = "ai_agent")]
+    pub ai_cost_micro_usd_total: u64,
+    #[cfg(feature = "ai_agent")]
+    pub ai_attacks_detected: u64,
+    #[cfg(feature = "ai_agent")]
+    pub ai_escalations_total: u64,
+    #[cfg(feature = "ai_agent")]
+    pub ai_circuit_breaker_open: u64,
 }
 
 impl MetricsSnapshot {
@@ -277,7 +398,77 @@ impl MetricsSnapshot {
             self.pipeline_duration_ms,
         );
 
+        #[cfg(feature = "ai_agent")]
+        self.write_ai_metrics(&mut out);
+
         out
+    }
+
+    #[cfg(feature = "ai_agent")]
+    fn write_ai_metrics(&self, out: &mut String) {
+        use std::fmt::Write;
+
+        let _ = writeln!(
+            out,
+            "# HELP sentinel_ai_requests_total Total AI requests by model tier"
+        );
+        let _ = writeln!(out, "# TYPE sentinel_ai_requests_total counter");
+        let _ = writeln!(
+            out,
+            "sentinel_ai_requests_total{{model=\"screening\"}} {}",
+            self.ai_screening_requests
+        );
+        let _ = writeln!(
+            out,
+            "sentinel_ai_requests_total{{model=\"escalation\"}} {}",
+            self.ai_escalation_requests
+        );
+        // Latency summary: count + sum (Prometheus summary style)
+        let _ = writeln!(
+            out,
+            "# HELP sentinel_ai_request_latency_ms AI request latency in milliseconds"
+        );
+        let _ = writeln!(out, "# TYPE sentinel_ai_request_latency_ms summary");
+        let _ = writeln!(
+            out,
+            "sentinel_ai_request_latency_ms_sum {}",
+            self.ai_request_latency_total_ms
+        );
+        let _ = writeln!(
+            out,
+            "sentinel_ai_request_latency_ms_count {}",
+            self.ai_request_latency_count
+        );
+        // Cost in USD (convert from micro-USD)
+        let cost_usd = self.ai_cost_micro_usd_total as f64 / 1_000_000.0;
+        let _ = writeln!(
+            out,
+            "# HELP sentinel_ai_cost_usd_total Cumulative AI API cost in USD"
+        );
+        let _ = writeln!(out, "# TYPE sentinel_ai_cost_usd_total counter");
+        let _ = writeln!(out, "sentinel_ai_cost_usd_total {cost_usd:.6}");
+        write_counter(
+            out,
+            "sentinel_ai_attacks_detected",
+            "Total attacks detected by AI analysis",
+            self.ai_attacks_detected,
+        );
+        write_counter(
+            out,
+            "sentinel_ai_escalations_total",
+            "Total escalations from screening to deep model",
+            self.ai_escalations_total,
+        );
+        let _ = writeln!(
+            out,
+            "# HELP sentinel_ai_circuit_breaker_open AI circuit breaker state (0=closed, 1=open)"
+        );
+        let _ = writeln!(out, "# TYPE sentinel_ai_circuit_breaker_open gauge");
+        let _ = writeln!(
+            out,
+            "sentinel_ai_circuit_breaker_open {}",
+            self.ai_circuit_breaker_open
+        );
     }
 }
 
@@ -313,7 +504,42 @@ impl fmt::Display for MetricsSnapshot {
             "  pipeline_steps_dismissed: {}",
             self.pipeline_steps_dismissed
         )?;
-        write!(f, "  pipeline_duration_ms:   {}", self.pipeline_duration_ms)
+        write!(f, "  pipeline_duration_ms:   {}", self.pipeline_duration_ms)?;
+
+        #[cfg(feature = "ai_agent")]
+        {
+            writeln!(f)?;
+            writeln!(
+                f,
+                "  ai_screening_requests:  {}",
+                self.ai_screening_requests
+            )?;
+            writeln!(
+                f,
+                "  ai_escalation_requests: {}",
+                self.ai_escalation_requests
+            )?;
+            writeln!(
+                f,
+                "  ai_request_latency_ms:  {}/{}",
+                self.ai_request_latency_total_ms, self.ai_request_latency_count
+            )?;
+            let cost_usd = self.ai_cost_micro_usd_total as f64 / 1_000_000.0;
+            writeln!(f, "  ai_cost_usd_total:      {cost_usd:.6}")?;
+            writeln!(f, "  ai_attacks_detected:    {}", self.ai_attacks_detected)?;
+            writeln!(f, "  ai_escalations_total:   {}", self.ai_escalations_total)?;
+            write!(
+                f,
+                "  ai_circuit_breaker:     {}",
+                if self.ai_circuit_breaker_open == 1 {
+                    "OPEN"
+                } else {
+                    "closed"
+                }
+            )?;
+        }
+
+        Ok(())
     }
 }
 
@@ -415,9 +641,13 @@ mod tests {
         assert!(text.contains("sentinel_alerts_rate_limited 0"));
         assert!(text.contains("sentinel_deep_analysis_total_ms 0"));
 
-        // Each metric should have exactly 3 lines: HELP, TYPE, value
+        // Each base metric has 3 lines: HELP, TYPE, value (14 base metrics = 42 lines)
+        // With ai_agent feature: +20 lines for AI metrics
         let lines: Vec<&str> = text.lines().collect();
-        assert_eq!(lines.len(), 42); // 14 metrics * 3 lines each
+        #[cfg(not(feature = "ai_agent"))]
+        assert_eq!(lines.len(), 42);
+        #[cfg(feature = "ai_agent")]
+        assert_eq!(lines.len(), 62);
     }
 
     #[test]

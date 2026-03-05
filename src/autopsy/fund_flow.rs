@@ -6,16 +6,10 @@
 
 use ethrex_common::{Address, H256, U256};
 
+use crate::opcodes::{OP_CALL, OP_CALLCODE, OP_CREATE, OP_CREATE2, OP_LOG3};
 use crate::types::StepRecord;
 
 use super::types::FundFlow;
-
-// Opcode constants
-const OP_CALL: u8 = 0xF1;
-const OP_CALLCODE: u8 = 0xF2;
-const OP_CREATE: u8 = 0xF0;
-const OP_CREATE2: u8 = 0xF5;
-const OP_LOG3: u8 = 0xA3;
 
 /// keccak256("Transfer(address,address,uint256)") first 4 bytes = 0xddf252ad
 const TRANSFER_TOPIC_PREFIX: [u8; 4] = [0xdd, 0xf2, 0x52, 0xad];

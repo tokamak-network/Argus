@@ -24,6 +24,8 @@
 pub mod ai_config;
 pub mod circuit_breaker;
 pub mod client;
+#[cfg(test)]
+mod client_http_test;
 pub mod context;
 #[cfg(test)]
 mod context_test;
@@ -41,6 +43,16 @@ mod judge_test;
 mod poc_test;
 pub mod prompts;
 pub mod rate_limit;
+#[cfg(test)]
+mod t5_calldata_test;
+#[cfg(test)]
+mod t5_cost_test;
+#[cfg(test)]
+pub(crate) mod t5_helpers;
+#[cfg(test)]
+mod t5_metrics_test;
+#[cfg(test)]
+mod t5_pipeline_test;
 pub mod types;
 
 pub use ai_config::AiConfig;

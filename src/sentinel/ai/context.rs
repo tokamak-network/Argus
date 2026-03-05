@@ -10,6 +10,10 @@ use super::types::{
     AgentContext, CallFrame, CallType, ContractCreation, CreateType, DelegateCallInfo, EthTransfer,
     LogEvent, StorageMutation, TokenTransfer,
 };
+use crate::opcodes::{
+    OP_CALL, OP_CALLCODE, OP_CREATE, OP_CREATE2, OP_DELEGATECALL, OP_LOG0, OP_LOG4, OP_REVERT,
+    OP_SSTORE, OP_STATICCALL,
+};
 use crate::types::StepRecord;
 
 // ── ExtractParams ────────────────────────────────────────────────────────
@@ -29,19 +33,6 @@ pub struct ExtractParams {
     pub suspicious_score: f64,
     pub suspicion_reasons: Vec<String>,
 }
-
-// ── Opcode constants ───────────────────────────────────────────────────────
-
-const OP_SSTORE: u8 = 0x55;
-const OP_CALL: u8 = 0xF1;
-const OP_CALLCODE: u8 = 0xF2;
-const OP_DELEGATECALL: u8 = 0xF4;
-const OP_CREATE: u8 = 0xF0;
-const OP_CREATE2: u8 = 0xF5;
-const OP_STATICCALL: u8 = 0xFA;
-const OP_REVERT: u8 = 0xFD;
-const OP_LOG0: u8 = 0xA0;
-const OP_LOG4: u8 = 0xA4;
 
 /// ERC-20 Transfer event topic: keccak256("Transfer(address,address,uint256)")
 const TRANSFER_TOPIC: H256 = H256([
@@ -159,29 +150,9 @@ impl ContextExtractor {
     }
 
     /// Extract the 4-byte function selector from CALL input data.
-    /// For CALL/CALLCODE: stack[3]=argsOffset, stack[4]=argsLength
-    /// For DELEGATECALL/STATICCALL: stack[2]=argsOffset, stack[3]=argsLength
+    /// Reads the `call_input_selector` field populated by `DebugRecorder` from memory.
     fn extract_input_selector(step: &StepRecord) -> Option<[u8; 4]> {
-        let args_length_idx = match step.opcode {
-            OP_CALL | OP_CALLCODE => 4,
-            OP_DELEGATECALL | OP_STATICCALL => 3,
-            _ => return None,
-        };
-
-        // Check that input length >= 4 bytes
-        let args_len = step.stack_top.get(args_length_idx)?;
-        if args_len.as_usize() < 4 {
-            return None;
-        }
-
-        // We don't have access to memory here, but we can't extract the selector
-        // from the stack alone. We'll use a placeholder approach:
-        // The actual selector extraction would require memory access.
-        // For now, return None. The recorder.rs already captures log_data for LOGs
-        // but not call input data. This is a known limitation.
-        //
-        // TODO(phase2): Add calldata capture to DebugRecorder for selector extraction.
-        None
+        step.call_input_selector
     }
 
     /// Extract input/output sizes from the call stack.

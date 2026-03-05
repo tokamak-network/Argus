@@ -34,6 +34,7 @@ fn make_step(index: usize, opcode: u8, depth: usize, code_address: Address) -> S
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -60,6 +61,7 @@ fn make_call_step(
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -89,6 +91,7 @@ fn make_sstore_step(
         }]),
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -108,6 +111,7 @@ fn make_staticcall_step(index: usize, depth: usize, from: Address, to: Address) 
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -152,6 +156,7 @@ fn make_log3_transfer(
             H256::from(to_bytes),
         ]),
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -189,6 +194,7 @@ fn make_log3_transfer_with_amount(
             H256::from(to_bytes),
         ]),
         log_data: Some(amount_data),
+        call_input_selector: None,
     }
 }
 
@@ -216,6 +222,7 @@ fn make_sload_step(index: usize, depth: usize, address: Address, slot_key: U256)
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -240,6 +247,7 @@ fn make_post_sload_step(
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -494,12 +502,13 @@ fn test_detect_flash_loan_callback() {
     steps.push(make_call_step(1, 1, flash_provider, attacker, U256::zero()));
 
     // 90% of execution at depth 2+ (inside callback)
-    for i in 2..92 {
+    for i in 2..91 {
         steps.push(make_step(i, 0x01, 2, attacker)); // ADD ops at depth 2
     }
 
-    // SSTORE inside the callback (state modification = non-trivial)
-    steps.push(make_sstore_step(92, 2, attacker, slot(1), U256::from(42)));
+    // 2 SSTOREs inside the callback (requires >= 2 for Strategy 3)
+    steps.push(make_sstore_step(91, 2, attacker, slot(1), U256::from(42)));
+    steps.push(make_sstore_step(92, 2, attacker, slot(2), U256::from(99)));
 
     // CALL inside callback
     steps.push(make_call_step(93, 2, attacker, addr(0xBB), U256::zero()));
@@ -993,6 +1002,7 @@ fn test_step_record_none_fields_skip_serializing() {
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     };
     let json = serde_json::to_string(&step).unwrap();
     assert!(!json.contains("call_value"));
@@ -1017,6 +1027,7 @@ fn test_step_record_some_fields_serialize() {
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     };
     let json = serde_json::to_string(&step).unwrap();
     assert!(json.contains("call_value"));

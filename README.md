@@ -228,7 +228,7 @@ Read the full analysis: [docs/analysis-bybit-1.4b-exploit.md](docs/analysis-bybi
 | Time-Travel Debugger | Interactive opcode replay | always included |
 | CLI | Interactive debugger shell | `cli` |
 | Dashboard | Web UI for Sentinel metrics | `sentinel` |
-| AI Agent | LLM-assisted attack verification (Phase 0 PoC complete, 100% accuracy) | `ai_agent` |
+| AI Agent | LLM-assisted attack verification (Phase 1 MVP complete — 2-tier judge, hallucination guard, cost tracking) | `ai_agent` |
 
 ---
 

@@ -198,6 +198,9 @@ fn suspicion_threshold_0_85_boundary_below() {
         min_gas_used: 100_000,
         min_erc20_transfers: 3,
         gas_ratio_threshold: 0.95,
+        min_independent_signals: 2,
+        relevance_factor: 0.3,
+        symmetry_discount: 0.5,
     };
     // revert(0.3) + erc20_3x(0.2) + unusual_gas(0.15) = 0.65, modifier=-0.11 → 0.54 < 0.85
     let wl = WhitelistEngine::new(WhitelistConfig {
@@ -229,21 +232,35 @@ fn suspicion_threshold_0_85_boundary_at_threshold() {
         min_gas_used: 100_000,
         min_erc20_transfers: 5,
         gas_ratio_threshold: 0.95,
+        min_independent_signals: 2,
+        relevance_factor: 0.3,
+        symmetry_discount: 0.5,
     };
     let filter = PreFilter::with_whitelist(config, WhitelistEngine::empty());
 
-    // Flash(0.4) + ERC20_11x(0.4) + known_contract(0.1) = 0.9 >= 0.85
+    // Flash(0.4) + ERC20_11x(0.4) + H2(0.3) = 1.1 → clamped 1.0
+    // No known contract → relevance = 1.0
+    // Asymmetric transfers (different from/to) → symmetry = 1.0
+    // score = 1.0 >= 0.85
     let flash_log = log_wl(attacker_wl(), vec![aave_flash_wl()]);
+    // Create ERC-20 logs with distinct from/to addresses to avoid symmetric cash flow discount
     let erc20_logs: Vec<Log> = (10..21_u8)
-        .map(|i| erc20_log_wl(Address::from_slice(&[i; 20])))
+        .map(|i| {
+            let mut from_bytes = [0u8; 32];
+            from_bytes[31] = i;
+            let mut to_bytes = [0u8; 32];
+            to_bytes[31] = i + 100;
+            log_wl(
+                Address::from_slice(&[i; 20]),
+                vec![transfer_wl(), H256::from(from_bytes), H256::from(to_bytes)],
+            )
+        })
         .collect();
-    let known_defi = wl_addr("7d2768de32b0b80b7a3454c06bdac94a69ddc7a9"); // Aave V2 (hardcoded DB)
-    let known_log = log_wl(known_defi, vec![H256::zero()]);
 
-    let mut logs = vec![flash_log, known_log];
+    let mut logs = vec![flash_log];
     logs.extend(erc20_logs);
-    let receipt = receipt_wl(true, 500_000, logs);
-    let tx = call_tx_wl(attacker_wl(), U256::zero(), 1_000_000);
+    let receipt = receipt_wl(false, 500_000, logs);
+    let tx = call_tx_wl(attacker_wl(), one_eth_wl() * 2, 1_000_000);
 
     let result = filter.scan_tx(&tx, &receipt, 0, &header_wl(20_000_000));
     assert!(result.is_some(), "Score >= 0.85 must produce an alert");
@@ -342,6 +359,9 @@ fn score_after_modifier_clamped_to_zero() {
         min_gas_used: 100_000,
         min_erc20_transfers: 3,
         gas_ratio_threshold: 0.95,
+        min_independent_signals: 2,
+        relevance_factor: 0.3,
+        symmetry_discount: 0.5,
     };
     let wl = WhitelistEngine::new(WhitelistConfig {
         entries: vec![WhitelistEntry {
@@ -378,6 +398,9 @@ fn score_does_not_exceed_1_0() {
         min_gas_used: 100_000,
         min_erc20_transfers: 5,
         gas_ratio_threshold: 0.95,
+        min_independent_signals: 2,
+        relevance_factor: 0.3,
+        symmetry_discount: 0.5,
     };
     let filter = PreFilter::with_whitelist(config, WhitelistEngine::empty());
 

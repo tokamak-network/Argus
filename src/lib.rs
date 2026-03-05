@@ -6,6 +6,7 @@
 
 pub mod engine;
 pub mod error;
+pub mod opcodes;
 pub mod recorder;
 pub mod types;
 

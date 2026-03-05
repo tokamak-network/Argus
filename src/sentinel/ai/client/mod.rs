@@ -29,6 +29,8 @@ pub enum AiError {
     ParseError(String),
     #[error("API key not configured")]
     MissingApiKey,
+    #[error("AgentContext too large ({size} bytes, max {max} bytes)")]
+    ContextTooLarge { size: usize, max: usize },
 }
 
 // ── AiClient trait ─────────────────────────────────────────────────────────
@@ -160,6 +162,27 @@ pub(crate) fn verdict_tool_schema() -> Value {
         },
         "required": ["is_attack", "confidence", "attack_type", "reasoning", "evidence"]
     })
+}
+
+// ── Context size guard ───────────────────────────────────────────────────
+
+/// Maximum serialized AgentContext size (256 KB). Prevents unbounded API spend
+/// from adversarial TX traces with extremely deep call graphs or many storage mutations.
+pub(crate) const MAX_CONTEXT_BYTES: usize = 256 * 1024;
+
+/// Serialize context to JSON and reject if it exceeds the size limit.
+/// Returns the JSON string on success.
+pub(crate) fn serialize_context_checked(
+    context: &super::types::AgentContext,
+) -> Result<String, AiError> {
+    let json = serde_json::to_string(context).map_err(|e| AiError::ParseError(e.to_string()))?;
+    if json.len() > MAX_CONTEXT_BYTES {
+        return Err(AiError::ContextTooLarge {
+            size: json.len(),
+            max: MAX_CONTEXT_BYTES,
+        });
+    }
+    Ok(json)
 }
 
 // ── Cost calculation (pricing table) ─────────────────────────────────────
@@ -616,5 +639,79 @@ mod tests {
             !required_strs.contains(&"false_positive_reason"),
             "false_positive_reason should be optional"
         );
+    }
+
+    // ── Context size guard tests ──────────────────────────────────────────
+
+    use super::super::types::*;
+    use ethrex_common::{Address, H256, U256};
+
+    fn small_context() -> AgentContext {
+        AgentContext {
+            tx_hash: H256::from([1u8; 32]),
+            block_number: 21_000_000,
+            from: Address::from([0xAA; 20]),
+            to: Some(Address::from([0xBB; 20])),
+            value_wei: U256::zero(),
+            gas_used: 100_000,
+            succeeded: true,
+            revert_count: 0,
+            suspicious_score: 0.3,
+            suspicion_reasons: vec![],
+            call_graph: vec![],
+            storage_mutations: vec![],
+            erc20_transfers: vec![],
+            eth_transfers: vec![],
+            log_events: vec![],
+            delegatecalls: vec![],
+            contract_creations: vec![],
+        }
+    }
+
+    #[test]
+    fn serialize_context_checked_small_succeeds() {
+        let ctx = small_context();
+        let result = serialize_context_checked(&ctx);
+        assert!(result.is_ok());
+        assert!(result.unwrap().len() < MAX_CONTEXT_BYTES);
+    }
+
+    #[test]
+    fn serialize_context_checked_oversized_rejected() {
+        let mut ctx = small_context();
+        // Fill call_graph with enough entries to exceed 256KB
+        for i in 0..5000 {
+            ctx.call_graph.push(CallFrame {
+                depth: (i % 1024) as u16,
+                caller: Address::from([0xCC; 20]),
+                target: Address::from([0xDD; 20]),
+                value: U256::from(i),
+                input_selector: Some([0xAA, 0xBB, 0xCC, 0xDD]),
+                input_size: 1000,
+                output_size: 500,
+                gas_used: 100_000,
+                call_type: CallType::Call,
+                reverted: false,
+            });
+        }
+        let result = serialize_context_checked(&ctx);
+        match result {
+            Err(AiError::ContextTooLarge { size, max }) => {
+                assert!(size > MAX_CONTEXT_BYTES);
+                assert_eq!(max, MAX_CONTEXT_BYTES);
+            }
+            other => panic!("expected ContextTooLarge, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn context_too_large_error_display() {
+        let err = AiError::ContextTooLarge {
+            size: 300_000,
+            max: 262_144,
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("300000"), "should contain size: {msg}");
+        assert!(msg.contains("262144"), "should contain max: {msg}");
     }
 }
