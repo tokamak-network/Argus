@@ -1,0 +1,116 @@
+# Argus Sentinel — Example Configuration
+#
+# Copy this file to `sentinel.toml` and adjust values for your deployment.
+# All fields use serde defaults — omitted fields get sensible defaults.
+#
+# Usage:
+#   argus sentinel --rpc https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY \
+#                  --config sentinel.toml
+
+[sentinel]
+enabled = true
+
+# ---------------------------------------------------------------------------
+# Pre-filter heuristics (fast receipt-based screening, ~10-50us per TX)
+# ---------------------------------------------------------------------------
+[sentinel.prefilter]
+# Minimum combined heuristic score to flag a TX for deep analysis [0.0 - 1.0].
+# Lower = more sensitive (more alerts), higher = fewer false positives.
+suspicion_threshold = 0.5
+
+# Minimum ETH value to trigger the high-value-transfer heuristic.
+min_value_eth = 1.0
+
+# Minimum gas used to trigger gas-related heuristics.
+min_gas_used = 500000
+
+# Minimum ERC-20 Transfer events to flag token-heavy TXs.
+min_erc20_transfers = 5
+
+# Gas used/limit ratio above which a TX is flagged as unusual [0.0 - 1.0].
+gas_ratio_threshold = 0.95
+
+# ---------------------------------------------------------------------------
+# Deep analysis engine (opcode-level replay on flagged TXs)
+# ---------------------------------------------------------------------------
+[sentinel.analysis]
+# Maximum opcode steps before aborting replay (safety limit).
+max_steps = 1000000
+
+# Minimum classifier confidence to emit an alert [0.0 - 1.0].
+min_alert_confidence = 0.4
+
+# Emit lightweight alerts from pre-filter when deep analysis is unavailable.
+# Useful for RPC mode without archive node access.
+prefilter_alert_mode = true
+
+# ---------------------------------------------------------------------------
+# Alert output destinations
+# ---------------------------------------------------------------------------
+[sentinel.alert]
+# Path for append-only JSONL alert log. Comment out to disable.
+jsonl_path = "/var/log/argus/alerts.jsonl"
+
+# Webhook URL for Slack, Discord, or PagerDuty. Comment out to disable.
+# webhook_url = "https://hooks.slack.com/services/T.../B.../xxx"
+
+# Maximum alerts per minute (rate limiter).
+rate_limit_per_minute = 30
+
+# Suppress duplicate alerts for the same TX within this many blocks.
+dedup_window_blocks = 10
+
+# ---------------------------------------------------------------------------
+# Mempool monitoring (pre-execution scanning)
+# ---------------------------------------------------------------------------
+[sentinel.mempool]
+enabled = false
+min_value_eth = 10.0
+min_gas = 500000
+
+# ---------------------------------------------------------------------------
+# Auto-pause circuit breaker
+# ---------------------------------------------------------------------------
+[sentinel.auto_pause]
+# WARNING: Enabling auto-pause on a validator node risks slashing penalties.
+# Only enable if you understand the implications for your infrastructure.
+enabled = false
+confidence_threshold = 0.9
+priority_threshold = "Critical"
+
+# ---------------------------------------------------------------------------
+# Adaptive ML pipeline (experimental)
+# ---------------------------------------------------------------------------
+[sentinel.pipeline]
+enabled = false
+# model_path = "/opt/argus/models/prefilter-v1.onnx"
+max_pipeline_ms = 100
+
+# ---------------------------------------------------------------------------
+# DeFi protocol whitelist (false-positive reduction)
+#
+# Known DeFi protocols that legitimately trigger heuristics (flash loans,
+# high-volume swaps, etc.). Each entry reduces the suspicion score by
+# `score_modifier` when the TX interacts with the whitelisted address.
+#
+# Categories: FlashLoan, DEX, Lending, Bridge
+# ---------------------------------------------------------------------------
+[sentinel.whitelist]
+
+[[sentinel.whitelist.entries]]
+protocol = "Aave V3 Pool"
+address = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2"
+category = "Lending"
+score_modifier = -0.3
+
+[[sentinel.whitelist.entries]]
+protocol = "Uniswap V3 Router"
+address = "0xE592427A0AEce92De3Edee1F18E0157C05861564"
+category = "DEX"
+score_modifier = -0.2
+
+[[sentinel.whitelist.entries]]
+protocol = "Balancer Vault"
+address = "0xBA12222222228d8Ba445958a75a0704d566BF2C8"
+category = "FlashLoan"
+score_modifier = -0.25

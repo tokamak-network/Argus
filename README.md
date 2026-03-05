@@ -10,6 +10,35 @@ Real-time attack detection, post-hack forensics, and time-travel debugging for E
 > Existing security tools (Slither, Mythril, Echidna) analyze contracts **before** deployment.
 > Argus protects **after** deployment — detecting attacks as they happen and analyzing them when they've already occurred.
 
+### See It in Action
+
+```
+$ cargo run --example sentinel_realtime_demo
+
+ ┌─────────────────────────────────────────────────────┐
+ │  Argus Sentinel — Real-Time Attack Detection Demo   │
+ └─────────────────────────────────────────────────────┘
+
+ Demo 1  Multi-TX Block Scanning
+   TX 0: Simple ETH transfer (21k gas, success)  →  CLEAN
+   TX 1: Flash loan via Aave (2.5M gas)          →  CLEAN
+   TX 2: 5 ETH transfer, reverted (950k gas)     →  FLAGGED
+
+   ⚠ Alert #2
+     Priority: High   Score: 0.75
+     Reason:   HighValueWithRevert, UnusualGas, SelfDestruct
+
+ Demo 3  Mempool Pre-Filter (Pending TX Scanning)
+   Mempool TXs scanned:  4
+   Mempool TXs flagged:  3
+
+ Demo 4  Auto-Pause Circuit Breaker
+   Critical alert → block processing HALTED
+```
+
+> No RPC key needed — demos run against local LEVM. Try it in 30 seconds:
+> `git clone https://github.com/tokamak-network/Argus.git && cd Argus && cargo run --example sentinel_realtime_demo`
+
 ---
 
 ## What Argus Does
@@ -231,6 +260,17 @@ docker run -d \
 docker build -t argus-demo .
 docker run argus-demo
 ```
+
+### Configuration
+
+Copy the example config and adjust for your setup:
+
+```bash
+cp sentinel.toml.example sentinel.toml
+argus sentinel --rpc https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY --config sentinel.toml
+```
+
+See [`sentinel.toml.example`](sentinel.toml.example) for all available options with inline documentation.
 
 For production deployment on AWS ECS Fargate, see [Deployment Guide](docs/deployment.md).
 
