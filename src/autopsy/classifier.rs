@@ -873,4 +873,14 @@ mod flash_loan_overlap_tests {
         let b = make_flash_loan(10, 10);
         assert!(flash_loan_ranges_overlap(&a, &b));
     }
+
+    /// Degenerate range: borrow_step > repay_step creates a semantically empty
+    /// interval. The overlap check `a_borrow <= b_repay && b_borrow <= a_repay`
+    /// returns false when both ranges are inverted (50 <= 10 is false).
+    #[test]
+    fn test_flash_loan_overlap_degenerate_inverted_ranges() {
+        let a = make_flash_loan(50, 10);
+        let b = make_flash_loan(50, 10);
+        assert!(!flash_loan_ranges_overlap(&a, &b));
+    }
 }

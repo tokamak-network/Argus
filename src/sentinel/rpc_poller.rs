@@ -115,21 +115,53 @@ const MAX_CATCHUP_BLOCKS: u64 = 128;
 /// Fetch all receipts for a block, preferring `eth_getBlockReceipts` (single
 /// RPC call) and falling back to per-transaction `eth_getTransactionReceipt`
 /// (N+1 calls) when the batch method is unsupported or returns a mismatched count.
+///
+/// Retryable errors (network timeouts, connection failures) are propagated
+/// immediately — falling back to N+1 individual calls would also fail and
+/// waste time on retries that cannot succeed.
 fn fetch_receipts_with_fallback(
     client: &EthRpcClient,
     block: &RpcBlock,
-    block_num: u64,
 ) -> Result<Vec<RpcReceipt>, crate::error::DebuggerError> {
+    let block_num = block.header.number;
     match client.eth_get_block_receipts(block_num) {
         Ok(batch) if batch.len() == block.transactions.len() => Ok(batch),
-        _ => {
-            let mut receipts = Vec::with_capacity(block.transactions.len());
-            for tx_ref in &block.transactions {
-                receipts.push(client.eth_get_transaction_receipt(tx_ref.hash)?);
+        Ok(_) => {
+            #[cfg(debug_assertions)]
+            eprintln!(
+                "[argus] eth_getBlockReceipts count mismatch for block {block_num}, \
+                 falling back to per-tx fetch"
+            );
+            fetch_receipts_individually(client, block)
+        }
+        Err(e) => {
+            // Retryable errors (network down, timeout) → propagate immediately.
+            // Non-retryable errors (method not found, parse error) → fallback.
+            if let crate::error::DebuggerError::Rpc(ref rpc_err) = e
+                && rpc_err.is_retryable()
+            {
+                return Err(e);
             }
-            Ok(receipts)
+            #[cfg(debug_assertions)]
+            eprintln!(
+                "[argus] eth_getBlockReceipts unsupported for block {block_num}, \
+                 falling back to per-tx fetch"
+            );
+            fetch_receipts_individually(client, block)
         }
     }
+}
+
+/// Individual per-transaction receipt fetch (N+1 fallback).
+fn fetch_receipts_individually(
+    client: &EthRpcClient,
+    block: &RpcBlock,
+) -> Result<Vec<RpcReceipt>, crate::error::DebuggerError> {
+    let mut receipts = Vec::with_capacity(block.transactions.len());
+    for tx_ref in &block.transactions {
+        receipts.push(client.eth_get_transaction_receipt(tx_ref.hash)?);
+    }
+    Ok(receipts)
 }
 
 /// Core polling loop — runs in a spawned tokio task.
@@ -214,7 +246,7 @@ async fn poll_loop(
             let result = tokio::task::spawn_blocking(move || {
                 let client = EthRpcClient::with_config(&url2, 0, rpc_cfg);
                 let block = client.eth_get_block_by_number_with_txs(block_num)?;
-                let receipts = fetch_receipts_with_fallback(&client, &block, block_num)?;
+                let receipts = fetch_receipts_with_fallback(&client, &block)?;
                 Ok::<_, crate::error::DebuggerError>((block, receipts))
             })
             .await;
@@ -397,6 +429,58 @@ mod tests {
         let clamped_from = tip.saturating_sub(MAX_CATCHUP_BLOCKS);
         let range: Vec<u64> = (clamped_from + 1..=tip).collect();
         assert_eq!(range.len() as u64, MAX_CATCHUP_BLOCKS);
+    }
+
+    // --- Fallback error classification (offline) ---
+
+    /// Verifies that the error classification used by `fetch_receipts_with_fallback`
+    /// correctly distinguishes retryable (network) vs non-retryable (unsupported method)
+    /// errors. Retryable errors must propagate; non-retryable errors must trigger fallback.
+    #[test]
+    fn test_fallback_error_classification() {
+        use crate::error::RpcError;
+
+        // JsonRpcError (method not found) → non-retryable → triggers fallback
+        let err = RpcError::JsonRpcError {
+            method: "eth_getBlockReceipts".into(),
+            code: -32601,
+            message: "Method not found".into(),
+        };
+        assert!(
+            !err.is_retryable(),
+            "method-not-found must trigger fallback, not propagate"
+        );
+
+        // ParseError (null result) → non-retryable → triggers fallback
+        let err = RpcError::ParseError {
+            method: "eth_getBlockReceipts".into(),
+            field: "result".into(),
+            cause: "expected array".into(),
+        };
+        assert!(
+            !err.is_retryable(),
+            "parse error must trigger fallback, not propagate"
+        );
+
+        // ConnectionFailed → retryable → must propagate immediately
+        let err = RpcError::ConnectionFailed {
+            url: "http://example.com".into(),
+            cause: "connection refused".into(),
+        };
+        assert!(
+            err.is_retryable(),
+            "network error must propagate, not trigger fallback"
+        );
+
+        // Timeout → retryable → must propagate immediately
+        let err = RpcError::Timeout {
+            method: "eth_getBlockReceipts".into(),
+            elapsed_ms: 30000,
+        };
+        assert!(
+            err.is_retryable(),
+            "timeout must propagate, not trigger fallback"
+        );
     }
 
     // --- Live tests (require real RPC, marked #[ignore]) ---
