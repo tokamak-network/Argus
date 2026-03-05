@@ -129,9 +129,6 @@ mod tests {
             }
         }
 
-        fn calls(&self) -> u32 {
-            self.call_count.load(Ordering::Relaxed)
-        }
     }
 
     impl AiClient for CountingMockClient {

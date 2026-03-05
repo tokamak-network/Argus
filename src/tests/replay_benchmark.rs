@@ -13,7 +13,7 @@ use std::time::Instant;
 
 use crate::autopsy::classifier::AttackClassifier;
 use crate::autopsy::fund_flow::FundFlowTracer;
-use crate::autopsy::types::{AttackPattern, DetectedPattern};
+use crate::autopsy::types::AttackPattern;
 use crate::sentinel::pipeline::FeatureVector;
 use crate::types::StepRecord;
 
