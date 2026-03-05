@@ -39,6 +39,11 @@ sentinel = [
     "dep:tower-http",
     "dep:tokio",
 ]
+ai_agent = [
+    "sentinel",
+    "dep:reqwest",
+    "dep:serde_json",
+]
 
 [dependencies]
 # Core ethrex dependencies (git)

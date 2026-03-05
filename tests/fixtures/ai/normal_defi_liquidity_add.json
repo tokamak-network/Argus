@@ -1,0 +1,79 @@
+{
+  "tx_hash": "0x2003200320032003200320032003200320032003200320032003200320032003",
+  "block_number": 21000012,
+  "from": "0x000000000000000000000000000000000000a030",
+  "to": "0x000000000000000000000000000000000000d030",
+  "value_wei": "0xde0b6b3a7640000",
+  "gas_used": 200000,
+  "succeeded": true,
+  "revert_count": 0,
+  "suspicious_score": 0.35,
+  "suspicion_reasons": ["erc20-transfers"],
+  "call_graph": [
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d030",
+      "target": "0x000000000000000000000000000000000000e030",
+      "value": "0xde0b6b3a7640000",
+      "input_selector": [232, 231, 126, 49],
+      "input_size": 164,
+      "output_size": 96,
+      "gas_used": 80000,
+      "call_type": "Call",
+      "reverted": false
+    }
+  ],
+  "storage_mutations": [
+    {
+      "contract": "0x000000000000000000000000000000000000e030",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000008",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x00000000000000000000000000000000000000000000003635c9adc5dea00000",
+      "in_callback": false
+    }
+  ],
+  "erc20_transfers": [
+    {
+      "token": "0x000000000000000000000000000000000000f030",
+      "from": "0x000000000000000000000000000000000000a030",
+      "to": "0x000000000000000000000000000000000000e030",
+      "amount": "0x3635c9adc5dea00000"
+    },
+    {
+      "token": "0x000000000000000000000000000000000000e030",
+      "from": "0x0000000000000000000000000000000000000000",
+      "to": "0x000000000000000000000000000000000000a030",
+      "amount": "0x1bc16d674ec80000"
+    }
+  ],
+  "eth_transfers": [
+    {
+      "from": "0x000000000000000000000000000000000000d030",
+      "to": "0x000000000000000000000000000000000000e030",
+      "value": "0xde0b6b3a7640000",
+      "call_depth": 0
+    }
+  ],
+  "log_events": [
+    {
+      "address": "0x000000000000000000000000000000000000e030",
+      "topic0": "0x4c209b5fc8ad50758f13e2e1088ba56a560dff690a1c6fef26394f4c03821c4f",
+      "topics": [
+        "0x000000000000000000000000000000000000000000000000000000000000a030"
+      ],
+      "data_size": 96
+    },
+    {
+      "address": "0x000000000000000000000000000000000000e030",
+      "topic0": "0x1c411e9a96e071241c2f21f7726b17ae89e3cab4c78be50e062b03a9fffbbad1",
+      "topics": [],
+      "data_size": 64
+    }
+  ],
+  "delegatecalls": [],
+  "contract_creations": [],
+  "_meta": {
+    "attack_type": null,
+    "description": "Add liquidity to Uniswap V2-style pool. User sends Token + ETH, receives LP tokens (minted from address(0)). Mint and Sync events. Normal DeFi activity."
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "tx_hash": "0x0101010101010101010101010101010101010101010101010101010101010101",
+  "block_number": 1718497,
+  "from": "0x0000000000000000000000000000000000000666",
+  "to": "0x0000000000000000000000000000000000000da0",
+  "value_wei": "0x0",
+  "gas_used": 150000,
+  "succeeded": true,
+  "revert_count": 0,
+  "suspicious_score": 0.85,
+  "suspicion_reasons": ["high-value-revert", "unusual-gas"],
+  "call_graph": [
+    {
+      "depth": 0,
+      "caller": "0x0000000000000000000000000000000000000da0",
+      "target": "0x0000000000000000000000000000000000000666",
+      "value": "0xde0b6b3a7640000",
+      "input_selector": null,
+      "input_size": 0,
+      "output_size": 0,
+      "gas_used": 0,
+      "call_type": "Call",
+      "reverted": false
+    },
+    {
+      "depth": 1,
+      "caller": "0x0000000000000000000000000000000000000666",
+      "target": "0x0000000000000000000000000000000000000da0",
+      "value": "0x0",
+      "input_selector": null,
+      "input_size": 0,
+      "output_size": 0,
+      "gas_used": 0,
+      "call_type": "Call",
+      "reverted": false
+    }
+  ],
+  "storage_mutations": [
+    {
+      "contract": "0x0000000000000000000000000000000000000da0",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "in_callback": true
+    }
+  ],
+  "erc20_transfers": [],
+  "eth_transfers": [
+    {
+      "from": "0x0000000000000000000000000000000000000da0",
+      "to": "0x0000000000000000000000000000000000000666",
+      "value": "0xde0b6b3a7640000",
+      "call_depth": 0
+    }
+  ],
+  "log_events": [],
+  "delegatecalls": [],
+  "contract_creations": [],
+  "_meta": {
+    "source": "synthetic fixture from exploit_fixtures::reentrancy_dao_fixture()",
+    "attack_type": "Reentrancy",
+    "model_after": "The DAO hack (2016-06-17)",
+    "description": "Victim contract sends 1 ETH to attacker via CALL. Attacker fallback re-enters victim before balance update. Victim SSTORE (balance write) happens inside the callback at depth 2.",
+    "key_signals": [
+      "CALL at depth 0 from victim to attacker with 1 ETH value",
+      "Re-entry CALL at depth 1 from attacker back to victim",
+      "SSTORE in victim contract at depth 2 (inside callback)",
+      "State modification after value transfer (classic reentrancy)"
+    ]
+  }
+}

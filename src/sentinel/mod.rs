@@ -3,6 +3,8 @@
 //! Pre-filters every transaction receipt in a block using lightweight heuristics,
 //! flagging suspicious transactions for deep analysis via the Autopsy Lab pipeline.
 
+#[cfg(feature = "ai_agent")]
+pub mod ai;
 pub mod alert;
 pub mod analyzer;
 pub mod auto_pause;

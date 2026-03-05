@@ -1,0 +1,79 @@
+{
+  "tx_hash": "0x3002300230023002300230023002300230023002300230023002300230023002",
+  "block_number": 21000021,
+  "from": "0x000000000000000000000000000000000000a050",
+  "to": "0x000000000000000000000000000000000000d050",
+  "value_wei": "0x0",
+  "gas_used": 250000,
+  "succeeded": true,
+  "revert_count": 0,
+  "suspicious_score": 0.40,
+  "suspicion_reasons": ["unusual-gas"],
+  "call_graph": [
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d050",
+      "target": "0x000000000000000000000000000000000000e050",
+      "value": "0x0",
+      "input_selector": [218, 149, 118, 36],
+      "input_size": 324,
+      "output_size": 32,
+      "gas_used": 80000,
+      "call_type": "Call",
+      "reverted": false
+    },
+    {
+      "depth": 1,
+      "caller": "0x000000000000000000000000000000000000e050",
+      "target": "0x000000000000000000000000000000000000e051",
+      "value": "0x0",
+      "input_selector": [93, 167, 147, 245],
+      "input_size": 68,
+      "output_size": 0,
+      "gas_used": 30000,
+      "call_type": "Call",
+      "reverted": false
+    }
+  ],
+  "storage_mutations": [
+    {
+      "contract": "0x000000000000000000000000000000000000d050",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000003",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "in_callback": false
+    },
+    {
+      "contract": "0x000000000000000000000000000000000000e050",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000010",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "in_callback": false
+    }
+  ],
+  "erc20_transfers": [],
+  "eth_transfers": [],
+  "log_events": [
+    {
+      "address": "0x000000000000000000000000000000000000d050",
+      "topic0": "0x789cf55be980739dad1d0699b93b58e806b51c9d96619bfa8fe0a28abf8b6847",
+      "topics": [
+        "0x0000000000000000000000000000000000000000000000000000000000000005"
+      ],
+      "data_size": 128
+    }
+  ],
+  "delegatecalls": [
+    {
+      "caller": "0x000000000000000000000000000000000000e050",
+      "target": "0x000000000000000000000000000000000000e051",
+      "input_selector": [93, 167, 147, 245]
+    }
+  ],
+  "contract_creations": [],
+  "_meta": {
+    "attack_type": null,
+    "description": "Governance proposal execution (e.g., Compound Governor). Timelock executes proposal via internal CALL + DELEGATECALL. Storage mutations in governance contract. Looks like it could be an access control issue (DELEGATECALL + SSTORE) but is a standard governance execution.",
+    "false_positive_notes": "Contains DELEGATECALL + SSTORE without CALLER check, which resembles access control bypass. However, this is the standard pattern for governance proposal execution where the timelock is the authorized caller."
+  }
+}

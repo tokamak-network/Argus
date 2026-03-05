@@ -1,0 +1,127 @@
+{
+  "tx_hash": "0x2002200220022002200220022002200220022002200220022002200220022002",
+  "block_number": 21000011,
+  "from": "0x000000000000000000000000000000000000a020",
+  "to": "0x000000000000000000000000000000000000d020",
+  "value_wei": "0x0",
+  "gas_used": 350000,
+  "succeeded": true,
+  "revert_count": 0,
+  "suspicious_score": 0.50,
+  "suspicion_reasons": ["erc20-transfers", "unusual-gas"],
+  "call_graph": [
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d020",
+      "target": "0x000000000000000000000000000000000000e020",
+      "value": "0x0",
+      "input_selector": [56, 237, 23, 57],
+      "input_size": 228,
+      "output_size": 32,
+      "gas_used": 100000,
+      "call_type": "Call",
+      "reverted": false
+    },
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d020",
+      "target": "0x000000000000000000000000000000000000e021",
+      "value": "0x0",
+      "input_selector": [56, 237, 23, 57],
+      "input_size": 228,
+      "output_size": 32,
+      "gas_used": 100000,
+      "call_type": "Call",
+      "reverted": false
+    },
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d020",
+      "target": "0x000000000000000000000000000000000000e022",
+      "value": "0x0",
+      "input_selector": [56, 237, 23, 57],
+      "input_size": 228,
+      "output_size": 32,
+      "gas_used": 100000,
+      "call_type": "Call",
+      "reverted": false
+    }
+  ],
+  "storage_mutations": [
+    {
+      "contract": "0x000000000000000000000000000000000000e020",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000008",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000001000",
+      "in_callback": false
+    },
+    {
+      "contract": "0x000000000000000000000000000000000000e021",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000008",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000002000",
+      "in_callback": false
+    },
+    {
+      "contract": "0x000000000000000000000000000000000000e022",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000008",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000003000",
+      "in_callback": false
+    }
+  ],
+  "erc20_transfers": [
+    {
+      "token": "0x000000000000000000000000000000000000f020",
+      "from": "0x000000000000000000000000000000000000a020",
+      "to": "0x000000000000000000000000000000000000e020",
+      "amount": "0x3635c9adc5dea00000"
+    },
+    {
+      "token": "0x000000000000000000000000000000000000f021",
+      "from": "0x000000000000000000000000000000000000e020",
+      "to": "0x000000000000000000000000000000000000e021",
+      "amount": "0x1bc16d674ec80000"
+    },
+    {
+      "token": "0x000000000000000000000000000000000000f022",
+      "from": "0x000000000000000000000000000000000000e021",
+      "to": "0x000000000000000000000000000000000000e022",
+      "amount": "0xde0b6b3a7640000"
+    },
+    {
+      "token": "0x000000000000000000000000000000000000f023",
+      "from": "0x000000000000000000000000000000000000e022",
+      "to": "0x000000000000000000000000000000000000a020",
+      "amount": "0x6f05b59d3b20000"
+    }
+  ],
+  "eth_transfers": [],
+  "log_events": [
+    {
+      "address": "0x000000000000000000000000000000000000e020",
+      "topic0": "0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822",
+      "topics": [],
+      "data_size": 128
+    },
+    {
+      "address": "0x000000000000000000000000000000000000e021",
+      "topic0": "0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822",
+      "topics": [],
+      "data_size": 128
+    },
+    {
+      "address": "0x000000000000000000000000000000000000e022",
+      "topic0": "0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822",
+      "topics": [],
+      "data_size": 128
+    }
+  ],
+  "delegatecalls": [],
+  "contract_creations": [],
+  "_meta": {
+    "attack_type": null,
+    "description": "Multi-hop DEX swap (A->B->C->D) across 3 pools. 4 ERC-20 transfers, 3 Swap events. Higher suspicion score (0.50) due to multiple transfers and gas usage, but entirely normal DeFi routing. Key false-positive test case.",
+    "false_positive_notes": "Looks suspicious due to many ERC-20 transfers and high gas, but multi-hop swaps are standard DeFi operations."
+  }
+}

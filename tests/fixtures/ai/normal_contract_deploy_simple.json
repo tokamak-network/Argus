@@ -1,0 +1,45 @@
+{
+  "tx_hash": "0x4001400140014001400140014001400140014001400140014001400140014001",
+  "block_number": 21000030,
+  "from": "0x000000000000000000000000000000000000a060",
+  "to": null,
+  "value_wei": "0x0",
+  "gas_used": 500000,
+  "succeeded": true,
+  "revert_count": 0,
+  "suspicious_score": 0.10,
+  "suspicion_reasons": [],
+  "call_graph": [],
+  "storage_mutations": [
+    {
+      "contract": "0x000000000000000000000000000000000000c060",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x000000000000000000000000000000000000000000000000000000000000a060",
+      "in_callback": false
+    },
+    {
+      "contract": "0x000000000000000000000000000000000000c060",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "in_callback": false
+    }
+  ],
+  "erc20_transfers": [],
+  "eth_transfers": [],
+  "log_events": [],
+  "delegatecalls": [],
+  "contract_creations": [
+    {
+      "deployer": "0x000000000000000000000000000000000000a060",
+      "deployed": "0x000000000000000000000000000000000000c060",
+      "code_size": 2048,
+      "create_type": "Create"
+    }
+  ],
+  "_meta": {
+    "attack_type": null,
+    "description": "Simple contract deployment via CREATE. Deploys a small contract (~2KB) with constructor that sets owner and initial state. No external calls during deployment. Normal development activity."
+  }
+}

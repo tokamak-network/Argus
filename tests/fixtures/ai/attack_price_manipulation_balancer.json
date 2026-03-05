@@ -1,0 +1,70 @@
+{
+  "tx_hash": "0x0303030303030303030303030303030303030303030303030303030303030303",
+  "block_number": 19500000,
+  "from": "0x000000000000000000000000000000000000000a",
+  "to": "0x0000000000000000000000000000000000000ba1",
+  "value_wei": "0x0",
+  "gas_used": 300000,
+  "succeeded": true,
+  "revert_count": 0,
+  "suspicious_score": 0.75,
+  "suspicion_reasons": ["oracle-swap", "erc20-transfers"],
+  "call_graph": [
+    {
+      "depth": 0,
+      "caller": "0x0000000000000000000000000000000000000ba1",
+      "target": "0x0000000000000000000000000000000000000ac1",
+      "value": "0x0",
+      "input_selector": null,
+      "input_size": 0,
+      "output_size": 0,
+      "gas_used": 0,
+      "call_type": "StaticCall",
+      "reverted": false
+    },
+    {
+      "depth": 0,
+      "caller": "0x0000000000000000000000000000000000000ba1",
+      "target": "0x0000000000000000000000000000000000000ac1",
+      "value": "0x0",
+      "input_selector": null,
+      "input_size": 0,
+      "output_size": 0,
+      "gas_used": 0,
+      "call_type": "StaticCall",
+      "reverted": false
+    }
+  ],
+  "storage_mutations": [],
+  "erc20_transfers": [
+    {
+      "token": "0x0000000000000000000000000000000000000de3",
+      "from": "0x000000000000000000000000000000000000000a",
+      "to": "0x000000000000000000000000000000000000000b",
+      "amount": "0x0"
+    },
+    {
+      "token": "0x0000000000000000000000000000000000000de3",
+      "from": "0x000000000000000000000000000000000000000b",
+      "to": "0x000000000000000000000000000000000000000a",
+      "amount": "0x0"
+    }
+  ],
+  "eth_transfers": [],
+  "log_events": [],
+  "delegatecalls": [],
+  "contract_creations": [],
+  "_meta": {
+    "source": "synthetic fixture from exploit_fixtures::price_manipulation_balancer_fixture()",
+    "attack_type": "PriceManipulation",
+    "model_after": "Balancer V2 price oracle manipulation",
+    "description": "Victim contract reads oracle price via STATICCALL (returns 1000). Then ERC-20 swap occurs on DEX (Transfer events). Victim reads same oracle again via STATICCALL (returns 1500). Price delta: 50% — classic oracle manipulation pattern.",
+    "key_signals": [
+      "Two STATICCALL reads to same oracle contract (0x0AC1)",
+      "ERC-20 Transfer events between the two oracle reads (swap)",
+      "Oracle returned 1000 on first read, 1500 on second read",
+      "Price delta of 50% between reads (well above 5% threshold)",
+      "No SSTORE — attacker reads manipulated price, not writes"
+    ]
+  }
+}

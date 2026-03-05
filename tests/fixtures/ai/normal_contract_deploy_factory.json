@@ -1,0 +1,94 @@
+{
+  "tx_hash": "0x4002400240024002400240024002400240024002400240024002400240024002",
+  "block_number": 21000031,
+  "from": "0x000000000000000000000000000000000000a070",
+  "to": "0x000000000000000000000000000000000000d070",
+  "value_wei": "0x0",
+  "gas_used": 800000,
+  "succeeded": true,
+  "revert_count": 0,
+  "suspicious_score": 0.45,
+  "suspicion_reasons": ["unusual-gas"],
+  "call_graph": [
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d070",
+      "target": "0x000000000000000000000000000000000000c071",
+      "value": "0x0",
+      "input_selector": null,
+      "input_size": 0,
+      "output_size": 0,
+      "gas_used": 200000,
+      "call_type": "Call",
+      "reverted": false
+    },
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d070",
+      "target": "0x000000000000000000000000000000000000c072",
+      "value": "0x0",
+      "input_selector": null,
+      "input_size": 0,
+      "output_size": 0,
+      "gas_used": 200000,
+      "call_type": "Call",
+      "reverted": false
+    }
+  ],
+  "storage_mutations": [
+    {
+      "contract": "0x000000000000000000000000000000000000d070",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "in_callback": false
+    },
+    {
+      "contract": "0x000000000000000000000000000000000000c071",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x000000000000000000000000000000000000000000000000000000000000d070",
+      "in_callback": false
+    },
+    {
+      "contract": "0x000000000000000000000000000000000000c072",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x000000000000000000000000000000000000000000000000000000000000d070",
+      "in_callback": false
+    }
+  ],
+  "erc20_transfers": [],
+  "eth_transfers": [],
+  "log_events": [
+    {
+      "address": "0x000000000000000000000000000000000000d070",
+      "topic0": "0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0",
+      "topics": [
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "0x000000000000000000000000000000000000000000000000000000000000a070"
+      ],
+      "data_size": 0
+    }
+  ],
+  "delegatecalls": [],
+  "contract_creations": [
+    {
+      "deployer": "0x000000000000000000000000000000000000d070",
+      "deployed": "0x000000000000000000000000000000000000c071",
+      "code_size": 4096,
+      "create_type": "Create2"
+    },
+    {
+      "deployer": "0x000000000000000000000000000000000000d070",
+      "deployed": "0x000000000000000000000000000000000000c072",
+      "code_size": 4096,
+      "create_type": "Create2"
+    }
+  ],
+  "_meta": {
+    "attack_type": null,
+    "description": "Factory contract deploys 2 child contracts via CREATE2. High gas due to bytecode deployment. Factory updates internal counter. OwnershipTransferred event emitted. Normal factory pattern (e.g., Uniswap pair creation, proxy deployment).",
+    "false_positive_notes": "High gas (800K) and CREATE2 could indicate attack setup, but factory pattern with deterministic addresses is standard DeFi infrastructure."
+  }
+}

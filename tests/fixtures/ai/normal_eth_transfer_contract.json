@@ -1,0 +1,43 @@
+{
+  "tx_hash": "0x1003100310031003100310031003100310031003100310031003100310031003",
+  "block_number": 21000003,
+  "from": "0x000000000000000000000000000000000000a003",
+  "to": "0x000000000000000000000000000000000000c003",
+  "value_wei": "0x2386f26fc10000",
+  "gas_used": 35000,
+  "succeeded": true,
+  "revert_count": 0,
+  "suspicious_score": 0.05,
+  "suspicion_reasons": [],
+  "call_graph": [
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000c003",
+      "target": "0x000000000000000000000000000000000000d003",
+      "value": "0x2386f26fc10000",
+      "input_selector": null,
+      "input_size": 0,
+      "output_size": 0,
+      "gas_used": 7000,
+      "call_type": "Call",
+      "reverted": false
+    }
+  ],
+  "storage_mutations": [],
+  "erc20_transfers": [],
+  "eth_transfers": [
+    {
+      "from": "0x000000000000000000000000000000000000c003",
+      "to": "0x000000000000000000000000000000000000d003",
+      "value": "0x2386f26fc10000",
+      "call_depth": 0
+    }
+  ],
+  "log_events": [],
+  "delegatecalls": [],
+  "contract_creations": [],
+  "_meta": {
+    "attack_type": null,
+    "description": "ETH transfer to a contract (0.01 ETH). Contract forwards ETH via internal CALL. Normal payment splitter pattern."
+  }
+}

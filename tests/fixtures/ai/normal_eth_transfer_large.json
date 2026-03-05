@@ -1,0 +1,23 @@
+{
+  "tx_hash": "0x1002100210021002100210021002100210021002100210021002100210021002",
+  "block_number": 21000002,
+  "from": "0x000000000000000000000000000000000000a002",
+  "to": "0x000000000000000000000000000000000000b002",
+  "value_wei": "0x4563918244f40000",
+  "gas_used": 21000,
+  "succeeded": true,
+  "revert_count": 0,
+  "suspicious_score": 0.15,
+  "suspicion_reasons": ["unusual-gas"],
+  "call_graph": [],
+  "storage_mutations": [],
+  "erc20_transfers": [],
+  "eth_transfers": [],
+  "log_events": [],
+  "delegatecalls": [],
+  "contract_creations": [],
+  "_meta": {
+    "attack_type": null,
+    "description": "Large ETH transfer (5 ETH) between EOAs. May trigger low suspicion due to high value, but perfectly normal whale activity. No internal calls."
+  }
+}

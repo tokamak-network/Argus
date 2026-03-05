@@ -1,0 +1,126 @@
+{
+  "tx_hash": "0x3001300130013001300130013001300130013001300130013001300130013001",
+  "block_number": 21000020,
+  "from": "0x000000000000000000000000000000000000a040",
+  "to": "0x000000000000000000000000000000000000d040",
+  "value_wei": "0x0",
+  "gas_used": 450000,
+  "succeeded": true,
+  "revert_count": 2,
+  "suspicious_score": 0.55,
+  "suspicion_reasons": ["unusual-gas", "erc20-transfers"],
+  "call_graph": [
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d040",
+      "target": "0x000000000000000000000000000000000000e040",
+      "value": "0x0",
+      "input_selector": [172, 154, 208, 161],
+      "input_size": 100,
+      "output_size": 32,
+      "gas_used": 50000,
+      "call_type": "Call",
+      "reverted": false
+    },
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d040",
+      "target": "0x000000000000000000000000000000000000e041",
+      "value": "0x0",
+      "input_selector": [172, 154, 208, 161],
+      "input_size": 100,
+      "output_size": 32,
+      "gas_used": 50000,
+      "call_type": "Call",
+      "reverted": true
+    },
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d040",
+      "target": "0x000000000000000000000000000000000000e042",
+      "value": "0x0",
+      "input_selector": [172, 154, 208, 161],
+      "input_size": 100,
+      "output_size": 32,
+      "gas_used": 50000,
+      "call_type": "Call",
+      "reverted": true
+    },
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d040",
+      "target": "0x000000000000000000000000000000000000e043",
+      "value": "0x0",
+      "input_selector": [172, 154, 208, 161],
+      "input_size": 100,
+      "output_size": 32,
+      "gas_used": 50000,
+      "call_type": "Call",
+      "reverted": false
+    },
+    {
+      "depth": 0,
+      "caller": "0x000000000000000000000000000000000000d040",
+      "target": "0x000000000000000000000000000000000000e044",
+      "value": "0x0",
+      "input_selector": [172, 154, 208, 161],
+      "input_size": 100,
+      "output_size": 32,
+      "gas_used": 50000,
+      "call_type": "Call",
+      "reverted": false
+    }
+  ],
+  "storage_mutations": [
+    {
+      "contract": "0x000000000000000000000000000000000000e040",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000005",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "in_callback": false
+    },
+    {
+      "contract": "0x000000000000000000000000000000000000e043",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000005",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "in_callback": false
+    },
+    {
+      "contract": "0x000000000000000000000000000000000000e044",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000005",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "in_callback": false
+    }
+  ],
+  "erc20_transfers": [
+    {
+      "token": "0x000000000000000000000000000000000000f040",
+      "from": "0x000000000000000000000000000000000000a040",
+      "to": "0x000000000000000000000000000000000000e040",
+      "amount": "0x56bc75e2d63100000"
+    },
+    {
+      "token": "0x000000000000000000000000000000000000f040",
+      "from": "0x000000000000000000000000000000000000a040",
+      "to": "0x000000000000000000000000000000000000e043",
+      "amount": "0x56bc75e2d63100000"
+    },
+    {
+      "token": "0x000000000000000000000000000000000000f040",
+      "from": "0x000000000000000000000000000000000000a040",
+      "to": "0x000000000000000000000000000000000000e044",
+      "amount": "0x56bc75e2d63100000"
+    }
+  ],
+  "eth_transfers": [],
+  "log_events": [],
+  "delegatecalls": [],
+  "contract_creations": [],
+  "_meta": {
+    "attack_type": null,
+    "description": "Multicall/batch transaction via aggregator contract. 5 internal calls (3 succeed, 2 revert). High gas and 2 reverts look suspicious but this is normal batch processing — individual calls may fail (insufficient balance, slippage, etc.) without making the overall TX malicious.",
+    "false_positive_notes": "2 reverts + high gas + multiple ERC-20 transfers. Looks suspicious but is a standard Multicall pattern where partial failures are expected."
+  }
+}

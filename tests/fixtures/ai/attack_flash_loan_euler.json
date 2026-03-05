@@ -1,0 +1,118 @@
+{
+  "tx_hash": "0x0202020202020202020202020202020202020202020202020202020202020202",
+  "block_number": 16818057,
+  "from": "0x0000000000000000000000000000000000000e17",
+  "to": "0x000000000000000000000000000000000000aa1e",
+  "value_wei": "0x0",
+  "gas_used": 800000,
+  "succeeded": true,
+  "revert_count": 0,
+  "suspicious_score": 0.80,
+  "suspicion_reasons": ["flash-loan", "erc20-transfers"],
+  "call_graph": [
+    {
+      "depth": 0,
+      "caller": "0x0000000000000000000000000000000000000e17",
+      "target": "0x000000000000000000000000000000000000aa1e",
+      "value": "0x0",
+      "input_selector": null,
+      "input_size": 0,
+      "output_size": 0,
+      "gas_used": 0,
+      "call_type": "Call",
+      "reverted": false
+    },
+    {
+      "depth": 1,
+      "caller": "0x000000000000000000000000000000000000aa1e",
+      "target": "0x0000000000000000000000000000000000000e17",
+      "value": "0x0",
+      "input_selector": null,
+      "input_size": 0,
+      "output_size": 0,
+      "gas_used": 0,
+      "call_type": "Call",
+      "reverted": false
+    },
+    {
+      "depth": 2,
+      "caller": "0x0000000000000000000000000000000000000e17",
+      "target": "0x0000000000000000000000000000000000000eee",
+      "value": "0x0",
+      "input_selector": null,
+      "input_size": 0,
+      "output_size": 0,
+      "gas_used": 0,
+      "call_type": "Call",
+      "reverted": false
+    }
+  ],
+  "storage_mutations": [
+    {
+      "contract": "0x0000000000000000000000000000000000000eee",
+      "slot": "0x000000000000000000000000000000000000000000000000000000000000000f",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x000000000000000000000000000000000000000000000000000000000000000f",
+      "in_callback": true
+    },
+    {
+      "contract": "0x0000000000000000000000000000000000000eee",
+      "slot": "0x000000000000000000000000000000000000000000000000000000000000001e",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x000000000000000000000000000000000000000000000000000000000000001e",
+      "in_callback": true
+    },
+    {
+      "contract": "0x0000000000000000000000000000000000000eee",
+      "slot": "0x000000000000000000000000000000000000000000000000000000000000002d",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x000000000000000000000000000000000000000000000000000000000000002d",
+      "in_callback": true
+    },
+    {
+      "contract": "0x0000000000000000000000000000000000000eee",
+      "slot": "0x000000000000000000000000000000000000000000000000000000000000003c",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x000000000000000000000000000000000000000000000000000000000000003c",
+      "in_callback": true
+    },
+    {
+      "contract": "0x0000000000000000000000000000000000000eee",
+      "slot": "0x000000000000000000000000000000000000000000000000000000000000004b",
+      "old_value": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "new_value": "0x000000000000000000000000000000000000000000000000000000000000004b",
+      "in_callback": true
+    }
+  ],
+  "erc20_transfers": [
+    {
+      "token": "0x000000000000000000000000000000000000dead",
+      "from": "0x000000000000000000000000000000000000aa1e",
+      "to": "0x0000000000000000000000000000000000000e17",
+      "amount": "0x0"
+    },
+    {
+      "token": "0x000000000000000000000000000000000000dead",
+      "from": "0x0000000000000000000000000000000000000e17",
+      "to": "0x000000000000000000000000000000000000aa1e",
+      "amount": "0x0"
+    }
+  ],
+  "eth_transfers": [],
+  "log_events": [],
+  "delegatecalls": [],
+  "contract_creations": [],
+  "_meta": {
+    "source": "synthetic fixture from exploit_fixtures::flash_loan_euler_fixture()",
+    "attack_type": "FlashLoan",
+    "model_after": "Euler Finance exploit (2023-03-13)",
+    "description": "Attacker calls flash loan pool. Pool sends ERC-20 tokens (borrow), then calls back attacker. Inside callback (depth 2), attacker performs operations with 5 SSTOREs on target contract. Attacker repays ERC-20 to pool. 77% of steps execute inside the callback.",
+    "key_signals": [
+      "ERC-20 Transfer from pool to attacker (borrow) in first half of trace",
+      "Callback pattern: pool calls back attacker at depth 2",
+      "77% of operations at depth > entry_depth + 1 (classic flash loan callback)",
+      "5 SSTORE operations on target contract inside callback",
+      "ERC-20 Transfer from attacker to pool (repay) in second half"
+    ]
+  }
+}
