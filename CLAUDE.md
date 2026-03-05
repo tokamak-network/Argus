@@ -9,7 +9,7 @@ Built with Rust, powered by ethrex LEVM.
 
 ```bash
 cargo check                                    # Compile check
-cargo test                                     # Run 662 tests (+ 25 ignored)
+cargo test                                     # Run 767 tests (+ 27 ignored)
 cargo clippy --all-features -- -D warnings     # Lint (warnings = errors)
 cargo fmt --check                              # Format check
 
@@ -65,7 +65,7 @@ src/
 │   ├── history.rs      #   Alert history storage
 │   └── config.rs       #   TOML config parsing
 │   ├── ai/             #   AI Agent MVP (feature: ai_agent, ~6,500 LoC)
-│   │   ├── types.rs    #     AgentContext, AgentVerdict, AttackType, CostTracker
+│   │   ├── types/      #     Sub-modules: attack_type, context, cost_tracker, verdict
 │   │   ├── context.rs  #     ContextExtractor (StepRecord[] → AgentContext)
 │   │   ├── judge.rs    #     AiJudge 2-tier pipeline (screening → deep)
 │   │   ├── guard.rs    #     Hallucination Guard (evidence verification)
@@ -86,7 +86,7 @@ src/
 │   ├── abi_decoder.rs  #   Function/event decoding
 │   └── enrichment.rs   #   Contract label enrichment
 ├── cli/                # Interactive GDB-style debugger
-└── tests/              # Test suite (662+ tests)
+└── tests/              # Test suite (767+ tests)
 
 dashboard/              # Web UI (Astro + React + Recharts)
 examples/               # 4 runnable demos

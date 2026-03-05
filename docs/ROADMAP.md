@@ -124,7 +124,7 @@ Phase AI-1 ✅ 완료 (2026-03-05) → AI-2 (최적화, 2-3주) → AI-3 (고도
 | AI-1-3 | **AiJudge 2-tier + HallucinationGuard** | screening(gemini-3-flash) → escalation → deep(gemini-3-pro) + 증거 검증 | ✅ 완료 |
 | AI-1-4 | **Sentinel Pipeline 통합** | rpc_service.rs에 AI judge 비동기 통합, SentinelAlert.agent_verdict 필드 | ✅ 완료 |
 
-**산출물:** 18개 신규 파일, ~6,500 LoC, 145 신규 테스트 (총 662 pass + 25 ignored)
+**산출물:** 18개 신규 파일, ~6,500 LoC, 145 신규 테스트 (총 767 pass + 27 ignored)
 
 **알려진 제한:** input_selector = None (Phase 2에서 recorder.rs calldata 캡처 추가 예정), CREATE deployed = Address::zero()
 
