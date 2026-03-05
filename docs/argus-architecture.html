@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Argus Architecture — Complete Module Map</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1337ec",
+                        "background-dark": "#0a0c14",
+                        "panel-dark": "#121625",
+                        "accent-blue": "#3b82f6",
+                        "accent-cyan": "#06b6d4",
+                        "accent-purple": "#a855f7",
+                        "accent-green": "#22c55e",
+                        "accent-orange": "#f97316",
+                        "accent-teal": "#14b8a6",
+                        "accent-gray": "#64748b",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "mono": ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"],
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer utilities {
+            .connector-v {
+                @apply w-px h-6 bg-slate-700 mx-auto relative;
+            }
+            .connector-v::after {
+                content: '▼';
+                @apply absolute -bottom-1 left-1/2 -translate-x-1/2 text-[8px] text-slate-700;
+            }
+            .connector-h {
+                @apply h-px w-6 bg-slate-700 relative;
+            }
+            .connector-h::after {
+                content: '▶';
+                @apply absolute -right-1 top-1/2 -translate-y-1/2 text-[8px] text-slate-700;
+            }
+            .module-box {
+                @apply px-4 py-2 bg-panel-dark border border-slate-700 rounded-lg text-center shadow-md flex flex-col items-center justify-center;
+            }
+            .module-title {
+                @apply text-sm font-bold;
+            }
+            .module-file {
+                @apply text-[10px] text-slate-400 font-mono mt-1;
+            }
+            .flow-label {
+                @apply absolute text-[10px] text-slate-400 bg-background-dark px-1 font-mono z-10;
+            }
+        }
+    </style>
+</head>
+<body class="bg-background-dark font-display text-slate-100 min-h-screen p-4 md:p-8">
+<div class="max-w-[1400px] mx-auto relative">
+<div class="absolute top-0 right-0 text-right">
+<div class="text-[10px] text-slate-400 font-mono space-y-1 bg-panel-dark/50 p-3 rounded-lg border border-slate-800">
+<div>72 .rs files</div>
+<div>~15k LoC</div>
+<div>461+ tests</div>
+<div>4 feature flags</div>
+</div>
+</div>
+<header class="text-center mb-12">
+<h1 class="text-3xl md:text-4xl font-bold tracking-tight text-white mb-2">Argus Architecture <span class="text-slate-500 font-light">— Complete Module Map</span></h1>
+<p class="text-slate-400 text-sm max-w-2xl mx-auto mb-4">Detailed software architecture map for Argus, an Ethereum real-time attack detection and forensics system built in Rust.</p>
+</header>
+<div class="flex justify-center gap-8 mb-8 relative">
+<div class="flex flex-col items-center">
+<div class="px-6 py-4 rounded-xl border border-slate-600 bg-slate-800 shadow-xl min-w-[200px] text-center relative z-10">
+<span class="material-symbols-outlined text-slate-300 mb-2 block">database</span>
+<span class="font-bold text-sm uppercase tracking-wider">Ethereum Mempool</span>
+</div>
+<div class="connector-v h-12 relative">
+<span class="flow-label top-1/2 -translate-y-1/2 left-2 w-max">RPC JSON</span>
+</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="px-6 py-4 rounded-xl border border-slate-600 bg-slate-800 shadow-xl min-w-[200px] text-center relative z-10">
+<span class="material-symbols-outlined text-slate-300 mb-2 block">hub</span>
+<span class="font-bold text-sm uppercase tracking-wider">Ethereum RPC Node</span>
+</div>
+<div class="connector-v h-12 relative">
+<span class="flow-label top-1/2 -translate-y-1/2 left-2 w-max">RPC JSON</span>
+</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="px-6 py-4 rounded-xl border border-slate-600 bg-slate-800 shadow-xl min-w-[200px] text-center relative z-10">
+<span class="material-symbols-outlined text-slate-300 mb-2 block">history</span>
+<span class="font-bold text-sm uppercase tracking-wider">Archive RPC Node</span>
+<div class="hidden lg:block absolute -left-20 top-1/2 w-20 h-px bg-accent-green/40 border-dashed z-0">
+<span class="absolute -top-4 left-0 text-[8px] text-accent-green/70 bg-background-dark px-1 w-max">◀ RPC JSON</span>
+</div>
+</div>
+<div class="connector-v h-12 relative">
+<span class="flow-label top-1/2 -translate-y-1/2 left-2 w-max">RPC JSON</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 gap-6 mb-8">
+<div class="col-span-3">
+<div class="h-full rounded-2xl border-2 border-accent-green/30 bg-accent-green/5 p-5 relative">
+<div class="absolute -top-3 left-6 px-3 py-0.5 bg-accent-green text-black text-[10px] font-black uppercase tracking-widest rounded">[feature: autopsy]</div>
+<div class="flex flex-col gap-3">
+<div class="module-box"><span class="module-title">RPC Client</span><span class="module-file">rpc_client.rs</span></div>
+<div class="connector-v !h-3"></div>
+<div class="module-box"><span class="module-title">Remote DB</span><span class="module-file">remote_db.rs</span></div>
+<div class="connector-v !h-3"></div>
+<div class="module-box"><span class="module-title">RPC Types</span><span class="module-file">rpc_types.rs</span></div>
+<div class="connector-v !h-3"></div>
+<div class="module-box border-accent-green/50 bg-accent-green/10">
+<span class="module-title text-accent-green">Classifier</span><span class="module-file">classifier.rs</span>
+</div>
+<div class="connector-v !h-3"></div>
+<div class="module-box border-accent-green/50 bg-accent-green/10">
+<span class="module-title text-accent-green">Fund Flow</span><span class="module-file">fund_flow.rs</span>
+</div>
+<div class="connector-v !h-3"></div>
+<div class="module-box"><span class="module-title">ABI Decoder</span><span class="module-file">abi_decoder.rs</span></div>
+<div class="connector-v !h-3"></div>
+<div class="module-box"><span class="module-title">Enrichment</span><span class="module-file">enrichment.rs</span></div>
+<div class="connector-v !h-3"></div>
+<div class="module-box"><span class="module-title">Labels DB</span><span class="module-file">labels.rs</span></div>
+<div class="connector-v !h-3"></div>
+<div class="module-box border-accent-green/80 bg-accent-green/20">
+<span class="module-title text-white">Report</span><span class="module-file">report.rs</span>
+</div>
+<div class="connector-v !h-3"></div>
+<div class="module-box"><span class="module-title">Metrics</span><span class="module-file">metrics.rs</span></div>
+</div>
+</div>
+</div>
+<div class="col-span-6 flex flex-col gap-6">
+<div class="grid grid-cols-2 gap-6 flex-1">
+<div class="rounded-2xl border-2 border-accent-blue/30 bg-accent-blue/5 p-5 relative">
+<div class="absolute -top-3 left-6 px-3 py-0.5 bg-accent-blue text-white text-[10px] font-black uppercase tracking-widest rounded">[feature: sentinel]</div>
+<div class="text-center mb-4 text-xs font-bold text-accent-blue uppercase tracking-wider">Store Mode</div>
+<div class="flex flex-col gap-4">
+<div class="module-box">
+<span class="module-title">Mempool Filter</span>
+<span class="module-file">mempool_filter.rs</span>
+</div>
+<div class="connector-v"></div>
+<div class="module-box">
+<span class="module-title">Pre-Filter</span>
+<span class="module-file">pre_filter.rs</span>
+<span class="text-[9px] text-accent-orange mt-1">10-50μs/tx</span>
+</div>
+<div class="connector-v"></div>
+<div class="module-box border-accent-blue/50 bg-accent-blue/10 p-3">
+<span class="module-title mb-2 text-accent-blue">Pipeline Orchestrator</span>
+<div class="grid grid-cols-2 gap-2 w-full">
+<span class="module-file bg-panel-dark/80 p-1 rounded">orchestrator.rs</span>
+<span class="module-file bg-panel-dark/80 p-1 rounded">steps.rs</span>
+<span class="module-file bg-panel-dark/80 p-1 rounded">context.rs</span>
+<span class="module-file bg-panel-dark/80 p-1 rounded">features.rs</span>
+</div>
+</div>
+<div class="connector-v"></div>
+<div class="module-box">
+<span class="module-title">Deep Analyzer</span>
+<span class="module-file">analyzer.rs</span>
+</div>
+<div class="connector-v"></div>
+<div class="module-box border-red-500/50 bg-red-500/10">
+<span class="module-title text-red-400">Alert Dispatcher</span>
+<span class="module-file">alert.rs</span>
+</div>
+</div>
+</div>
+<div class="rounded-2xl border-2 border-accent-cyan/30 bg-accent-cyan/5 p-5 relative">
+<div class="absolute -top-3 left-6 px-3 py-0.5 bg-accent-cyan text-black text-[10px] font-black uppercase tracking-widest rounded">[feature: sentinel + autopsy]</div>
+<div class="text-center mb-4 text-xs font-bold text-accent-cyan uppercase tracking-wider">RPC Mode</div>
+<div class="flex flex-col gap-4 h-full">
+<div class="module-box">
+<span class="module-title">RPC Poller</span>
+<span class="module-file">rpc_poller.rs</span>
+</div>
+<div class="connector-v"></div>
+<div class="module-box">
+<span class="module-title">RPC Type Converter</span>
+<span class="module-file">rpc_types.rs</span>
+</div>
+<div class="connector-v"></div>
+<div class="module-box border-dashed border-accent-cyan/50">
+<span class="module-title text-slate-300">Pre-Filter (Shared)</span>
+</div>
+<div class="connector-v"></div>
+<div class="module-box">
+<span class="module-title">RPC Replay</span>
+<span class="module-file">rpc_replay.rs</span>
+</div>
+<div class="connector-v"></div>
+<div class="module-box">
+<span class="module-title">RPC Service</span>
+<span class="module-file">rpc_service.rs</span>
+</div>
+</div>
+</div>
+</div>
+<div class="rounded-xl border border-accent-blue/40 bg-accent-blue/10 p-4">
+<div class="text-[10px] font-bold text-accent-blue uppercase tracking-widest mb-3 text-center">Shared Sentinel Components</div>
+<div class="flex flex-wrap justify-center gap-2">
+<div class="px-3 py-1.5 bg-panel-dark border border-slate-700 rounded text-xs">Whitelist</div>
+<div class="px-3 py-1.5 bg-panel-dark border border-slate-700 rounded text-xs">ML Model</div>
+<div class="px-3 py-1.5 bg-panel-dark border border-slate-700 rounded text-xs">History</div>
+<div class="px-3 py-1.5 bg-panel-dark border border-slate-700 rounded text-xs">Config</div>
+<div class="px-3 py-1.5 bg-panel-dark border border-slate-700 rounded text-xs">Auto-Pause</div>
+<div class="px-3 py-1.5 bg-panel-dark border border-slate-700 rounded text-xs">Metrics</div>
+<div class="px-3 py-1.5 bg-panel-dark border border-slate-700 rounded text-xs">HTTP Server</div>
+</div>
+</div>
+<div class="relative pt-4">
+<div class="absolute top-0 left-1/2 -translate-x-1/2 w-px h-4 bg-slate-600"></div>
+<div class="absolute top-4 left-1/2 -translate-x-1/2 w-3/4 h-px bg-slate-600"></div>
+<div class="flex justify-between gap-2 mt-4 relative z-10">
+<div class="flex-1 flex flex-col items-center">
+<div class="w-px h-4 bg-slate-600 mb-1 relative"><div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 text-[8px] text-slate-600">▼</div></div>
+<div class="w-full p-2 bg-panel-dark border border-slate-700 rounded text-center">
+<div class="text-xs font-bold text-slate-300">[JSONL file]</div>
+<div class="text-[9px] text-slate-500 font-mono mt-1">(file I/O)</div>
+</div>
+</div>
+<div class="flex-1 flex flex-col items-center">
+<div class="w-px h-4 bg-slate-600 mb-1 relative"><div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 text-[8px] text-slate-600">▼</div></div>
+<div class="w-full p-2 bg-panel-dark border border-slate-700 rounded text-center">
+<div class="text-xs font-bold text-accent-blue">[Webhook]</div>
+<div class="text-[9px] text-slate-500 font-mono mt-1">(HTTP)</div>
+</div>
+</div>
+<div class="flex-1 flex flex-col items-center">
+<div class="w-px h-4 bg-slate-600 mb-1 relative"><div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 text-[8px] text-slate-600">▼</div></div>
+<div class="w-full p-2 bg-panel-dark border border-slate-700 rounded text-center relative group">
+<div class="text-xs font-bold text-accent-orange">[WebSocket stream]</div>
+<div class="text-[9px] text-slate-500 font-mono mt-1">(WS)</div>
+<div class="hidden lg:block absolute top-1/2 -right-16 w-16 h-px bg-accent-orange border-dashed z-0">
+<span class="absolute -top-4 left-2 text-[8px] text-accent-orange bg-background-dark px-1 w-max">WS connection ▶</span>
+</div>
+</div>
+</div>
+<div class="flex-1 flex flex-col items-center">
+<div class="w-px h-4 bg-slate-600 mb-1 relative"><div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 text-[8px] text-slate-600">▼</div></div>
+<div class="w-full p-2 bg-panel-dark border border-slate-700 rounded text-center">
+<div class="text-xs font-bold text-red-400">[Prometheus]</div>
+<div class="text-[9px] text-slate-500 font-mono mt-1">(HTTP)</div>
+</div>
+</div>
+<div class="flex-1 flex flex-col items-center">
+<div class="w-px h-4 bg-slate-600 mb-1 relative"><div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 text-[8px] text-slate-600">▼</div></div>
+<div class="w-full p-2 bg-red-500/10 border border-red-500/30 rounded text-center">
+<div class="text-xs font-bold text-red-500">[Auto-Pause trigger]</div>
+<div class="text-[9px] text-slate-500 font-mono mt-1">(fn call)</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-3">
+<div class="h-full rounded-2xl border-2 border-accent-purple/30 bg-accent-purple/5 p-5 relative">
+<div class="absolute -top-3 left-6 px-3 py-0.5 bg-accent-purple text-white text-[10px] font-black uppercase tracking-widest rounded">[feature: ai_agent]</div>
+<div class="hidden lg:block absolute top-1/3 -left-8 w-8 h-px bg-accent-purple/50 border-dashed z-0">
+<span class="absolute -top-4 -left-6 text-[8px] text-accent-purple/70 bg-background-dark px-1 w-max">async 2-pass ▶</span>
+</div>
+<div class="flex flex-col gap-4">
+<div class="module-box border-accent-purple/40 bg-accent-purple/10">
+<span class="module-title text-accent-purple">AI Agent</span>
+<div class="mt-3 flex flex-col gap-2 w-full text-left">
+<div class="bg-panel-dark/80 p-2 rounded border border-slate-700">
+<span class="text-xs font-bold block mb-1">AiClient trait</span>
+<span class="text-[9px] text-slate-400 font-mono">client/mod.rs</span>
+<span class="text-[9px] text-slate-500 font-mono block">LiteLLM / Anthropic</span>
+</div>
+<div class="bg-panel-dark/80 p-2 rounded border border-slate-700 text-xs">System Prompt<span class="module-file block">prompts.rs</span></div>
+<div class="bg-panel-dark/80 p-2 rounded border border-slate-700 text-xs">AgentContext / Verdict<span class="module-file block">types.rs</span></div>
+<div class="bg-panel-dark/80 p-2 rounded border border-slate-700 text-xs">CostTracker<span class="module-file block">types.rs</span></div>
+<div class="bg-panel-dark/80 p-2 rounded border border-slate-700 text-xs">Fixtures<span class="module-file block">fixtures.rs</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Autopsy → Core Engine connection -->
+<div class="grid grid-cols-12 gap-0 mb-2">
+<div class="col-span-3 flex justify-center">
+<div class="flex flex-col items-center">
+<div class="w-px h-6 bg-accent-green/50"></div>
+<span class="text-[9px] text-accent-green/70 font-mono bg-background-dark px-1">fn call ▼</span>
+<div class="w-px h-6 bg-accent-green/50"></div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 gap-6 mb-8">
+<div class="col-span-4">
+<div class="h-full rounded-2xl border-2 border-accent-orange/30 bg-accent-orange/5 p-5 relative">
+<div class="absolute -top-3 left-6 px-3 py-0.5 bg-accent-orange text-black text-[10px] font-black uppercase tracking-widest rounded">Core Engine</div>
+<div class="grid grid-cols-2 gap-3 h-full items-start">
+<div class="module-box border-accent-orange/40 bg-accent-orange/10"><span class="module-title">ReplayEngine</span><span class="module-file">engine.rs</span></div>
+<div class="module-box"><span class="module-title">DebugRecorder</span><span class="module-file">recorder.rs</span></div>
+<div class="module-box"><span class="module-title">Types</span><span class="module-file">types.rs</span></div>
+<div class="module-box"><span class="module-title">Error</span><span class="module-file">error.rs</span></div>
+<div class="col-span-2 mt-auto">
+<div class="p-3 bg-accent-orange text-black rounded-xl text-center font-black italic shadow-lg">
+                        ethrex LEVM
+                    </div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-4">
+<div class="h-full rounded-2xl border-2 border-slate-600/50 bg-slate-800/30 p-5 relative">
+<div class="absolute -top-3 left-6 px-3 py-0.5 bg-slate-600 text-white text-[10px] font-black uppercase tracking-widest rounded">[feature: cli]</div>
+<div class="flex flex-col gap-3">
+<div class="module-box"><span class="module-title">Binary Entry</span><span class="module-file">bin/debugger.rs</span></div>
+<div class="grid grid-cols-3 gap-2">
+<div class="module-box p-2"><span class="text-xs font-bold">REPL</span><span class="module-file">repl.rs</span></div>
+<div class="module-box p-2"><span class="text-xs font-bold">Commands</span><span class="module-file">commands.rs</span></div>
+<div class="module-box p-2"><span class="text-xs font-bold">Formatter</span><span class="module-file">formatter.rs</span></div>
+</div>
+<div class="flex justify-around mt-2">
+<div class="text-center">
+<div class="w-px h-6 bg-slate-600 mx-auto relative"><div class="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] text-slate-500">▲</div></div>
+<span class="text-[9px] text-slate-400 font-mono">sentinel cmd</span>
+</div>
+<div class="text-center">
+<div class="w-px h-6 bg-slate-600 mx-auto relative"><div class="absolute -top-1 left-1/2 -translate-x-1/2 text-[8px] text-slate-500">▲</div></div>
+<span class="text-[9px] text-slate-400 font-mono">autopsy cmd</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-4">
+<div class="h-full rounded-2xl border-2 border-accent-teal/30 bg-accent-teal/5 p-5 relative flex flex-col justify-center">
+<div class="absolute -top-3 right-6 px-3 py-0.5 bg-accent-teal text-black text-[10px] font-black uppercase tracking-widest rounded">Dashboard</div>
+<div class="p-5 bg-panel-dark rounded-xl border border-accent-teal/30 shadow-lg text-center">
+<span class="material-symbols-outlined text-accent-teal text-3xl mb-2">dashboard</span>
+<h4 class="font-bold text-lg mb-1">Real-time Alert View</h4>
+<div class="flex justify-center gap-2 text-[10px] font-mono text-slate-400 mt-3">
+<span class="px-2 py-1 bg-slate-800 rounded">Astro</span>
+<span class="px-2 py-1 bg-slate-800 rounded">React</span>
+<span class="px-2 py-1 bg-slate-800 rounded">Recharts</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<footer class="mt-12 pt-6 border-t border-slate-800 flex flex-wrap justify-center gap-8 md:gap-12 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+<div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm md:text-base">layers</span> Docker</div>
+<div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm md:text-base">inventory_2</span> AWS ECR</div>
+<div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm md:text-base">published_with_changes</span> GitHub Actions</div>
+<div class="flex items-center gap-2 ml-auto text-orange-400/80">
+<span class="material-symbols-outlined text-sm md:text-base">code</span> Rust 1.85+
+    </div>
+</footer>
+</div>
+</body></html>
