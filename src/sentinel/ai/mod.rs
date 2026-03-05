@@ -38,6 +38,8 @@ pub mod judge;
 #[cfg(test)]
 mod judge_test;
 #[cfg(test)]
+mod client_http_test;
+#[cfg(test)]
 mod poc_test;
 pub mod prompts;
 pub mod rate_limit;

@@ -215,11 +215,9 @@ pub struct CostTracker {
     pub monthly_budget_usd: f64,
     /// Daily spend ceiling in USD (default 10.0).
     pub daily_limit_usd: f64,
-    // TODO(phase1-pre-prod): Enforce hourly_rate_limit in can_afford() before production.
-    /// Maximum AI requests per hour. **NOT YET ENFORCED** — will be checked in Phase 1.
+    /// Maximum AI requests per hour. Enforced by HourlyRateTracker in AiJudge.
     pub hourly_rate_limit: u32,
-    // TODO(phase1-pre-prod): Enforce max_concurrent_per_block in can_afford() before production.
-    /// Maximum concurrent AI requests per block. **NOT YET ENFORCED** — will be checked in Phase 1.
+    /// Maximum concurrent AI requests per block. Enforced by BlockConcurrencyTracker in AiJudge.
     pub max_concurrent_per_block: u8,
 
     // Running totals (reset periodically)
@@ -244,8 +242,8 @@ impl CostTracker {
     /// Checks monthly budget, daily limit, and exhaustion flag.
     /// Does NOT mutate state — call [`CostTracker::record`] after a successful call.
     ///
-    /// Note: hourly_rate_limit and max_concurrent_per_block are NOT yet checked.
-    /// Daily reset is NOT yet implemented — today_cost_usd must be reset externally.
+    /// Note: hourly_rate_limit and max_concurrent_per_block are enforced by
+    /// AiJudge (HourlyRateTracker + BlockConcurrencyTracker), not in this method.
     pub fn can_afford(&self, estimated_usd: f64) -> bool {
         const EPSILON: f64 = 0.01;
         if self.budget_exhausted {

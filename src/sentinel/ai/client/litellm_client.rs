@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::time::Instant;
 
 use super::super::types::AgentContext;
-use super::{AiClient, AiError, AiResponse, TokenUsage, parse_verdict, verdict_tool_schema};
+use super::{AiClient, AiError, AiResponse, TokenUsage, parse_verdict, serialize_context_checked, verdict_tool_schema};
 
 // ── OpenAI-compatible API types (request) ────────────────────────────────
 
@@ -175,15 +175,8 @@ impl LiteLLMClient {
 }
 
 impl AiClient for LiteLLMClient {
-    // TODO(phase1-pre-prod): Add mock HTTP tests (wiremock/mockito) for this method before production.
-    //   Required scenarios: 200 OK with valid tool_call, 429 rate limit, empty choices,
-    //   malformed JSON body, network timeout. See devil review 2nd round — 종목 7 감점.
-    // TODO(phase1-pre-prod): Guard AgentContext size before serialization.
-    //   Use context.approx_json_bytes() and reject if > MAX_CONTEXT_BYTES to prevent
-    //   unbounded API spend from adversarial TX traces. See devil review 2nd round — 종목 2 감점.
     async fn judge(&self, context: &AgentContext, model: &str) -> Result<AiResponse, AiError> {
-        let context_json =
-            serde_json::to_string(context).map_err(|e| AiError::ParseError(e.to_string()))?;
+        let context_json = serialize_context_checked(context)?;
 
         let request_body = ChatCompletionRequest {
             model: model.to_string(),

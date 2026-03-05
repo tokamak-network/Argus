@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::time::Instant;
 
 use super::super::types::AgentContext;
-use super::{AiClient, AiError, AiResponse, TokenUsage, parse_verdict, verdict_tool_schema};
+use super::{AiClient, AiError, AiResponse, TokenUsage, parse_verdict, serialize_context_checked, verdict_tool_schema};
 
 // ── Anthropic API types (request) ────────────────────────────────────────
 
@@ -108,6 +108,7 @@ struct AnthropicErrorDetail {
 /// Use this as a fallback when LiteLLM proxy is not available.
 pub struct AnthropicClient {
     http: reqwest::Client,
+    api_url: String,
     api_key: String,
     system_prompt: String,
     enable_cache: bool,
@@ -130,6 +131,7 @@ impl AnthropicClient {
 
         Ok(Self {
             http,
+            api_url: Self::API_URL.to_string(),
             api_key,
             system_prompt,
             enable_cache: true,
@@ -145,10 +147,19 @@ impl AnthropicClient {
 
         Ok(Self {
             http,
+            api_url: Self::API_URL.to_string(),
             api_key,
             system_prompt,
             enable_cache: true,
         })
+    }
+
+    /// Override the API URL (for testing with mock servers).
+    pub fn with_api_url(self, url: String) -> Self {
+        Self {
+            api_url: url,
+            ..self
+        }
     }
 
     /// Disable prompt caching (for testing/comparison).
@@ -172,13 +183,8 @@ impl AnthropicClient {
 }
 
 impl AiClient for AnthropicClient {
-    // TODO(phase1-pre-prod): Add mock HTTP tests and AnthropicClient unit tests before production.
-    //   Required: verdict_tool format, header construction (x-api-key, anthropic-version, anthropic-beta),
-    //   without_cache() behavior, error response parsing. See devil review 2nd round — 종목 7 감점.
-    // TODO(phase1-pre-prod): Guard AgentContext size before serialization (same as LiteLLMClient).
     async fn judge(&self, context: &AgentContext, model: &str) -> Result<AiResponse, AiError> {
-        let context_json =
-            serde_json::to_string(context).map_err(|e| AiError::ParseError(e.to_string()))?;
+        let context_json = serialize_context_checked(context)?;
 
         let cache_control = if self.enable_cache {
             Some(CacheControl {
@@ -231,7 +237,7 @@ impl AiClient for AnthropicClient {
 
         let response = self
             .http
-            .post(Self::API_URL)
+            .post(&self.api_url)
             .headers(headers)
             .json(&request_body)
             .send()

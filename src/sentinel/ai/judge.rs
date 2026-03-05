@@ -16,7 +16,7 @@ use super::ai_config::AiConfig;
 use super::circuit_breaker::CircuitBreaker;
 use super::client::{AiClient, AiError, AiResponse, TokenUsage};
 use super::guard::validate_evidence;
-use super::rate_limit::HourlyRateTracker;
+use super::rate_limit::{BlockConcurrencyTracker, HourlyRateTracker};
 use super::types::{AgentContext, AgentVerdict, CostTracker};
 
 /// Worst-case estimated cost (USD) for a single AI request.
@@ -34,6 +34,8 @@ pub enum JudgeError {
     CircuitBreakerOpen,
     #[error("Hourly rate limit exceeded")]
     RateLimitExceeded,
+    #[error("Block concurrency limit exceeded (block {block_number})")]
+    BlockConcurrencyExceeded { block_number: u64 },
     #[error("AI client error: {0}")]
     AiError(#[from] AiError),
     #[error("All retries exhausted after {attempts} attempts: {last_error}")]
@@ -48,6 +50,7 @@ pub struct AiJudge<C: AiClient> {
     cost_tracker: Arc<Mutex<CostTracker>>,
     circuit_breaker: Arc<Mutex<CircuitBreaker>>,
     hourly_tracker: Arc<Mutex<HourlyRateTracker>>,
+    block_concurrency: Arc<Mutex<BlockConcurrencyTracker>>,
     config: AiConfig,
 }
 
@@ -56,12 +59,16 @@ impl<C: AiClient> AiJudge<C> {
     pub fn new(client: C, cost_tracker: Arc<Mutex<CostTracker>>, config: AiConfig) -> Self {
         let circuit_breaker = Arc::new(Mutex::new(config.to_circuit_breaker()));
         let hourly_tracker = Arc::new(Mutex::new(config.to_hourly_tracker()));
+        let block_concurrency = Arc::new(Mutex::new(BlockConcurrencyTracker::new(
+            config.max_concurrent_per_block,
+        )));
 
         Self {
             client,
             cost_tracker,
             circuit_breaker,
             hourly_tracker,
+            block_concurrency,
             config,
         }
     }
@@ -77,6 +84,31 @@ impl<C: AiClient> AiJudge<C> {
     pub async fn judge(&self, context: &AgentContext) -> Result<AgentVerdict, JudgeError> {
         self.check_preflight().await?;
 
+        // Check block concurrency limit
+        {
+            let mut bc = self.block_concurrency.lock().await;
+            if !bc.is_allowed(context.block_number) {
+                return Err(JudgeError::BlockConcurrencyExceeded {
+                    block_number: context.block_number,
+                });
+            }
+            bc.acquire(context.block_number);
+        }
+
+        // Wrap the actual pipeline so we always release the concurrency slot
+        let result = self.run_pipeline(context).await;
+
+        // Release concurrency slot regardless of success/failure
+        {
+            let mut bc = self.block_concurrency.lock().await;
+            bc.release(context.block_number);
+        }
+
+        result
+    }
+
+    /// Inner pipeline: screening → optional escalation → hallucination guard.
+    async fn run_pipeline(&self, context: &AgentContext) -> Result<AgentVerdict, JudgeError> {
         // Step 1: Screening model
         let screening_response = self
             .call_with_retry(context, &self.config.screening_model)
@@ -489,6 +521,46 @@ mod tests {
         let verdict = result.unwrap();
         // "Low gas usage pattern" has no hex addresses/amounts → qualitative → passes
         assert!(verdict.evidence_valid);
+    }
+
+    #[tokio::test]
+    async fn judge_block_concurrency_exceeded() {
+        let client = MockAiClient::always_responding(benign_verdict());
+        let mut config = test_config();
+        config.max_concurrent_per_block = 1;
+        let cost_tracker = Arc::new(Mutex::new(config.to_cost_tracker()));
+        let judge = AiJudge::new(client, cost_tracker, config);
+
+        // Pre-acquire one slot for this block
+        {
+            let mut bc = judge.block_concurrency.lock().await;
+            bc.acquire(21_000_000);
+        }
+
+        let result = judge.judge(&minimal_context()).await;
+        assert!(matches!(
+            result,
+            Err(JudgeError::BlockConcurrencyExceeded {
+                block_number: 21_000_000
+            })
+        ));
+    }
+
+    #[tokio::test]
+    async fn judge_block_concurrency_releases_on_success() {
+        let client = MockAiClient::always_responding(benign_verdict());
+        let mut config = test_config();
+        config.max_concurrent_per_block = 1;
+        let cost_tracker = Arc::new(Mutex::new(config.to_cost_tracker()));
+        let judge = AiJudge::new(client, cost_tracker, config);
+
+        // First call should succeed and release slot
+        let result = judge.judge(&minimal_context()).await;
+        assert!(result.is_ok());
+
+        // Second call to same block should also succeed (slot was released)
+        let result = judge.judge(&minimal_context()).await;
+        assert!(result.is_ok());
     }
 
     #[tokio::test]

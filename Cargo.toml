@@ -83,6 +83,8 @@ ethrex-blockchain = { git = "https://github.com/tokamak-network/ethrex", rev = "
 ethrex-vm = { git = "https://github.com/tokamak-network/ethrex", rev = "03fc1858" }
 rustc-hash = "2.1.1"
 serde_json = "1.0.117"
+wiremock = "0.6"
+tokio = { version = "1.41.1", features = ["full"] }
 
 [[bin]]
 name = "argus"
