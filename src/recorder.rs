@@ -199,3 +199,146 @@ impl OpcodeRecorder for DebugRecorder {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const STACK_LIMIT: usize = 1024;
+
+    /// Build a Stack with values placed so peek(0..N) returns them in order.
+    fn make_stack(values: &[U256]) -> Stack {
+        let mut stack = Stack {
+            values: Box::new([U256::zero(); STACK_LIMIT]),
+            offset: STACK_LIMIT,
+        };
+        // Push in reverse so peek(0) = values[0], peek(1) = values[1], etc.
+        for v in values.iter().rev() {
+            stack.push(*v).unwrap();
+        }
+        stack
+    }
+
+    /// Build a Memory with given bytes starting at offset 0.
+    fn make_memory(bytes: &[u8]) -> Memory {
+        let mem = Memory::new();
+        mem.buffer.borrow_mut().extend_from_slice(bytes);
+        mem
+    }
+
+    #[test]
+    fn call_input_selector_extracted_for_call() {
+        // CALL stack: [gas, to, value, argsOffset, argsLength, retOffset, retLength]
+        let stack = make_stack(&[
+            U256::from(50_000_u64), // gas
+            U256::from(0xBB_u64),   // to
+            U256::zero(),           // value
+            U256::from(0_u64),      // argsOffset = 0
+            U256::from(36_u64),     // argsLength = 36 (>= 4)
+            U256::zero(),           // retOffset
+            U256::from(32_u64),     // retLength
+        ]);
+        let memory = make_memory(&[0xa9, 0x05, 0x9c, 0xbb, 0x00, 0x00]);
+
+        let result = DebugRecorder::extract_call_input_selector(OP_CALL, &stack, &memory);
+        assert_eq!(result, Some([0xa9, 0x05, 0x9c, 0xbb]));
+    }
+
+    #[test]
+    fn call_input_selector_extracted_for_delegatecall() {
+        // DELEGATECALL stack: [gas, to, argsOffset, argsLength, retOffset, retLength]
+        let stack = make_stack(&[
+            U256::from(50_000_u64), // gas
+            U256::from(0xDD_u64),   // to
+            U256::from(0_u64),      // argsOffset = 0
+            U256::from(68_u64),     // argsLength = 68 (>= 4)
+            U256::zero(),           // retOffset
+            U256::from(32_u64),     // retLength
+        ]);
+        let memory = make_memory(&[0x12, 0x34, 0x56, 0x78, 0x00]);
+
+        let result = DebugRecorder::extract_call_input_selector(OP_DELEGATECALL, &stack, &memory);
+        assert_eq!(result, Some([0x12, 0x34, 0x56, 0x78]));
+    }
+
+    #[test]
+    fn call_input_selector_extracted_for_staticcall() {
+        // STATICCALL stack: same layout as DELEGATECALL
+        let stack = make_stack(&[
+            U256::from(30_000_u64),
+            U256::from(0xEE_u64),
+            U256::from(0_u64), // argsOffset
+            U256::from(4_u64), // argsLength = exactly 4
+            U256::zero(),
+            U256::from(32_u64),
+        ]);
+        let memory = make_memory(&[0xde, 0xad, 0xbe, 0xef]);
+
+        let result = DebugRecorder::extract_call_input_selector(OP_STATICCALL, &stack, &memory);
+        assert_eq!(result, Some([0xde, 0xad, 0xbe, 0xef]));
+    }
+
+    #[test]
+    fn call_input_selector_none_for_short_calldata() {
+        // argsLength = 3 (< 4)
+        let stack = make_stack(&[
+            U256::from(50_000_u64),
+            U256::from(0xBB_u64),
+            U256::zero(),
+            U256::from(0_u64), // argsOffset
+            U256::from(3_u64), // argsLength < 4
+            U256::zero(),
+            U256::from(32_u64),
+        ]);
+        let memory = make_memory(&[0xaa, 0xbb, 0xcc]);
+
+        let result = DebugRecorder::extract_call_input_selector(OP_CALL, &stack, &memory);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn call_input_selector_none_for_non_call_opcode() {
+        let stack = make_stack(&[U256::from(42_u64)]);
+        let memory = make_memory(&[0xaa, 0xbb, 0xcc, 0xdd]);
+
+        // ADD opcode (0x01)
+        let result = DebugRecorder::extract_call_input_selector(0x01, &stack, &memory);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn call_input_selector_none_when_memory_too_short() {
+        // argsOffset = 10, argsLength = 4, but memory only has 8 bytes
+        let stack = make_stack(&[
+            U256::from(50_000_u64),
+            U256::from(0xBB_u64),
+            U256::zero(),
+            U256::from(10_u64), // argsOffset = 10
+            U256::from(4_u64),  // argsLength = 4
+            U256::zero(),
+            U256::from(32_u64),
+        ]);
+        let memory = make_memory(&[0u8; 8]); // only 8 bytes, need offset 10+4=14
+
+        let result = DebugRecorder::extract_call_input_selector(OP_CALL, &stack, &memory);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn call_input_selector_with_nonzero_offset() {
+        // Selector is at argsOffset=4 in memory
+        let stack = make_stack(&[
+            U256::from(50_000_u64),
+            U256::from(0xBB_u64),
+            U256::zero(),
+            U256::from(4_u64),  // argsOffset = 4
+            U256::from(36_u64), // argsLength = 36
+            U256::zero(),
+            U256::from(32_u64),
+        ]);
+        let memory = make_memory(&[0x00, 0x00, 0x00, 0x00, 0xca, 0xfe, 0xba, 0xbe, 0x11, 0x22]);
+
+        let result = DebugRecorder::extract_call_input_selector(OP_CALL, &stack, &memory);
+        assert_eq!(result, Some([0xca, 0xfe, 0xba, 0xbe]));
+    }
+}

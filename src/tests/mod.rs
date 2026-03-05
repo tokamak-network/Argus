@@ -26,6 +26,15 @@ mod exploit_fixtures;
 #[cfg(feature = "autopsy")]
 mod exploit_smoke_tests;
 
+#[cfg(feature = "autopsy")]
+mod classifier_diagnostic;
+
+#[cfg(feature = "autopsy")]
+mod classifier_validation_tests;
+
+#[cfg(all(feature = "autopsy", feature = "sentinel"))]
+mod live_replay_diagnostic;
+
 #[cfg(all(feature = "autopsy", feature = "sentinel"))]
 mod replay_benchmark;
 
