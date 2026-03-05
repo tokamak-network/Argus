@@ -9,7 +9,7 @@ Built with Rust, powered by ethrex LEVM.
 
 ```bash
 cargo check                                    # Compile check
-cargo test                                     # Run 461 tests (+ 6 ignored)
+cargo test                                     # Run 662 tests (+ 25 ignored)
 cargo clippy --all-features -- -D warnings     # Lint (warnings = errors)
 cargo fmt --check                              # Format check
 
@@ -64,12 +64,19 @@ src/
 │   ├── metrics.rs      #   Prometheus-compatible
 │   ├── history.rs      #   Alert history storage
 │   └── config.rs       #   TOML config parsing
-│   ├── ai/             #   AI Agent PoC (feature: ai_agent)
+│   ├── ai/             #   AI Agent MVP (feature: ai_agent, ~6,500 LoC)
 │   │   ├── types.rs    #     AgentContext, AgentVerdict, AttackType, CostTracker
-│   │   ├── client.rs   #     AiClient trait + LiteLLMClient + AnthropicClient
+│   │   ├── context.rs  #     ContextExtractor (StepRecord[] → AgentContext)
+│   │   ├── judge.rs    #     AiJudge 2-tier pipeline (screening → deep)
+│   │   ├── guard.rs    #     Hallucination Guard (evidence verification)
+│   │   ├── client/     #     AiClient trait + LiteLLMClient + AnthropicClient
+│   │   ├── cost.rs     #     CostTracker persistence (JSON, daily/monthly reset)
+│   │   ├── ai_config.rs#     TOML config for [ai] section
+│   │   ├── rate_limit.rs#    HourlyRateTracker + BlockConcurrencyTracker
+│   │   ├── circuit_breaker.rs# CircuitBreaker for API failure protection
 │   │   ├── prompts.rs  #     SYSTEM_PROMPT (5 attack patterns)
 │   │   ├── fixtures.rs #     Fixture loader utilities
-│   │   └── poc_test.rs #     PoC integration tests (6 tests)
+│   │   └── *_test.rs   #     Tests: context, judge, guard, cost, poc (50 tests)
 ├── autopsy/            # Post-hack forensics (3,544 LoC)
 │   ├── types.rs        #   AttackPattern, FundFlow
 │   ├── classifier.rs   #   Reentrancy, flash loan, price manipulation
@@ -79,7 +86,7 @@ src/
 │   ├── abi_decoder.rs  #   Function/event decoding
 │   └── enrichment.rs   #   Contract label enrichment
 ├── cli/                # Interactive GDB-style debugger
-└── tests/              # Test suite (461+ tests)
+└── tests/              # Test suite (662+ tests)
 
 dashboard/              # Web UI (Astro + React + Recharts)
 examples/               # 4 runnable demos
@@ -93,7 +100,7 @@ docs/                   # Case studies
 | `sentinel` | Yes | Real-time detection pipeline, axum, tokio |
 | `autopsy` | Yes | Forensic analysis, reqwest, sha3 |
 | `cli` | No | Interactive debugger shell, clap, rustyline |
-| `ai_agent` | No | LLM-assisted detection (LiteLLM proxy, Gemini flash/pro). See PRD/ and docs/ai-agent-poc-report.md |
+| `ai_agent` | No | LLM-assisted detection — Phase 1 MVP complete. 2-tier judge, hallucination guard, cost tracker, circuit breaker. See PRD/ and docs/ai-agent-poc-report.md |
 
 ## Key Dependencies
 

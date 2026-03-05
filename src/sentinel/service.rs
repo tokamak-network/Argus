@@ -206,6 +206,8 @@ impl SentinelService {
                         ),
                         total_steps: 0,
                         feature_vector: None,
+                        #[cfg(feature = "ai_agent")]
+                        agent_verdict: None,
                     };
                     alert_handler.on_alert(sentinel_alert);
                 }
@@ -313,6 +315,8 @@ impl SentinelService {
             ),
             total_steps: 0,
             feature_vector: None,
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         }
     }
 }

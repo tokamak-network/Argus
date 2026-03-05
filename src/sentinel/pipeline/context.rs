@@ -129,6 +129,8 @@ impl AnalysisContext {
             summary,
             total_steps,
             feature_vector: self.features.clone(),
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         }
     }
 }

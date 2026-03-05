@@ -142,6 +142,8 @@ mod tests {
             summary: "test ws alert".to_string(),
             total_steps: 100,
             feature_vector: None,
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         }
     }
 

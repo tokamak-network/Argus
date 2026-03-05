@@ -1,30 +1,18 @@
 //! RPC-mode Sentinel service — runs the full detection pipeline using any JSON-RPC endpoint.
 //!
-//! `RpcSentinelService` polls an Ethereum node via JSON-RPC, converts each incoming
-//! block into ethrex-native types, and runs the same two-stage detection pipeline
-//! used by the Store-mode service: pre-filter heuristics followed by optional deep
-//! opcode-level replay.
+//! Like a security guard watching a live camera feed (RPC poller) instead of reviewing
+//! footage from an internal hard drive (local Store). Same guard, same skills — different
+//! data source. Supports two modes:
 //!
-//! Think of it like a security guard watching a live camera feed (RPC poller) instead
-//! of reviewing footage from an internal hard drive (local Store). Same guard, same
-//! skills — different data source.
-//!
-//! # Modes
-//!
-//! - **prefilter_only = false** (default): Deep RPC replay via `replay_tx_from_rpc`.
-//!   Requires an archive node.
-//! - **prefilter_only = true**: Receipt-based heuristics only. Compatible with any
-//!   full node. Lower fidelity but faster and cheaper.
+//! - **prefilter_only = false** (default): Deep RPC replay. Requires an archive node.
+//! - **prefilter_only = true**: Receipt heuristics only. Works with any full node.
 
 #![cfg(all(feature = "sentinel", feature = "autopsy"))]
 
 use std::sync::Arc;
 use std::time::Instant;
 
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
-
-use crate::autopsy::rpc_client::{RpcBlock, RpcReceipt};
+use tokio::sync::{mpsc, oneshot};
 
 use super::metrics::SentinelMetrics;
 use super::pre_filter::PreFilter;
@@ -35,6 +23,7 @@ use super::types::{
     AlertPriority, AnalysisConfig, SentinelAlert, SentinelConfig, SuspicionReason, SuspiciousTx,
 };
 use super::whitelist::WhitelistEngine;
+use crate::autopsy::rpc_client::{RpcBlock, RpcReceipt};
 
 /// Configuration for the RPC-mode sentinel service.
 #[derive(Debug, Clone)]
@@ -58,6 +47,10 @@ pub struct RpcSentinelConfig {
     /// DeFi protocol whitelist engine for false-positive reduction.
     /// When `None`, no whitelist is applied.
     pub whitelist: Option<WhitelistEngine>,
+    /// AI agent configuration. When `Some` and `enabled = true`, alerts are enriched
+    /// with AI verdicts (2-pass: rule-based immediate → AI enrichment).
+    #[cfg(feature = "ai_agent")]
+    pub ai_config: Option<super::ai::AiConfig>,
 }
 
 impl RpcSentinelConfig {
@@ -76,6 +69,8 @@ impl RpcSentinelConfig {
             prefilter_only: false,
             prefilter_config: None,
             whitelist: None,
+            #[cfg(feature = "ai_agent")]
+            ai_config: None,
         }
     }
 }
@@ -144,6 +139,11 @@ async fn service_loop(
     metrics: Arc<SentinelMetrics>,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) {
+    // AI judge setup (only when ai_agent feature is enabled) — must happen
+    // before `config.poller_config` is moved into the poller.
+    #[cfg(feature = "ai_agent")]
+    let ai_judge = super::rpc_ai::init_ai_judge(config.ai_config.as_ref());
+
     let poller = RpcBlockPoller::new(config.poller_config);
     let mut block_rx = poller.start().await;
 
@@ -183,6 +183,8 @@ async fn service_loop(
                         prefilter_only,
                         alert_tx: &alert_tx,
                         metrics: &metrics,
+                        #[cfg(feature = "ai_agent")]
+                        ai_judge: ai_judge.as_ref(),
                     },
                 )
                 .await;
@@ -199,6 +201,8 @@ struct ProcessContext<'a> {
     prefilter_only: bool,
     alert_tx: &'a mpsc::Sender<SentinelAlert>,
     metrics: &'a SentinelMetrics,
+    #[cfg(feature = "ai_agent")]
+    ai_judge: Option<&'a super::ai::judge::AiJudge<super::ai::LiteLLMClient>>,
 }
 
 /// Process one `(RpcBlock, Vec<RpcReceipt>)` pair through the detection pipeline.
@@ -207,14 +211,12 @@ async fn process_rpc_block(
     rpc_receipts: &[RpcReceipt],
     ctx: ProcessContext<'_>,
 ) {
-    let ProcessContext {
-        pre_filter,
-        rpc_url,
-        analysis_config,
-        prefilter_only,
-        alert_tx,
-        metrics,
-    } = ctx;
+    let pre_filter = ctx.pre_filter;
+    let rpc_url = ctx.rpc_url;
+    let analysis_config = ctx.analysis_config;
+    let prefilter_only = ctx.prefilter_only;
+    let alert_tx = ctx.alert_tx;
+    let metrics = ctx.metrics;
     // Convert RPC types to ethrex types for pre-filter
     let ethrex_block = match rpc_block_to_ethrex(rpc_block) {
         Ok(b) => b,
@@ -305,12 +307,32 @@ async fn process_rpc_block(
         let alert = match replay_result {
             Ok(replay) => {
                 // Deep analysis succeeded — build enriched alert with classifier + fund flow
-                build_deep_alert(
+                let alert = build_deep_alert(
                     rpc_block,
                     suspicion,
                     &replay.trace.steps,
                     replay.trace.success,
-                )
+                );
+
+                // AI enrichment: extract context from steps and run AI judge (2nd pass)
+                #[cfg(feature = "ai_agent")]
+                if let Some(judge) = ctx.ai_judge {
+                    let verdict = super::rpc_ai::enrich_with_ai(
+                        judge,
+                        &replay.trace.steps,
+                        rpc_block,
+                        suspicion,
+                        replay.trace.success,
+                    )
+                    .await;
+                    let mut enriched = alert;
+                    enriched.agent_verdict = verdict;
+                    enriched
+                } else {
+                    alert
+                }
+                #[cfg(not(feature = "ai_agent"))]
+                alert
             }
             Err(_) if prefilter_alert_mode => {
                 // Deep analysis failed but prefilter_alert_mode is on
@@ -344,7 +366,6 @@ fn reason_display_name(r: &SuspicionReason) -> &'static str {
     }
 }
 
-/// Build the common fields shared by prefilter and deep alerts.
 fn build_alert_base(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelAlert {
     SentinelAlert {
         block_number: rpc_block.header.number,
@@ -363,10 +384,11 @@ fn build_alert_base(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelA
         summary: String::new(),
         total_steps: 0,
         feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
     }
 }
 
-/// Build a lightweight `SentinelAlert` from pre-filter results only (no replay).
 fn build_prefilter_alert(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelAlert {
     let reason_names: Vec<&str> = suspicion.reasons.iter().map(reason_display_name).collect();
     let summary = format!(
@@ -380,11 +402,7 @@ fn build_prefilter_alert(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> Sent
     }
 }
 
-/// Build an enriched `SentinelAlert` after successful RPC replay.
-///
-/// Runs `AttackClassifier` and `FundFlowTracer` on the replay steps to populate
-/// `detected_patterns`, `fund_flows`, and `total_value_at_risk` — mirroring
-/// the Store-mode `DeepAnalyzer::analyze()` logic.
+/// Build an enriched `SentinelAlert` after RPC replay (classifier + fund flow).
 fn build_deep_alert(
     rpc_block: &RpcBlock,
     suspicion: &SuspiciousTx,
@@ -589,6 +607,8 @@ mod tests {
                 prefilter_only: true,
                 alert_tx: &alert_tx,
                 metrics: &metrics,
+                #[cfg(feature = "ai_agent")]
+                ai_judge: None,
             },
         )
         .await;

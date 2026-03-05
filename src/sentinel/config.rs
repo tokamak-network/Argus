@@ -42,6 +42,9 @@ pub struct SentinelFullConfig {
     pub pipeline: AdaptivePipelineConfig,
     /// DeFi protocol whitelist for false-positive reduction.
     pub whitelist: WhitelistTomlConfig,
+    /// AI agent configuration (requires `ai_agent` feature).
+    #[cfg(feature = "ai_agent")]
+    pub ai: super::ai::AiConfig,
 }
 
 impl SentinelFullConfig {

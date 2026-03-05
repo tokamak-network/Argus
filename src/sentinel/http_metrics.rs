@@ -286,6 +286,8 @@ mod tests {
             summary: format!("Test alert at block {block_number}"),
             total_steps: 100,
             feature_vector: None,
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         }
     }
 

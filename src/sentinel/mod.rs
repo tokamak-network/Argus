@@ -18,6 +18,8 @@ pub mod ml_model;
 pub mod pipeline;
 pub mod pre_filter;
 pub mod replay;
+#[cfg(all(feature = "sentinel", feature = "autopsy", feature = "ai_agent"))]
+pub(crate) mod rpc_ai;
 #[cfg(all(feature = "sentinel", feature = "autopsy"))]
 pub mod rpc_poller;
 #[cfg(all(feature = "sentinel", feature = "autopsy"))]

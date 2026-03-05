@@ -53,6 +53,8 @@ mod h5_integration_tests {
             summary: format!("H5 test alert block={}", block_number),
             total_steps: 100,
             feature_vector: None,
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         }
     }
 

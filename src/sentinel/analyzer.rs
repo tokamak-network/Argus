@@ -124,6 +124,8 @@ impl DeepAnalyzer {
             summary,
             total_steps,
             feature_vector: None,
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         };
 
         Ok(Some(alert))

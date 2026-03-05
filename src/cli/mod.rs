@@ -126,6 +126,11 @@ pub enum InputMode {
         /// Block polling interval in seconds
         #[arg(long, default_value = "2")]
         poll_interval: u64,
+
+        /// Enable AI-assisted attack classification (requires LITELLM_API_KEY env var)
+        #[cfg(feature = "ai_agent")]
+        #[arg(long = "ai", default_value = "false")]
+        ai_enabled: bool,
     },
 }
 
@@ -165,6 +170,8 @@ pub fn run(args: Args) -> Result<(), DebuggerError> {
             metrics_port,
             webhook_url,
             poll_interval,
+            #[cfg(feature = "ai_agent")]
+            ai_enabled,
         } => run_sentinel(
             &rpc_url,
             archive_rpc_url,
@@ -174,6 +181,8 @@ pub fn run(args: Args) -> Result<(), DebuggerError> {
             metrics_port,
             webhook_url,
             poll_interval,
+            #[cfg(feature = "ai_agent")]
+            ai_enabled,
         ),
     }
 }
@@ -566,6 +575,7 @@ fn run_sentinel(
     metrics_port: u16,
     webhook_url: Option<String>,
     poll_interval: u64,
+    #[cfg(feature = "ai_agent")] ai_enabled: bool,
 ) -> Result<(), DebuggerError> {
     // Load TOML config (or defaults if no path given)
     let full_config = crate::sentinel::config::load_config(config.as_ref())
@@ -582,6 +592,8 @@ fn run_sentinel(
         webhook_url,
         poll_interval,
         full_config,
+        #[cfg(feature = "ai_agent")]
+        ai_enabled,
     ))
 }
 
@@ -596,6 +608,7 @@ async fn run_sentinel_async(
     webhook_url: Option<String>,
     poll_interval: u64,
     full_config: crate::sentinel::config::SentinelFullConfig,
+    #[cfg(feature = "ai_agent")] ai_enabled: bool,
 ) -> Result<(), DebuggerError> {
     use std::time::{Duration, Instant};
 
@@ -625,6 +638,10 @@ async fn run_sentinel_async(
     eprintln!(
         "[sentinel] prefilter_only={prefilter_only}  poll_interval={poll_interval}s  metrics_port={metrics_port}"
     );
+    #[cfg(feature = "ai_agent")]
+    if ai_enabled {
+        eprintln!("[sentinel] AI agent enabled (2-tier: screening + deep analysis)");
+    }
     eprintln!("[sentinel] Press Ctrl+C to stop.");
 
     // Build RpcSentinelConfig from loaded TOML config
@@ -670,6 +687,14 @@ async fn run_sentinel_async(
             None
         } else {
             Some(whitelist_engine)
+        },
+        #[cfg(feature = "ai_agent")]
+        ai_config: if ai_enabled {
+            let mut ai_cfg = full_config.ai.clone();
+            ai_cfg.enabled = true;
+            Some(ai_cfg)
+        } else {
+            None
         },
     };
 

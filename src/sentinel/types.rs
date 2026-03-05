@@ -164,6 +164,10 @@ pub struct SentinelAlert {
     /// Numerical feature vector extracted by the adaptive pipeline.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub feature_vector: Option<super::pipeline::FeatureVector>,
+    /// AI agent verdict (populated asynchronously when ai_agent feature is enabled).
+    #[cfg(feature = "ai_agent")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_verdict: Option<super::ai::types::AgentVerdict>,
 }
 
 #[cfg(feature = "autopsy")]

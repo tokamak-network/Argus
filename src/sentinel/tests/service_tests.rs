@@ -214,6 +214,8 @@ fn test_alert_handler_log_handler_doesnt_panic() {
         summary: "Test alert".to_string(),
         total_steps: 100,
         feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
     };
 
     handler.on_alert(alert);
@@ -276,6 +278,8 @@ fn test_counting_alert_handler() {
         summary: "Test".to_string(),
         total_steps: 0,
         feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
     };
 
     handler.on_alert(alert.clone());

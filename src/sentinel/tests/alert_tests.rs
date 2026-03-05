@@ -94,6 +94,8 @@ fn test_sentinel_alert_serialization() {
         summary: "Flash Loan detected".to_string(),
         total_steps: 10_000,
         feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
     };
 
     let json = serde_json::to_string(&alert).expect("should serialize");
@@ -123,6 +125,8 @@ fn test_sentinel_alert_priority_from_score() {
         summary: String::new(),
         total_steps: 0,
         feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
     };
     assert_eq!(alert.alert_priority, AlertPriority::Critical);
 
@@ -153,6 +157,8 @@ fn test_sentinel_alert_empty_patterns() {
         summary: "Unusual gas pattern".to_string(),
         total_steps: 500,
         feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
     };
 
     assert_eq!(alert.tx_index, 0);
@@ -194,6 +200,8 @@ fn test_sentinel_alert_multiple_suspicion_reasons() {
         summary: "Multi-signal alert".to_string(),
         total_steps: 8000,
         feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
     };
 
     assert_eq!(alert.alert_priority, AlertPriority::Critical);
@@ -395,6 +403,8 @@ mod autopsy_sentinel_tests {
             summary: "Flash Loan detected".to_string(),
             total_steps: 10_000,
             feature_vector: None,
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         };
 
         assert!((alert.max_confidence() - 0.9).abs() < f64::EPSILON);
@@ -441,6 +451,8 @@ mod autopsy_sentinel_tests {
             summary: String::new(),
             total_steps: 1000,
             feature_vector: None,
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         };
 
         // max_confidence should return the highest
@@ -468,6 +480,8 @@ mod autopsy_sentinel_tests {
             summary: String::new(),
             total_steps: 0,
             feature_vector: None,
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         };
 
         assert!((alert.max_confidence() - 0.0).abs() < f64::EPSILON);
@@ -502,6 +516,8 @@ mod autopsy_sentinel_tests {
             summary: "Price manipulation detected".to_string(),
             total_steps: 5000,
             feature_vector: None,
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         };
 
         let json = serde_json::to_string_pretty(&alert).expect("should serialize");
@@ -568,6 +584,8 @@ mod autopsy_sentinel_tests {
             summary: String::new(),
             total_steps: 100,
             feature_vector: None,
+            #[cfg(feature = "ai_agent")]
+            agent_verdict: None,
         };
 
         let names = alert.pattern_names();
