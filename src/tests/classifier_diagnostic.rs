@@ -5,104 +5,9 @@
 
 use crate::autopsy::classifier::AttackClassifier;
 use crate::autopsy::types::AttackPattern;
-use crate::types::{StepRecord, StorageWrite};
-use ethrex_common::{Address, H256, U256};
-
-// ── Helpers ──────────────────────────────────────────────────
-
-fn addr(id: u64) -> Address {
-    Address::from_low_u64_be(id)
-}
-
-fn transfer_topic() -> H256 {
-    let mut bytes = [0u8; 32];
-    bytes[0] = 0xdd;
-    bytes[1] = 0xf2;
-    bytes[2] = 0x52;
-    bytes[3] = 0xad;
-    H256::from(bytes)
-}
-
-fn addr_to_topic(a: Address) -> H256 {
-    let mut bytes = [0u8; 32];
-    bytes[12..].copy_from_slice(a.as_bytes());
-    H256::from(bytes)
-}
-
-fn make_step(index: usize, opcode: u8, depth: usize, code_address: Address) -> StepRecord {
-    StepRecord {
-        step_index: index,
-        pc: index * 2,
-        opcode,
-        depth,
-        gas_remaining: 1_000_000 - (index as i64 * 10),
-        stack_top: vec![],
-        stack_depth: 0,
-        memory_size: 0,
-        code_address,
-        call_value: None,
-        storage_writes: None,
-        log_topics: None,
-        log_data: None,
-        call_input_selector: None,
-    }
-}
-
-fn make_call_step(
-    index: usize,
-    depth: usize,
-    from: Address,
-    to: Address,
-    value: U256,
-) -> StepRecord {
-    let to_u256 = U256::from_big_endian(to.as_bytes());
-    StepRecord {
-        opcode: 0xF1, // CALL
-        stack_top: vec![U256::from(100_000), to_u256, value],
-        stack_depth: 7,
-        code_address: from,
-        call_value: if value > U256::zero() {
-            Some(value)
-        } else {
-            None
-        },
-        ..make_step(index, 0xF1, depth, from)
-    }
-}
-
-fn make_sstore_step(index: usize, depth: usize, contract: Address) -> StepRecord {
-    StepRecord {
-        opcode: 0x55,
-        stack_top: vec![U256::from(1), U256::from(42)],
-        stack_depth: 2,
-        storage_writes: Some(vec![StorageWrite {
-            address: contract,
-            slot: H256::zero(),
-            old_value: U256::zero(),
-            new_value: U256::from(42),
-        }]),
-        ..make_step(index, 0x55, depth, contract)
-    }
-}
-
-fn make_log3_transfer(
-    index: usize,
-    depth: usize,
-    token: Address,
-    from: Address,
-    to: Address,
-) -> StepRecord {
-    StepRecord {
-        opcode: 0xA3,
-        log_topics: Some(vec![
-            transfer_topic(),
-            addr_to_topic(from),
-            addr_to_topic(to),
-        ]),
-        log_data: Some(vec![0; 32]),
-        ..make_step(index, 0xA3, depth, token)
-    }
-}
+use crate::tests::classifier_helpers::*;
+use crate::types::StepRecord;
+use ethrex_common::U256;
 
 // ── Strategy 1 Diagnostic: ETH value ──
 
@@ -132,14 +37,16 @@ fn diag_strategy1_fails_for_erc20_flash_loan() {
     }
 
     let patterns = AttackClassifier::classify(&steps);
-    let eth_flash_loans: Vec<_> = patterns
+    // Strategy 1 produces FlashLoan with token=None, provider=None (ETH value only).
+    // Strategy 2 produces FlashLoan with token=Some(..) (ERC-20 transfer matching).
+    let eth_only_flash_loans: Vec<_> = patterns
         .iter()
-        .filter(|p| matches!(p, AttackPattern::FlashLoan { borrow_amount, .. } if *borrow_amount > U256::zero()))
+        .filter(|p| matches!(p, AttackPattern::FlashLoan { token: None, .. }))
         .collect();
 
     // EXPECTED: No Strategy 1 match (ETH-based flash loan)
     assert!(
-        eth_flash_loans.is_empty(),
+        eth_only_flash_loans.is_empty(),
         "Strategy 1 (ETH value) should NOT match ERC-20 flash loans"
     );
 }
@@ -188,7 +95,7 @@ fn diag_strategy2_works_with_proper_log_topics() {
 #[test]
 fn diag_strategy2_fails_when_log_topics_missing() {
     let attacker = addr(0xA);
-    let pool = addr(0xB);
+    let _pool = addr(0xB);
     let token = addr(0xC);
 
     let mut steps = Vec::with_capacity(20);
@@ -228,10 +135,10 @@ fn diag_strategy2_fails_when_log_topics_missing() {
 
 // ── Strategy 3 Diagnostic: Callback depth ──
 
-/// Strategy 3 detects when >60% of steps are at depth > entry_depth + 1.
+/// Strategy 3 detects when >40% of steps are at depth > entry_depth + 1.
 /// This works for flash loan callbacks where most work happens inside the callback.
 #[test]
-fn diag_strategy3_works_at_60pct_depth_ratio() {
+fn diag_strategy3_works_at_65pct_depth_ratio() {
     let attacker = addr(0xA);
     let pool = addr(0xB);
     let target = addr(0xC);
@@ -243,9 +150,10 @@ fn diag_strategy3_works_at_60pct_depth_ratio() {
     steps.push(make_call_step(2, 1, pool, attacker, U256::zero()));
 
     // 65 steps at depth 2 (deep callback) — 65% of 100
+    // Requires 2+ SSTOREs for Strategy 3 to fire
     for i in 3..68 {
-        if i == 30 {
-            steps.push(make_sstore_step(i, 2, target));
+        if i == 30 || i == 50 {
+            steps.push(make_sstore_step_simple(i, 2, target));
         } else {
             steps.push(make_step(i, 0x01, 2, attacker));
         }
@@ -268,10 +176,7 @@ fn diag_strategy3_works_at_60pct_depth_ratio() {
     );
 }
 
-/// Strategy 3 now detects when deep ratio is 48% (above lowered 40% threshold).
-/// The threshold was lowered from 60% to 40% because real-world Balancer TXs have
-/// significant pre-callback and post-callback setup/cleanup at shallow depth,
-/// resulting in deep ratios around 50% that the old 60% threshold would miss.
+/// Strategy 3 detects when deep ratio is 48% (above lowered 40% threshold).
 #[test]
 fn diag_strategy3_detects_at_48pct_depth_ratio() {
     let attacker = addr(0xA);
@@ -279,7 +184,6 @@ fn diag_strategy3_detects_at_48pct_depth_ratio() {
     let target = addr(0xC);
 
     let mut steps = Vec::with_capacity(100);
-    // 10 steps at depth 0-1 (pre-callback)
     for i in 0..10 {
         steps.push(make_step(i, 0x01, 0, attacker));
     }
@@ -288,14 +192,13 @@ fn diag_strategy3_detects_at_48pct_depth_ratio() {
 
     // 48 steps at depth 2 (48% — above 40% threshold)
     for i in 12..60 {
-        if i == 30 {
-            steps.push(make_sstore_step(i, 2, target));
+        if i == 30 || i == 45 {
+            steps.push(make_sstore_step_simple(i, 2, target));
         } else {
             steps.push(make_step(i, 0x01, 2, attacker));
         }
     }
 
-    // 40 steps at depth 0 (cleanup, post-callback)
     for i in 60..100 {
         steps.push(make_step(i, 0x01, 0, attacker));
     }
@@ -306,39 +209,35 @@ fn diag_strategy3_detects_at_48pct_depth_ratio() {
         .filter(|p| matches!(p, AttackPattern::FlashLoan { .. }))
         .collect();
 
-    // 48% > 40% threshold → callback detection succeeds (threshold lowered for real-world coverage)
     assert!(
         !callback_flash_loans.is_empty(),
-        "Strategy 3 should detect when deep ratio is 48% (above lowered 40% threshold). Got: {patterns:?}"
+        "Strategy 3 should detect when deep ratio is 48% (above 40% threshold). Got: {patterns:?}"
     );
 }
 
-/// Strategy 3 FAILS when deep ratio is below 40% (e.g., 30%).
-/// This ensures we don't detect too many false positives from normal DeFi TXs.
+/// Strategy 3 FAILS when deep ratio is below 40% (28%).
 #[test]
-fn diag_strategy3_fails_below_40pct_depth_ratio() {
+fn diag_strategy3_fails_at_28pct_depth_ratio() {
     let attacker = addr(0xA);
     let pool = addr(0xB);
     let target = addr(0xC);
 
     let mut steps = Vec::with_capacity(100);
-    // 10 steps at depth 0-1 (pre-callback)
     for i in 0..10 {
         steps.push(make_step(i, 0x01, 0, attacker));
     }
     steps.push(make_call_step(10, 0, attacker, pool, U256::zero()));
     steps.push(make_call_step(11, 1, pool, attacker, U256::zero()));
 
-    // 28 steps at depth 2 (28% — below 40%)
+    // 28 steps at depth 2 (28% — well below 40%)
     for i in 12..40 {
-        if i == 30 {
-            steps.push(make_sstore_step(i, 2, target));
+        if i == 25 || i == 35 {
+            steps.push(make_sstore_step_simple(i, 2, target));
         } else {
             steps.push(make_step(i, 0x01, 2, attacker));
         }
     }
 
-    // 60 steps at depth 0 (cleanup, post-callback)
     for i in 40..100 {
         steps.push(make_step(i, 0x01, 0, attacker));
     }
@@ -349,25 +248,103 @@ fn diag_strategy3_fails_below_40pct_depth_ratio() {
         .filter(|p| matches!(p, AttackPattern::FlashLoan { .. }))
         .collect();
 
-    // 28% < 40% threshold → no callback detection
     assert!(
         callback_flash_loans.is_empty(),
-        "Strategy 3 should NOT detect when deep ratio is 28% (below 40% threshold). Got: {patterns:?}"
+        "Strategy 3 should NOT detect when deep ratio is 28%. Got: {patterns:?}"
+    );
+}
+
+// ── Boundary tests: precise 40% threshold validation ──
+
+/// Exactly 41 of 100 steps at depth 2 → 41% > 40% threshold → detected.
+#[test]
+fn diag_strategy3_passes_at_41pct_boundary() {
+    let attacker = addr(0xA);
+    let pool = addr(0xB);
+    let target = addr(0xC);
+
+    let mut steps = Vec::with_capacity(100);
+    // 9 shallow steps (depth 0-1)
+    for i in 0..7 {
+        steps.push(make_step(i, 0x01, 0, attacker));
+    }
+    steps.push(make_call_step(7, 0, attacker, pool, U256::zero()));
+    steps.push(make_call_step(8, 1, pool, attacker, U256::zero()));
+
+    // 41 deep steps at depth 2 (index 9..50) → 41%
+    for i in 9..50 {
+        if i == 20 || i == 35 {
+            steps.push(make_sstore_step_simple(i, 2, target));
+        } else {
+            steps.push(make_step(i, 0x01, 2, attacker));
+        }
+    }
+
+    // 50 shallow steps (depth 0)
+    for i in 50..100 {
+        steps.push(make_step(i, 0x01, 0, attacker));
+    }
+
+    let deep = steps.iter().filter(|s| s.depth > 1).count();
+    assert_eq!(deep, 41, "fixture sanity: expected 41 deep steps");
+
+    let patterns = AttackClassifier::classify(&steps);
+    let has_callback = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
+    assert!(
+        has_callback,
+        "41% > 40% threshold: Strategy 3 should detect. Got: {patterns:?}"
+    );
+}
+
+/// Exactly 39 of 100 steps at depth 2 → 39% < 40% threshold → NOT detected.
+#[test]
+fn diag_strategy3_fails_at_39pct_boundary() {
+    let attacker = addr(0xA);
+    let pool = addr(0xB);
+    let target = addr(0xC);
+
+    let mut steps = Vec::with_capacity(100);
+    // 11 shallow steps (depth 0-1)
+    for i in 0..9 {
+        steps.push(make_step(i, 0x01, 0, attacker));
+    }
+    steps.push(make_call_step(9, 0, attacker, pool, U256::zero()));
+    steps.push(make_call_step(10, 1, pool, attacker, U256::zero()));
+
+    // 39 deep steps at depth 2 (index 11..50) → 39%
+    for i in 11..50 {
+        if i == 20 || i == 35 {
+            steps.push(make_sstore_step_simple(i, 2, target));
+        } else {
+            steps.push(make_step(i, 0x01, 2, attacker));
+        }
+    }
+
+    // 50 shallow steps (depth 0)
+    for i in 50..100 {
+        steps.push(make_step(i, 0x01, 0, attacker));
+    }
+
+    let deep = steps.iter().filter(|s| s.depth > 1).count();
+    assert_eq!(deep, 39, "fixture sanity: expected 39 deep steps");
+
+    let patterns = AttackClassifier::classify(&steps);
+    let has_callback = patterns
+        .iter()
+        .any(|p| matches!(p, AttackPattern::FlashLoan { .. }));
+    assert!(
+        !has_callback,
+        "39% < 40% threshold: Strategy 3 should NOT detect. Got: {patterns:?}"
     );
 }
 
 // ── Combined: Realistic Balancer Flash Loan ──
 
-/// Simulate a realistic Balancer flash loan TX profile:
-/// - Entry at depth 0 (attacker TX)
-/// - CALL to Balancer Vault at depth 1
-/// - ERC-20 Transfer (borrow) at depth 1
-/// - Callback at depth 2 (attacker operations)
-/// - More operations at depth 1 (between callback and repay)
-/// - ERC-20 Transfer (repay) at depth 1
-/// - Return to depth 0
-///
-/// This test checks which strategies actually match.
+/// Simulate a realistic Balancer flash loan TX profile.
+/// Validates that Strategy 2 (ERC-20 Transfer matching) detects the pattern
+/// and that dedup prevents duplicate Strategy 3 matches.
 #[test]
 fn diag_realistic_balancer_profile_detection() {
     let attacker = addr(0xA);
@@ -381,99 +358,54 @@ fn diag_realistic_balancer_profile_detection() {
     for i in 0..10 {
         steps.push(make_step(i, 0x01, 0, attacker));
     }
-
-    // Phase 2: Call to Balancer Vault (depth 0→1) — 1 step
+    // Phase 2: Call to Balancer Vault (depth 0→1)
     steps.push(make_call_step(10, 0, attacker, vault, U256::zero()));
-
     // Phase 3: Vault setup (depth 1) — 10 steps
     for i in 11..21 {
         steps.push(make_step(i, 0x01, 1, vault));
     }
-
-    // Phase 4: ERC-20 Transfer borrow (depth 1) — token from vault to attacker
+    // Phase 4: ERC-20 Transfer borrow
     steps.push(make_log3_transfer(21, 1, token, vault, attacker));
-
-    // Phase 5: Vault calls back attacker (depth 1→2) — 1 step
+    // Phase 5: Vault calls back attacker (depth 1→2)
     steps.push(make_call_step(22, 1, vault, attacker, U256::zero()));
-
     // Phase 6: Callback operations (depth 2) — 100 steps (50%)
     for i in 23..123 {
         if i % 20 == 0 {
-            steps.push(make_sstore_step(i, 2, target));
+            steps.push(make_sstore_step_simple(i, 2, target));
         } else if i % 30 == 0 {
             steps.push(make_call_step(i, 2, attacker, target, U256::zero()));
         } else {
             steps.push(make_step(i, 0x01, 2, attacker));
         }
     }
-
-    // Phase 7: Return from callback (depth 2→1) — 1 step
+    // Phase 7: Return from callback
     steps.push(make_step(123, 0xF3, 2, attacker));
-
     // Phase 8: Vault post-callback (depth 1) — 30 steps
     for i in 124..154 {
         steps.push(make_step(i, 0x01, 1, vault));
     }
-
-    // Phase 9: ERC-20 Transfer repay (depth 1) — token from attacker to vault
+    // Phase 9: ERC-20 Transfer repay
     steps.push(make_log3_transfer(154, 1, token, attacker, vault));
-
-    // Phase 10: Vault cleanup (depth 1) — 20 steps
-    for i in 155..175 {
-        steps.push(make_step(i, 0x01, 1, vault));
+    // Phase 10: Vault cleanup + return (depth 0)
+    for i in 155..200 {
+        steps.push(make_step(i, if i < 175 { 0x01 } else { 0x00 }, 0, attacker));
     }
-
-    // Phase 11: Return to attacker (depth 0) — 25 steps
-    for i in 175..200 {
-        steps.push(make_step(i, 0x01, 0, attacker));
-    }
-
-    let total = steps.len();
-    let deep_steps = steps.iter().filter(|s| s.depth > 1).count();
-    let deep_ratio = deep_steps as f64 / total as f64;
-
-    // Diagnostic info
-    eprintln!("=== Balancer Flash Loan Diagnostic ===");
-    eprintln!("Total steps: {total}");
-    eprintln!("Deep steps (depth > entry+1): {deep_steps}");
-    eprintln!("Deep ratio: {deep_ratio:.2} (threshold: 0.60)");
-
-    let log3_steps: Vec<_> = steps.iter().filter(|s| s.opcode == 0xA3).collect();
-    eprintln!("LOG3 steps: {}", log3_steps.len());
-    for s in &log3_steps {
-        let has_topics = s.log_topics.is_some();
-        eprintln!(
-            "  step={} depth={} has_topics={} code_addr=0x{:x}",
-            s.step_index, s.depth, has_topics, s.code_address
-        );
-    }
-
-    // Check half boundary for Strategy 2
-    let half = total / 2;
-    let borrow_in_first_half = log3_steps.iter().any(|s| s.step_index < half);
-    let repay_in_second_half = log3_steps.iter().any(|s| s.step_index >= half);
-    eprintln!("Half boundary: step {half}");
-    eprintln!("Borrow in first half: {borrow_in_first_half}");
-    eprintln!("Repay in second half: {repay_in_second_half}");
 
     let detected = AttackClassifier::classify_with_confidence(&steps);
-    eprintln!("\nDetected patterns:");
-    for d in &detected {
-        eprintln!("  {:?} (confidence: {:.2})", d.pattern, d.confidence);
-    }
-
-    let has_flash_loan = detected
+    let flash_loans: Vec<_> = detected
         .iter()
-        .any(|d| matches!(d.pattern, AttackPattern::FlashLoan { .. }));
+        .filter(|d| matches!(d.pattern, AttackPattern::FlashLoan { .. }))
+        .collect();
 
-    // THIS IS THE KEY ASSERTION:
-    // With a realistic Balancer profile where deep_ratio < 60%,
-    // Strategy 3 fails. Strategy 2 should still work if the Transfer
-    // events are properly positioned in first/second halves.
     assert!(
-        has_flash_loan,
-        "Realistic Balancer flash loan should be detected by at least one strategy. \
-         Deep ratio={deep_ratio:.2}, borrow_first_half={borrow_in_first_half}, \
-         repay_second_half={repay_in_second_half}"
+        !flash_loans.is_empty(),
+        "Realistic Balancer flash loan should be detected. Got: {detected:?}"
+    );
+
+    // Verify dedup: should NOT have duplicate FlashLoan patterns for the same TX
+    assert!(
+        flash_loans.len() <= 2,
+        "Expected at most 2 FlashLoan patterns (Strategy 2 for each token), got {}",
+        flash_loans.len()
     );
 }

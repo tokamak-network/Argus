@@ -10,6 +10,36 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use super::types::*;
 use super::whitelist::WhitelistEngine;
 
+/// Result of the cash flow symmetry check (H8).
+enum CashFlowResult {
+    /// Flash loan funds return to the same provider — likely legitimate arbitrage.
+    Symmetric,
+    /// Flash loan funds flow to new addresses — potential exploit.
+    Asymmetric { unique_destinations: usize },
+    /// No flash loan detected, check not applicable.
+    NotApplicable,
+}
+
+/// Count the number of independent signal categories in the reasons list.
+/// KnownContractInteraction is excluded (it acts as a relevance modifier, not an independent signal).
+fn count_independent_signals(reasons: &[SuspicionReason]) -> usize {
+    let mut categories = FxHashSet::default();
+    for reason in reasons {
+        let cat = match reason {
+            SuspicionReason::FlashLoanSignature { .. } => "flash",
+            SuspicionReason::HighValueWithRevert { .. } => "revert",
+            SuspicionReason::MultipleErc20Transfers { .. } => "erc20",
+            SuspicionReason::UnusualGasPattern { .. } => "gas",
+            SuspicionReason::SelfDestructDetected => "selfdestruct",
+            SuspicionReason::PriceOracleWithSwap { .. } => "oracle",
+            SuspicionReason::AsymmetricCashFlow { .. } => "cashflow",
+            SuspicionReason::KnownContractInteraction { .. } => continue,
+        };
+        categories.insert(cat);
+    }
+    categories.len()
+}
+
 /// ERC-20 Transfer(address,address,uint256) event topic prefix (first 4 bytes).
 const TRANSFER_TOPIC_PREFIX: [u8; 4] = [0xdd, 0xf2, 0x52, 0xad];
 
@@ -249,7 +279,42 @@ impl PreFilter {
             return None;
         }
 
+        // H8: Cash flow symmetry check (only when flash loan detected)
+        let flash_provider = reasons.iter().find_map(|r| match r {
+            SuspicionReason::FlashLoanSignature { provider_address } => Some(*provider_address),
+            _ => None,
+        });
+        let cash_flow = self.check_cash_flow_symmetry(&receipt.logs, flash_provider);
+        if let CashFlowResult::Asymmetric {
+            unique_destinations,
+        } = &cash_flow
+        {
+            reasons.push(SuspicionReason::AsymmetricCashFlow {
+                unique_destinations: *unique_destinations,
+            });
+        }
+
+        // Independent signal count (H4/KnownContract excluded)
+        let independent_count = count_independent_signals(&reasons);
+
+        // Base score (H4 contributes 0.0)
         let base_score: f64 = reasons.iter().map(|r| r.score()).sum();
+
+        // Relevance gate (QRadar pattern): known contract interaction dampens score
+        let has_known_contract = reasons
+            .iter()
+            .any(|r| matches!(r, SuspicionReason::KnownContractInteraction { .. }));
+        let relevance_factor = if has_known_contract {
+            self.config.relevance_factor
+        } else {
+            1.0
+        };
+
+        // Symmetry discount: symmetric flash loan repayment reduces score
+        let symmetry_factor = match cash_flow {
+            CashFlowResult::Symmetric => self.config.symmetry_discount,
+            _ => 1.0,
+        };
 
         // --- Whitelist layer ---
         // Collect all addresses involved in this TX (target + log emitters)
@@ -264,13 +329,11 @@ impl PreFilter {
         let (wl_matches, wl_modifier) = self.whitelist.check_addresses(&involved_addresses);
         let whitelist_match_count = wl_matches.len() as u32;
 
-        let score = (base_score + wl_modifier).clamp(0.0, 1.0);
+        // Final score: multiplicative factors + whitelist additive modifier
+        let score = (base_score * relevance_factor * symmetry_factor + wl_modifier).clamp(0.0, 1.0);
 
-        // FlashLoanSignature alone cannot trigger alert — requires at least
-        // one other reason type to produce a meaningful signal
-        let only_flash_loan =
-            reasons.len() == 1 && matches!(reasons[0], SuspicionReason::FlashLoanSignature { .. });
-        if only_flash_loan {
+        // Minimum 2 independent signals gate (generalizes old flash-loan-alone guard)
+        if independent_count < self.config.min_independent_signals {
             return None;
         }
 
@@ -411,6 +474,66 @@ impl PreFilter {
         }
 
         if found_dex { found_oracle } else { None }
+    }
+
+    /// H8: Check whether flash loan funds flow symmetrically (borrow → repay to same pool)
+    /// or asymmetrically (funds leak to new addresses).
+    ///
+    /// `flash_provider` is the address of the flash loan contract (from H1).
+    /// Symmetry requires the provider to appear as a Transfer destination in the
+    /// second half of the trace — a generic overlap check is insufficient because
+    /// intermediate routing addresses can appear in both halves even during an attack.
+    fn check_cash_flow_symmetry(
+        &self,
+        logs: &[Log],
+        flash_provider: Option<Address>,
+    ) -> CashFlowResult {
+        let provider = match flash_provider {
+            Some(p) => p,
+            None => return CashFlowResult::NotApplicable,
+        };
+
+        // Collect ERC-20 Transfer events: from (topic[1]) and to (topic[2])
+        let transfer_logs: Vec<_> = logs
+            .iter()
+            .filter(|log| {
+                log.topics.len() >= 3
+                    && log
+                        .topics
+                        .first()
+                        .map(|t| t.as_bytes()[..4] == TRANSFER_TOPIC_PREFIX)
+                        .unwrap_or(false)
+            })
+            .collect();
+
+        // Need at least 2 transfers to meaningfully compare first-half vs second-half
+        if transfer_logs.len() < 2 {
+            return CashFlowResult::NotApplicable;
+        }
+
+        // Split at midpoint: first half = borrow phase, second half = repay phase
+        let midpoint = transfer_logs.len() / 2;
+
+        // Collect second-half destinations
+        let mut second_half_destinations = FxHashSet::default();
+        for log in &transfer_logs[midpoint..] {
+            let to = Address::from_slice(&log.topics[2].as_bytes()[12..]);
+            second_half_destinations.insert(to);
+        }
+
+        // Symmetric iff the flash loan provider receives funds back in the second half
+        if second_half_destinations.contains(&provider) {
+            return CashFlowResult::Symmetric;
+        }
+
+        // Count unique destinations in second half that differ from the provider
+        let unique_dests = second_half_destinations
+            .iter()
+            .filter(|addr| **addr != provider)
+            .count();
+        CashFlowResult::Asymmetric {
+            unique_destinations: unique_dests,
+        }
     }
 
     // -----------------------------------------------------------------------

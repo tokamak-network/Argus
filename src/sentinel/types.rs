@@ -19,6 +19,13 @@ pub struct SentinelConfig {
     pub min_erc20_transfers: usize,
     /// Gas ratio threshold for unusual-gas heuristic (default: 0.95).
     pub gas_ratio_threshold: f64,
+    /// Minimum number of independent signal categories required to emit an alert (default: 2).
+    pub min_independent_signals: usize,
+    /// Multiplicative factor applied when a known contract is involved (default: 0.3).
+    /// Lower values suppress known-protocol interactions more aggressively.
+    pub relevance_factor: f64,
+    /// Multiplicative discount for symmetric flash loan cash flow (default: 0.5).
+    pub symmetry_discount: f64,
 }
 
 impl Default for SentinelConfig {
@@ -30,6 +37,9 @@ impl Default for SentinelConfig {
             min_gas_used: 500_000,
             min_erc20_transfers: 5,
             gas_ratio_threshold: 0.95,
+            min_independent_signals: 2,
+            relevance_factor: 0.3,
+            symmetry_discount: 0.5,
         }
     }
 }
@@ -64,6 +74,8 @@ pub enum SuspicionReason {
     SelfDestructDetected,
     /// Both price oracle and DEX interaction in same TX.
     PriceOracleWithSwap { oracle: Address },
+    /// Flash loan funds flow to new/unknown addresses instead of being repaid symmetrically.
+    AsymmetricCashFlow { unique_destinations: usize },
 }
 
 impl SuspicionReason {
@@ -79,10 +91,11 @@ impl SuspicionReason {
                     0.2
                 }
             }
-            Self::KnownContractInteraction { .. } => 0.1,
+            Self::KnownContractInteraction { .. } => 0.0,
             Self::UnusualGasPattern { .. } => 0.15,
             Self::SelfDestructDetected => 0.3,
             Self::PriceOracleWithSwap { .. } => 0.2,
+            Self::AsymmetricCashFlow { .. } => 0.2,
         }
     }
 }

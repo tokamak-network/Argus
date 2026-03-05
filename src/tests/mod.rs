@@ -1,5 +1,8 @@
 mod helpers;
 
+#[cfg(feature = "autopsy")]
+pub(super) mod classifier_helpers;
+
 mod basic_replay;
 mod error_handling;
 mod gas_tracking;

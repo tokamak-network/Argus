@@ -363,6 +363,7 @@ fn reason_display_name(r: &SuspicionReason) -> &'static str {
         SuspicionReason::UnusualGasPattern { .. } => "unusual-gas",
         SuspicionReason::SelfDestructDetected => "self-destruct",
         SuspicionReason::PriceOracleWithSwap { .. } => "oracle-swap",
+        SuspicionReason::AsymmetricCashFlow { .. } => "asymmetric-cash-flow",
     }
 }
 
@@ -589,6 +590,8 @@ mod tests {
             min_value_wei: U256::from(1_000_000_000_000_000_000_u64), // 1 ETH threshold
             // Lower threshold so HighValueWithRevert (score=0.3) is enough to flag
             suspicion_threshold: 0.25,
+            // Single signal test — relax min independent signals
+            min_independent_signals: 1,
             ..Default::default()
         };
         let pre_filter = PreFilter::new(sentinel_config);

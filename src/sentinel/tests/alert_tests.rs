@@ -180,8 +180,8 @@ fn test_sentinel_alert_multiple_suspicion_reasons() {
     ];
 
     let total_score: f64 = reasons.iter().map(|r| r.score()).sum();
-    // 0.4 + 0.4 (>10) + 0.1 = 0.9
-    assert!((total_score - 0.9).abs() < f64::EPSILON);
+    // 0.4 + 0.4 (>10) + 0.0 (KnownContract is relevance modifier only) = 0.8
+    assert!((total_score - 0.8).abs() < f64::EPSILON);
 
     let alert = SentinelAlert {
         block_number: 1,
@@ -204,7 +204,8 @@ fn test_sentinel_alert_multiple_suspicion_reasons() {
         agent_verdict: None,
     };
 
-    assert_eq!(alert.alert_priority, AlertPriority::Critical);
+    // 0.8 → High (Critical requires >= 0.85)
+    assert_eq!(alert.alert_priority, AlertPriority::High);
     assert_eq!(alert.suspicion_reasons.len(), 3);
 }
 

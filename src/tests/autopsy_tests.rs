@@ -502,12 +502,13 @@ fn test_detect_flash_loan_callback() {
     steps.push(make_call_step(1, 1, flash_provider, attacker, U256::zero()));
 
     // 90% of execution at depth 2+ (inside callback)
-    for i in 2..92 {
+    for i in 2..91 {
         steps.push(make_step(i, 0x01, 2, attacker)); // ADD ops at depth 2
     }
 
-    // SSTORE inside the callback (state modification = non-trivial)
-    steps.push(make_sstore_step(92, 2, attacker, slot(1), U256::from(42)));
+    // 2 SSTOREs inside the callback (requires >= 2 for Strategy 3)
+    steps.push(make_sstore_step(91, 2, attacker, slot(1), U256::from(42)));
+    steps.push(make_sstore_step(92, 2, attacker, slot(2), U256::from(99)));
 
     // CALL inside callback
     steps.push(make_call_step(93, 2, attacker, addr(0xBB), U256::zero()));

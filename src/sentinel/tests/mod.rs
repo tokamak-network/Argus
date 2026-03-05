@@ -110,6 +110,7 @@ pub(super) fn one_eth() -> U256 {
 
 mod alert_tests;
 mod pipeline_tests;
+mod prefilter_benchmark;
 mod prefilter_tests;
 mod service_tests;
 mod whitelist_tests;

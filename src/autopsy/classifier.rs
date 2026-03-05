@@ -13,6 +13,20 @@ use crate::types::StepRecord;
 
 use super::types::{AttackPattern, DetectedPattern};
 
+// ── Threshold & confidence constants ─────────────────────────────────
+
+/// Minimum fraction of steps at depth > entry+1 to trigger callback-based
+/// flash loan detection (Strategy 3). Lowered from 0.6 to 0.4 based on
+/// Balancer mainnet profiles where setup/cleanup dilutes the deep ratio.
+const CALLBACK_DEPTH_THRESHOLD: f64 = 0.4;
+
+/// Confidence tiers for flash loan scoring.
+const CONFIDENCE_AMOUNT_AND_SSTORE: f64 = 0.9;
+const CONFIDENCE_TOKEN_PROVIDER_SSTORE: f64 = 0.85;
+const CONFIDENCE_PROVIDER_SSTORE: f64 = 0.8;
+const CONFIDENCE_SSTORE_ONLY: f64 = 0.6;
+const CONFIDENCE_NO_EVIDENCE: f64 = 0.4;
+
 /// Stateless attack pattern classifier.
 pub struct AttackClassifier;
 
@@ -166,7 +180,17 @@ impl AttackClassifier {
         patterns.extend(Self::detect_flash_loan_erc20(steps));
 
         // === Strategy 3: Callback-based flash loan ===
-        patterns.extend(Self::detect_flash_loan_callback(steps));
+        // Only add callback patterns if they don't overlap with an existing
+        // detection. Two patterns "overlap" when their borrow→repay ranges
+        // intersect, meaning they describe the same logical flash loan.
+        for candidate in Self::detect_flash_loan_callback(steps) {
+            let dominated = patterns
+                .iter()
+                .any(|existing| flash_loan_ranges_overlap(existing, &candidate));
+            if !dominated {
+                patterns.push(candidate);
+            }
+        }
 
         patterns
     }
@@ -284,8 +308,8 @@ impl AttackClassifier {
 
         let deep_ratio = deep_steps as f64 / total as f64;
 
-        // If >40% of steps are deep, this is a callback pattern
-        if deep_ratio < 0.4 {
+        // If >CALLBACK_DEPTH_THRESHOLD of steps are deep, this is a callback pattern
+        if deep_ratio < CALLBACK_DEPTH_THRESHOLD {
             return patterns;
         }
 
@@ -304,16 +328,15 @@ impl AttackClassifier {
         let callback_exit = steps.iter().rev().find(|s| s.depth > entry_depth + 1);
 
         if let (Some(entry), Some(exit)) = (callback_entry, callback_exit) {
-            // Count state-modifying ops inside the callback to confirm it's non-trivial
+            // Count SSTORE ops inside the callback to confirm non-trivial state modification.
+            // Require >= 2 to avoid false positives from normal callbacks (e.g., Uniswap V3
+            // swap callbacks that do a single SSTORE for position tracking).
             let inner_sstores = steps
                 .iter()
-                .filter(|s| {
-                    s.depth > entry_depth + 1
-                        && matches!(s.opcode, OP_SSTORE | OP_CALL | OP_DELEGATECALL)
-                })
+                .filter(|s| s.depth > entry_depth + 1 && s.opcode == OP_SSTORE)
                 .count();
 
-            if inner_sstores >= 1 {
+            if inner_sstores >= 2 {
                 patterns.push(AttackPattern::FlashLoan {
                     borrow_step: flash_loan_call
                         .map(|s| s.step_index)
@@ -595,15 +618,15 @@ impl AttackClassifier {
         }
 
         let confidence = if has_amount && inner_sstores > 0 {
-            0.9
+            CONFIDENCE_AMOUNT_AND_SSTORE
         } else if has_token && has_provider && inner_sstores > 0 {
-            0.85
+            CONFIDENCE_TOKEN_PROVIDER_SSTORE
         } else if has_provider && inner_sstores > 0 {
-            0.8
+            CONFIDENCE_PROVIDER_SSTORE
         } else if inner_sstores > 0 {
-            0.6
+            CONFIDENCE_SSTORE_ONLY
         } else {
-            0.4
+            CONFIDENCE_NO_EVIDENCE
         };
 
         (confidence, evidence)
@@ -709,6 +732,30 @@ fn is_transfer_topic(topic: &ethrex_common::H256) -> bool {
 /// Extract an address from a 32-byte topic (last 20 bytes).
 fn address_from_topic(topic: &ethrex_common::H256) -> Address {
     Address::from_slice(&topic.as_bytes()[12..])
+}
+
+/// Check whether two FlashLoan patterns describe the same logical flash loan
+/// by testing if their borrow→repay step ranges overlap.
+fn flash_loan_ranges_overlap(a: &AttackPattern, b: &AttackPattern) -> bool {
+    let (a_borrow, a_repay) = match a {
+        AttackPattern::FlashLoan {
+            borrow_step,
+            repay_step,
+            ..
+        } => (*borrow_step, *repay_step),
+        _ => return false,
+    };
+    let (b_borrow, b_repay) = match b {
+        AttackPattern::FlashLoan {
+            borrow_step,
+            repay_step,
+            ..
+        } => (*borrow_step, *repay_step),
+        _ => return false,
+    };
+    // Two ranges [a_borrow, a_repay] and [b_borrow, b_repay] overlap when
+    // neither ends before the other begins.
+    a_borrow <= b_repay && b_borrow <= a_repay
 }
 
 /// Parsed ERC-20 Transfer event.

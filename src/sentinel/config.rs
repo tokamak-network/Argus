@@ -82,6 +82,9 @@ impl SentinelFullConfig {
             min_gas_used: self.prefilter.min_gas_used,
             min_erc20_transfers: self.prefilter.min_erc20_transfers,
             gas_ratio_threshold: self.prefilter.gas_ratio_threshold,
+            min_independent_signals: self.prefilter.min_independent_signals,
+            relevance_factor: self.prefilter.relevance_factor,
+            symmetry_discount: self.prefilter.symmetry_discount,
         }
     }
 
@@ -184,6 +187,12 @@ pub struct PrefilterConfig {
     pub min_erc20_transfers: usize,
     /// Gas ratio threshold for unusual-gas heuristic (default: 0.95).
     pub gas_ratio_threshold: f64,
+    /// Minimum number of independent signal categories required to emit an alert (default: 2).
+    pub min_independent_signals: usize,
+    /// Multiplicative factor when a known contract is involved (default: 0.3).
+    pub relevance_factor: f64,
+    /// Multiplicative discount for symmetric flash loan cash flow (default: 0.5).
+    pub symmetry_discount: f64,
 }
 
 impl Default for PrefilterConfig {
@@ -194,6 +203,9 @@ impl Default for PrefilterConfig {
             min_gas_used: 500_000,
             min_erc20_transfers: 5,
             gas_ratio_threshold: 0.95,
+            min_independent_signals: 2,
+            relevance_factor: 0.3,
+            symmetry_discount: 0.5,
         }
     }
 }

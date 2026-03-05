@@ -842,6 +842,7 @@ mod live_reentrancy_pipeline_tests {
         let config = SentinelConfig {
             suspicion_threshold: 0.1,
             min_gas_used: 50_000,
+            min_independent_signals: 1,
             ..Default::default()
         };
 
