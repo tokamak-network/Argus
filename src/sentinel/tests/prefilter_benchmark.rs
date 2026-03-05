@@ -24,6 +24,7 @@ struct BenchmarkCase {
     tx: Transaction,
     receipt: Receipt,
     /// Which heuristics SHOULD fire for this case (for diagnostic output)
+    #[allow(dead_code)]
     expected_signals: &'static str,
 }
 

@@ -128,10 +128,6 @@ mod tests {
                 fail_on_call: Some(fail_on),
             }
         }
-
-        fn calls(&self) -> u32 {
-            self.call_count.load(Ordering::Relaxed)
-        }
     }
 
     impl AiClient for CountingMockClient {
