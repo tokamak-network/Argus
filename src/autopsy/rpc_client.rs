@@ -145,6 +145,21 @@ impl EthRpcClient {
         parse_rpc_receipt(&result)
     }
 
+    /// Fetch all receipts for a block in a single RPC call.
+    ///
+    /// Uses `eth_getBlockReceipts` (supported by Alchemy, Infura, Geth 1.13+).
+    /// Returns one receipt per transaction in the block, in transaction-index order.
+    pub fn eth_get_block_receipts(&self, block_num: u64) -> Result<Vec<RpcReceipt>, DebuggerError> {
+        let block_hex = format!("0x{block_num:x}");
+        let result = self.rpc_call("eth_getBlockReceipts", json!([block_hex]))?;
+        let arr = result.as_array().ok_or_else(|| RpcError::ParseError {
+            method: "eth_getBlockReceipts".into(),
+            field: "result".into(),
+            cause: "expected array".into(),
+        })?;
+        arr.iter().map(parse_rpc_receipt).collect()
+    }
+
     /// Execute a JSON-RPC call with retry and backoff.
     fn rpc_call(&self, method: &str, params: Value) -> Result<Value, DebuggerError> {
         let body = json!({
@@ -453,5 +468,25 @@ mod tests {
         let receipt = client.eth_get_transaction_receipt(tx_hash).unwrap();
         // DAO hack tx succeeded
         assert!(receipt.status);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_eth_get_block_receipts_live() {
+        let url = std::env::var("ETH_RPC_URL")
+            .or_else(|_| {
+                std::env::var("ALCHEMY_API_KEY")
+                    .map(|k| format!("https://eth-mainnet.g.alchemy.com/v2/{k}"))
+            })
+            .expect("ETH_RPC_URL or ALCHEMY_API_KEY must be set");
+        let client = EthRpcClient::new(&url, 0);
+        // Block 46147 — first mainnet block with a transaction
+        let block = client.eth_get_block_by_number_with_txs(46147).unwrap();
+        let receipts = client.eth_get_block_receipts(46147).unwrap();
+        assert_eq!(
+            receipts.len(),
+            block.transactions.len(),
+            "receipt count must match transaction count"
+        );
     }
 }

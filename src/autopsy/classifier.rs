@@ -767,3 +767,110 @@ struct Erc20Transfer {
     /// Transfer amount decoded from log_data (uint256). Zero if log_data is absent.
     amount: U256,
 }
+
+#[cfg(test)]
+mod flash_loan_overlap_tests {
+    use super::*;
+    use ethrex_common::U256;
+
+    fn make_flash_loan(borrow: usize, repay: usize) -> AttackPattern {
+        AttackPattern::FlashLoan {
+            borrow_step: borrow,
+            borrow_amount: U256::zero(),
+            repay_step: repay,
+            repay_amount: U256::zero(),
+            provider: None,
+            token: None,
+        }
+    }
+
+    #[test]
+    fn test_flash_loan_overlap_identical() {
+        let a = make_flash_loan(10, 50);
+        let b = make_flash_loan(10, 50);
+        assert!(flash_loan_ranges_overlap(&a, &b));
+    }
+
+    #[test]
+    fn test_flash_loan_overlap_partial() {
+        let a = make_flash_loan(10, 30);
+        let b = make_flash_loan(20, 50);
+        assert!(flash_loan_ranges_overlap(&a, &b));
+    }
+
+    #[test]
+    fn test_flash_loan_overlap_boundary() {
+        let a = make_flash_loan(10, 20);
+        let b = make_flash_loan(20, 30);
+        assert!(flash_loan_ranges_overlap(&a, &b));
+    }
+
+    #[test]
+    fn test_flash_loan_overlap_disjoint() {
+        let a = make_flash_loan(10, 20);
+        let b = make_flash_loan(21, 30);
+        assert!(!flash_loan_ranges_overlap(&a, &b));
+    }
+
+    #[test]
+    fn test_flash_loan_overlap_contains() {
+        let a = make_flash_loan(10, 50);
+        let b = make_flash_loan(20, 30);
+        assert!(flash_loan_ranges_overlap(&a, &b));
+    }
+
+    #[test]
+    fn test_flash_loan_overlap_contained() {
+        let a = make_flash_loan(20, 30);
+        let b = make_flash_loan(10, 50);
+        assert!(flash_loan_ranges_overlap(&a, &b));
+    }
+
+    #[test]
+    fn test_flash_loan_overlap_non_flash_loan_a() {
+        let a = AttackPattern::Reentrancy {
+            target_contract: Address::zero(),
+            reentrant_call_step: 10,
+            state_modified_step: 20,
+            call_depth_at_entry: 1,
+        };
+        let b = make_flash_loan(10, 50);
+        assert!(!flash_loan_ranges_overlap(&a, &b));
+    }
+
+    #[test]
+    fn test_flash_loan_overlap_non_flash_loan_b() {
+        let a = make_flash_loan(10, 50);
+        let b = AttackPattern::PriceManipulation {
+            oracle_read_before: 10,
+            swap_step: 20,
+            oracle_read_after: 30,
+            price_delta_percent: 5.0,
+        };
+        assert!(!flash_loan_ranges_overlap(&a, &b));
+    }
+
+    #[test]
+    fn test_flash_loan_overlap_both_non_flash_loan() {
+        let a = AttackPattern::Reentrancy {
+            target_contract: Address::zero(),
+            reentrant_call_step: 10,
+            state_modified_step: 20,
+            call_depth_at_entry: 1,
+        };
+        let b = AttackPattern::PriceManipulation {
+            oracle_read_before: 10,
+            swap_step: 20,
+            oracle_read_after: 30,
+            price_delta_percent: 5.0,
+        };
+        assert!(!flash_loan_ranges_overlap(&a, &b));
+    }
+
+    #[test]
+    fn test_flash_loan_overlap_single_step() {
+        let a = make_flash_loan(10, 10);
+        let b = make_flash_loan(10, 10);
+        assert!(flash_loan_ranges_overlap(&a, &b));
+    }
+}

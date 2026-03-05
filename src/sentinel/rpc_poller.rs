@@ -112,6 +112,26 @@ impl RpcBlockPoller {
 /// (e.g., after a restart or sustained RPC outage).
 const MAX_CATCHUP_BLOCKS: u64 = 128;
 
+/// Fetch all receipts for a block, preferring `eth_getBlockReceipts` (single
+/// RPC call) and falling back to per-transaction `eth_getTransactionReceipt`
+/// (N+1 calls) when the batch method is unsupported or returns a mismatched count.
+fn fetch_receipts_with_fallback(
+    client: &EthRpcClient,
+    block: &RpcBlock,
+    block_num: u64,
+) -> Result<Vec<RpcReceipt>, crate::error::DebuggerError> {
+    match client.eth_get_block_receipts(block_num) {
+        Ok(batch) if batch.len() == block.transactions.len() => Ok(batch),
+        _ => {
+            let mut receipts = Vec::with_capacity(block.transactions.len());
+            for tx_ref in &block.transactions {
+                receipts.push(client.eth_get_transaction_receipt(tx_ref.hash)?);
+            }
+            Ok(receipts)
+        }
+    }
+}
+
 /// Core polling loop — runs in a spawned tokio task.
 async fn poll_loop(
     config: RpcPollerConfig,
@@ -194,10 +214,7 @@ async fn poll_loop(
             let result = tokio::task::spawn_blocking(move || {
                 let client = EthRpcClient::with_config(&url2, 0, rpc_cfg);
                 let block = client.eth_get_block_by_number_with_txs(block_num)?;
-                let mut receipts = Vec::with_capacity(block.transactions.len());
-                for tx_ref in &block.transactions {
-                    receipts.push(client.eth_get_transaction_receipt(tx_ref.hash)?);
-                }
+                let receipts = fetch_receipts_with_fallback(&client, &block, block_num)?;
                 Ok::<_, crate::error::DebuggerError>((block, receipts))
             })
             .await;
@@ -409,5 +426,30 @@ mod tests {
 
         assert!(block.header.number > 0);
         assert_eq!(block.transactions.len(), receipts.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "requires live RPC endpoint (ALCHEMY_API_KEY)"]
+    async fn test_batch_receipts_match_individual_live() {
+        let api_key = std::env::var("ALCHEMY_API_KEY").expect("ALCHEMY_API_KEY not set");
+        let url = format!("https://eth-mainnet.g.alchemy.com/v2/{api_key}");
+
+        let result = tokio::task::spawn_blocking(move || {
+            let client = EthRpcClient::with_config(&url, 0, RpcConfig::default());
+            let tip = client.eth_block_number()?;
+            let block = client.eth_get_block_by_number_with_txs(tip)?;
+            let batch = client.eth_get_block_receipts(tip)?;
+            Ok::<_, crate::error::DebuggerError>((block, batch))
+        })
+        .await
+        .expect("spawn_blocking panicked")
+        .expect("RPC call failed");
+
+        let (block, batch) = result;
+        assert_eq!(
+            batch.len(),
+            block.transactions.len(),
+            "batch receipt count must match transaction count"
+        );
     }
 }
