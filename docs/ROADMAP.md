@@ -109,7 +109,24 @@ Argus의 코드 품질은 높지만, 외부 경쟁력에는 구조적 문제가 
 
 **결과:** 정확도 100% (13/13) — Phase AI-1 MVP 착수 승인
 
-Phase AI-1 (MVP, 6-8주) → AI-2 (최적화, 2-3주) → AI-3 (고도화, 3-4주)
+Phase AI-1 ✅ 완료 (2026-03-05) → AI-2 (최적화, 2-3주) → AI-3 (고도화, 3-4주)
+
+---
+
+## Phase AI-1: MVP 구현 — 완료 (2026-03-05)
+
+목표: **ContextExtractor + 2-tier AI Judge + Hallucination Guard + 비용 제어 + Sentinel 통합**
+
+| # | 항목 | 설명 | 상태 |
+|---|------|------|------|
+| AI-1-1 | **CostTracker + CircuitBreaker + Config** | JSON 영속화, 일/월 리셋, 회로차단기, TOML 설정 | ✅ 완료 |
+| AI-1-2 | **ContextExtractor** | StepRecord[] → AgentContext (call_graph, storage_mutations, logs, transfers) | ✅ 완료 |
+| AI-1-3 | **AiJudge 2-tier + HallucinationGuard** | screening(gemini-3-flash) → escalation → deep(gemini-3-pro) + 증거 검증 | ✅ 완료 |
+| AI-1-4 | **Sentinel Pipeline 통합** | rpc_service.rs에 AI judge 비동기 통합, SentinelAlert.agent_verdict 필드 | ✅ 완료 |
+
+**산출물:** 18개 신규 파일, ~6,500 LoC, 145 신규 테스트 (총 662 pass + 25 ignored)
+
+**알려진 제한:** input_selector = None (Phase 2에서 recorder.rs calldata 캡처 추가 예정), CREATE deployed = Address::zero()
 
 ---
 

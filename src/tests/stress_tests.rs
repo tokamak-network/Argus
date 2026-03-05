@@ -56,6 +56,7 @@ fn make_large_trace(step_count: usize) -> Vec<StepRecord> {
                 None
             },
             log_data: None,
+            call_input_selector: None,
         });
     }
     steps

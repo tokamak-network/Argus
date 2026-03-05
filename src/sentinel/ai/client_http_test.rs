@@ -6,8 +6,8 @@
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use super::client::litellm_client::LiteLLMClient;
 use super::client::anthropic_client::AnthropicClient;
+use super::client::litellm_client::LiteLLMClient;
 use super::client::{AiClient, AiError};
 use super::types::*;
 use ethrex_common::{Address, H256, U256};
@@ -130,14 +130,12 @@ async fn litellm_429_rate_limit() {
 
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(429).set_body_json(serde_json::json!({
-                "error": {
-                    "message": "Rate limit exceeded",
-                    "type": "rate_limit_error"
-                }
-            })),
-        )
+        .respond_with(ResponseTemplate::new(429).set_body_json(serde_json::json!({
+            "error": {
+                "message": "Rate limit exceeded",
+                "type": "rate_limit_error"
+            }
+        })))
         .expect(1)
         .mount(&server)
         .await;
@@ -160,13 +158,11 @@ async fn litellm_500_server_error() {
 
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
-        .respond_with(
-            ResponseTemplate::new(500).set_body_json(serde_json::json!({
-                "error": {
-                    "message": "Internal server error"
-                }
-            })),
-        )
+        .respond_with(ResponseTemplate::new(500).set_body_json(serde_json::json!({
+            "error": {
+                "message": "Internal server error"
+            }
+        })))
         .expect(1)
         .mount(&server)
         .await;
@@ -283,8 +279,7 @@ async fn litellm_sends_correct_headers() {
         .mount(&server)
         .await;
 
-    let client =
-        LiteLLMClient::new(server.uri(), "my-secret-key".into(), "system".into()).unwrap();
+    let client = LiteLLMClient::new(server.uri(), "my-secret-key".into(), "system".into()).unwrap();
     let result = client.judge(&minimal_context(), "gemini-3-flash").await;
 
     assert!(result.is_ok());
@@ -331,7 +326,9 @@ async fn anthropic_200_ok_valid_tool_use() {
         .unwrap()
         .with_api_url(format!("{}/v1/messages", server.uri()));
 
-    let result = client.judge(&minimal_context(), "claude-haiku-4-5-20251001").await;
+    let result = client
+        .judge(&minimal_context(), "claude-haiku-4-5-20251001")
+        .await;
 
     let response = result.unwrap();
     assert!(response.verdict.is_attack);
@@ -348,15 +345,13 @@ async fn anthropic_429_rate_limit() {
     let server = MockServer::start().await;
 
     Mock::given(method("POST"))
-        .respond_with(
-            ResponseTemplate::new(429).set_body_json(serde_json::json!({
-                "type": "error",
-                "error": {
-                    "type": "rate_limit_error",
-                    "message": "Number of request tokens has exceeded your per-minute rate limit"
-                }
-            })),
-        )
+        .respond_with(ResponseTemplate::new(429).set_body_json(serde_json::json!({
+            "type": "error",
+            "error": {
+                "type": "rate_limit_error",
+                "message": "Number of request tokens has exceeded your per-minute rate limit"
+            }
+        })))
         .expect(1)
         .mount(&server)
         .await;
@@ -365,7 +360,9 @@ async fn anthropic_429_rate_limit() {
         .unwrap()
         .with_api_url(format!("{}/v1/messages", server.uri()));
 
-    let result = client.judge(&minimal_context(), "claude-haiku-4-5-20251001").await;
+    let result = client
+        .judge(&minimal_context(), "claude-haiku-4-5-20251001")
+        .await;
 
     match result {
         Err(AiError::Api { status, message }) => {
@@ -402,7 +399,9 @@ async fn anthropic_no_tool_use_block() {
         .unwrap()
         .with_api_url(format!("{}/v1/messages", server.uri()));
 
-    let result = client.judge(&minimal_context(), "claude-haiku-4-5-20251001").await;
+    let result = client
+        .judge(&minimal_context(), "claude-haiku-4-5-20251001")
+        .await;
 
     assert!(matches!(result, Err(AiError::NoToolResponse)));
 }
@@ -421,7 +420,9 @@ async fn anthropic_malformed_response_body() {
         .unwrap()
         .with_api_url(format!("{}/v1/messages", server.uri()));
 
-    let result = client.judge(&minimal_context(), "claude-haiku-4-5-20251001").await;
+    let result = client
+        .judge(&minimal_context(), "claude-haiku-4-5-20251001")
+        .await;
 
     assert!(matches!(result, Err(AiError::ParseError(_))));
 }
@@ -441,7 +442,9 @@ async fn anthropic_sends_cache_beta_header() {
         .unwrap()
         .with_api_url(format!("{}/v1/messages", server.uri()));
 
-    let result = client.judge(&minimal_context(), "claude-haiku-4-5-20251001").await;
+    let result = client
+        .judge(&minimal_context(), "claude-haiku-4-5-20251001")
+        .await;
     assert!(result.is_ok());
 }
 
@@ -464,7 +467,9 @@ async fn anthropic_without_cache_omits_beta_header() {
         .without_cache()
         .with_api_url(format!("{}/v1/messages", server.uri()));
 
-    let result = client.judge(&minimal_context(), "claude-haiku-4-5-20251001").await;
+    let result = client
+        .judge(&minimal_context(), "claude-haiku-4-5-20251001")
+        .await;
     assert!(result.is_ok());
 }
 
@@ -473,15 +478,13 @@ async fn anthropic_500_server_error() {
     let server = MockServer::start().await;
 
     Mock::given(method("POST"))
-        .respond_with(
-            ResponseTemplate::new(500).set_body_json(serde_json::json!({
-                "type": "error",
-                "error": {
-                    "type": "api_error",
-                    "message": "Internal server error"
-                }
-            })),
-        )
+        .respond_with(ResponseTemplate::new(500).set_body_json(serde_json::json!({
+            "type": "error",
+            "error": {
+                "type": "api_error",
+                "message": "Internal server error"
+            }
+        })))
         .expect(1)
         .mount(&server)
         .await;
@@ -490,7 +493,9 @@ async fn anthropic_500_server_error() {
         .unwrap()
         .with_api_url(format!("{}/v1/messages", server.uri()));
 
-    let result = client.judge(&minimal_context(), "claude-haiku-4-5-20251001").await;
+    let result = client
+        .judge(&minimal_context(), "claude-haiku-4-5-20251001")
+        .await;
 
     match result {
         Err(AiError::Api { status, .. }) => assert_eq!(status, 500),
@@ -512,7 +517,9 @@ async fn anthropic_error_without_json_structure() {
         .unwrap()
         .with_api_url(format!("{}/v1/messages", server.uri()));
 
-    let result = client.judge(&minimal_context(), "claude-haiku-4-5-20251001").await;
+    let result = client
+        .judge(&minimal_context(), "claude-haiku-4-5-20251001")
+        .await;
 
     match result {
         Err(AiError::Api { status, message }) => {
@@ -606,7 +613,9 @@ async fn anthropic_connection_refused() {
         .unwrap()
         .with_api_url("http://127.0.0.1:1/v1/messages".into());
 
-    let result = client.judge(&minimal_context(), "claude-haiku-4-5-20251001").await;
+    let result = client
+        .judge(&minimal_context(), "claude-haiku-4-5-20251001")
+        .await;
 
     assert!(matches!(result, Err(AiError::Http(_))));
 }

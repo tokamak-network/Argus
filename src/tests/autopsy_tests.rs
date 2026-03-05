@@ -34,6 +34,7 @@ fn make_step(index: usize, opcode: u8, depth: usize, code_address: Address) -> S
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -60,6 +61,7 @@ fn make_call_step(
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -89,6 +91,7 @@ fn make_sstore_step(
         }]),
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -108,6 +111,7 @@ fn make_staticcall_step(index: usize, depth: usize, from: Address, to: Address) 
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -152,6 +156,7 @@ fn make_log3_transfer(
             H256::from(to_bytes),
         ]),
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -189,6 +194,7 @@ fn make_log3_transfer_with_amount(
             H256::from(to_bytes),
         ]),
         log_data: Some(amount_data),
+        call_input_selector: None,
     }
 }
 
@@ -216,6 +222,7 @@ fn make_sload_step(index: usize, depth: usize, address: Address, slot_key: U256)
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -240,6 +247,7 @@ fn make_post_sload_step(
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     }
 }
 
@@ -993,6 +1001,7 @@ fn test_step_record_none_fields_skip_serializing() {
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     };
     let json = serde_json::to_string(&step).unwrap();
     assert!(!json.contains("call_value"));
@@ -1017,6 +1026,7 @@ fn test_step_record_some_fields_serialize() {
         storage_writes: None,
         log_topics: None,
         log_data: None,
+        call_input_selector: None,
     };
     let json = serde_json::to_string(&step).unwrap();
     assert!(json.contains("call_value"));

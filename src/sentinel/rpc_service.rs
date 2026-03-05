@@ -706,6 +706,7 @@ mod tests {
                 storage_writes: None,
                 log_topics: None,
                 log_data: None,
+                call_input_selector: None,
             },
             // Step 1: Attacker re-enters victim (CALL at depth > 0, target = victim)
             crate::types::StepRecord {
@@ -722,6 +723,7 @@ mod tests {
                 storage_writes: None,
                 log_topics: None,
                 log_data: None,
+                call_input_selector: None,
             },
             // Step 2: SSTORE in victim contract after re-entry
             crate::types::StepRecord {
@@ -743,6 +745,7 @@ mod tests {
                 }]),
                 log_topics: None,
                 log_data: None,
+                call_input_selector: None,
             },
         ]
     }

@@ -6,19 +6,12 @@
 use ethrex_common::{Address, U256};
 use rustc_hash::FxHashMap;
 
+use crate::opcodes::{
+    OP_CALL, OP_CALLCODE, OP_CALLER, OP_DELEGATECALL, OP_LOG3, OP_SLOAD, OP_SSTORE, OP_STATICCALL,
+};
 use crate::types::StepRecord;
 
 use super::types::{AttackPattern, DetectedPattern};
-
-// Opcode constants
-const OP_SLOAD: u8 = 0x54;
-const OP_SSTORE: u8 = 0x55;
-const OP_CALL: u8 = 0xF1;
-const OP_CALLCODE: u8 = 0xF2;
-const OP_DELEGATECALL: u8 = 0xF4;
-const OP_STATICCALL: u8 = 0xFA;
-const OP_CALLER: u8 = 0x33;
-const OP_LOG3: u8 = 0xA3;
 
 /// Stateless attack pattern classifier.
 pub struct AttackClassifier;

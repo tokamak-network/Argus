@@ -1,19 +1,14 @@
 //! [`OpcodeRecorder`] implementation that captures [`StepRecord`]s.
 
+use crate::opcodes::{
+    OP_CALL, OP_CALLCODE, OP_CREATE, OP_CREATE2, OP_DELEGATECALL, OP_LOG0, OP_LOG4, OP_SSTORE,
+    OP_STATICCALL,
+};
 use crate::types::{ReplayConfig, StepRecord, StorageWrite};
 use ethrex_common::{Address, H256, U256};
 use ethrex_levm::call_frame::Stack;
 use ethrex_levm::debugger_hook::OpcodeRecorder;
 use ethrex_levm::memory::Memory;
-
-// Opcode constants for enrichment
-const OP_SSTORE: u8 = 0x55;
-const OP_CALL: u8 = 0xF1;
-const OP_CALLCODE: u8 = 0xF2;
-const OP_CREATE: u8 = 0xF0;
-const OP_CREATE2: u8 = 0xF5;
-const OP_LOG0: u8 = 0xA0;
-const OP_LOG4: u8 = 0xA4;
 
 /// Maximum LOG data bytes to capture per step (prevents memory bloat).
 const MAX_LOG_DATA_CAPTURE: usize = 256;
@@ -107,6 +102,40 @@ impl DebugRecorder {
         }
     }
 
+    /// Extract the first 4 bytes (function selector) from CALL-family input data in memory.
+    ///
+    /// CALL/CALLCODE stack: [gas, to, value, argsOffset, argsLength, retOffset, retLength]
+    /// DELEGATECALL/STATICCALL stack: [gas, to, argsOffset, argsLength, retOffset, retLength]
+    ///
+    /// Returns `None` if the opcode is not a call, argsLength < 4, or memory is inaccessible.
+    fn extract_call_input_selector(opcode: u8, stack: &Stack, memory: &Memory) -> Option<[u8; 4]> {
+        let (offset_idx, length_idx) = match opcode {
+            OP_CALL | OP_CALLCODE => (3, 4),
+            OP_DELEGATECALL | OP_STATICCALL => (2, 3),
+            _ => return None,
+        };
+
+        let args_offset = stack.peek(offset_idx)?.as_usize();
+        let args_length = stack.peek(length_idx)?.as_usize();
+
+        if args_length < 4 {
+            return None;
+        }
+
+        let buf = memory.buffer.borrow();
+        let base = memory.current_base_offset();
+        let start = base + args_offset;
+        let end = start + 4;
+
+        if end <= buf.len() {
+            let mut selector = [0u8; 4];
+            selector.copy_from_slice(&buf[start..end]);
+            Some(selector)
+        } else {
+            None
+        }
+    }
+
     /// Extract storage write info for SSTORE from pre-execution stack.
     fn extract_sstore(
         opcode: u8,
@@ -150,6 +179,7 @@ impl OpcodeRecorder for DebugRecorder {
         let log_topics = Self::extract_log_topics(opcode, stack);
         let log_data = Self::extract_log_data(opcode, stack, memory);
         let storage_writes = Self::extract_sstore(opcode, stack, code_address);
+        let call_input_selector = Self::extract_call_input_selector(opcode, stack, memory);
 
         self.steps.push(StepRecord {
             step_index,
@@ -165,6 +195,7 @@ impl OpcodeRecorder for DebugRecorder {
             storage_writes,
             log_topics,
             log_data,
+            call_input_selector,
         });
     }
 }

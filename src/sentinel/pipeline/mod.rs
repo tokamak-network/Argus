@@ -20,16 +20,8 @@ pub use steps::{AnomalyDetector, ConfidenceScorer, ReportGenerator, TraceAnalyze
 #[cfg(feature = "autopsy")]
 pub use steps::{FundFlowAnalyzer, PatternMatcher};
 
-// Opcode constants for feature extraction (used by features + steps)
-pub(crate) const OP_SLOAD: u8 = 0x54;
-pub(crate) const OP_SSTORE: u8 = 0x55;
-pub(crate) const OP_CALL: u8 = 0xF1;
-pub(crate) const OP_CALLCODE: u8 = 0xF2;
-pub(crate) const OP_DELEGATECALL: u8 = 0xF4;
-pub(crate) const OP_CREATE: u8 = 0xF0;
-pub(crate) const OP_CREATE2: u8 = 0xF5;
-pub(crate) const OP_STATICCALL: u8 = 0xFA;
-pub(crate) const OP_SELFDESTRUCT: u8 = 0xFF;
-pub(crate) const OP_REVERT: u8 = 0xFD;
-pub(crate) const OP_LOG0: u8 = 0xA0;
-pub(crate) const OP_LOG4: u8 = 0xA4;
+// Re-export opcode constants for feature extraction (used by features + steps)
+pub(crate) use crate::opcodes::{
+    OP_CALL, OP_CALLCODE, OP_CREATE, OP_CREATE2, OP_DELEGATECALL, OP_LOG0, OP_LOG4, OP_REVERT,
+    OP_SELFDESTRUCT, OP_SLOAD, OP_SSTORE, OP_STATICCALL,
+};

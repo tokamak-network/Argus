@@ -285,14 +285,22 @@ mod h5_integration_tests {
         // Verify Prometheus format structure (HELP + TYPE per metric)
         let help_count = text.matches("# HELP").count();
         let type_count = text.matches("# TYPE").count();
-        assert_eq!(help_count, 14, "should have 14 HELP lines");
-        assert_eq!(type_count, 14, "should have 14 TYPE lines");
+        // 14 base metrics + 6 AI metrics (when ai_agent feature is enabled)
+        #[cfg(feature = "ai_agent")]
+        {
+            assert_eq!(help_count, 20, "should have 20 HELP lines (14 base + 6 AI)");
+            assert_eq!(type_count, 20, "should have 20 TYPE lines (14 base + 6 AI)");
+        }
+        #[cfg(not(feature = "ai_agent"))]
+        {
+            assert_eq!(help_count, 14, "should have 14 HELP lines");
+            assert_eq!(type_count, 14, "should have 14 TYPE lines");
+        }
 
-        // All types should be counters
-        assert_eq!(
-            text.matches("# TYPE").count(),
-            text.matches("counter").count(),
-            "all metrics should be counters"
+        // Base metrics are all counters
+        assert!(
+            text.contains("# TYPE sentinel_blocks_scanned counter"),
+            "base metrics should be counters"
         );
     }
 

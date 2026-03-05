@@ -66,13 +66,23 @@ impl CostTracker {
         Ok(tracker)
     }
 
-    /// Save the CostTracker to a JSON file. Creates parent directories if needed.
+    /// Save the CostTracker to a JSON file using atomic write (tmp + rename).
+    ///
+    /// Creates parent directories if needed. The rename ensures readers never
+    /// see a partially-written file.
     pub fn save(&self, path: &Path) -> Result<(), CostError> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| CostError::WriteError(e.to_string()))?;
         }
         let json = serde_json::to_string(self).map_err(|e| CostError::WriteError(e.to_string()))?;
-        std::fs::write(path, json).map_err(|e| CostError::WriteError(e.to_string()))?;
+
+        let tmp_path = path.with_extension(format!("json.{}.tmp", std::process::id()));
+        std::fs::write(&tmp_path, &json).map_err(|e| CostError::WriteError(e.to_string()))?;
+        std::fs::rename(&tmp_path, path).map_err(|e| {
+            // Clean up tmp on rename failure
+            let _ = std::fs::remove_file(&tmp_path);
+            CostError::WriteError(e.to_string())
+        })?;
         Ok(())
     }
 

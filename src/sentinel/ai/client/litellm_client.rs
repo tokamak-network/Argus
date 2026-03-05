@@ -5,7 +5,10 @@ use serde_json::Value;
 use std::time::Instant;
 
 use super::super::types::AgentContext;
-use super::{AiClient, AiError, AiResponse, TokenUsage, parse_verdict, serialize_context_checked, verdict_tool_schema};
+use super::{
+    AiClient, AiError, AiResponse, TokenUsage, parse_verdict, serialize_context_checked,
+    verdict_tool_schema,
+};
 
 // ── OpenAI-compatible API types (request) ────────────────────────────────
 

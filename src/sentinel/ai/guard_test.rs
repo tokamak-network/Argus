@@ -324,6 +324,7 @@ mod tests {
             storage_writes: None,
             log_topics: None,
             log_data: None,
+            call_input_selector: None,
         };
 
         let ctx = ContextExtractor::extract(
