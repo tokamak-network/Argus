@@ -311,6 +311,10 @@ impl PreFilter {
         if receipt.succeeded {
             return None;
         }
+        // NOTE: `cumulative_gas_used` is the running block total, not per-TX gas.
+        // This over-counts gas for TXs later in a block. Fix: compute
+        // `per_tx_gas = cumulative[i] - cumulative[i-1]` in the caller.
+        // Tracked: https://github.com/tokamak-network/Argus/issues/6
         let gas_used = receipt.cumulative_gas_used;
         if gas_used < 100_000 {
             return None;
@@ -365,6 +369,9 @@ impl PreFilter {
     /// H5: Check for unusual gas usage pattern (near-exact gas estimation).
     fn check_unusual_gas(&self, tx: &Transaction, receipt: &Receipt) -> Option<(u64, u64)> {
         let gas_limit = tx.gas_limit();
+        // NOTE: `cumulative_gas_used` is the running block total, not per-TX gas.
+        // The ratio calculation below can exceed 1.0 for TXs later in a block.
+        // See H2 comment for the fix. Tracked: GitHub issue #6
         let gas_used = receipt.cumulative_gas_used;
         if gas_limit == 0 {
             return None;
@@ -384,6 +391,7 @@ impl PreFilter {
     fn check_self_destruct(&self, receipt: &Receipt) -> bool {
         // High gas but zero or very few logs — possible self-destruct
         // This is a weak heuristic; deep analysis confirms it via opcode trace
+        // NOTE: `cumulative_gas_used` — same caveat as H2/H5. See GitHub issue #6.
         let gas_used = receipt.cumulative_gas_used;
         gas_used > 1_000_000 && receipt.logs.is_empty() && !receipt.succeeded
     }
