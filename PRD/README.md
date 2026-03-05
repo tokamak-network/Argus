@@ -1,37 +1,46 @@
-# Argus Sentinel 오탐률 개선 -- 디자인 문서
+# Argus AI Agent — PRD Navigation
 
-> Show Me The PRD로 생성됨 (2026-03-05)
+> **독자:** Argus 핵심 개발자 (Rust + EVM 배경 필요)
+>
+> **문체 규칙:** 01/03은 서술체("~한다"), 02는 정의체(명사형), 04는 명령체("~하라"). 표 내부는 간결성을 위해 명사형 허용.
 
-## 배경
+## Documents
 
-Argus Sentinel의 메인넷 운영 결과, 25건 알림 중 20건이 false positive (precision 20%).
-Balancer Vault 정상 flash loan 차익거래가 Critical로 분류되는 것이 주원인.
-이 프로젝트는 precision 70%+를 달성하여 외부 공유 가능한 수준으로 개선한다.
+| # | Document | Description |
+|---|----------|-------------|
+| 1 | [01_PRD.md](./01_PRD.md) | Product Requirements Document — 왜, 무엇을, 어떻게 |
+| 2 | [02_DATA_MODEL.md](./02_DATA_MODEL.md) | Data Model — AgentContext, AgentVerdict, CostTracker |
+| 3 | [03_PHASES.md](./03_PHASES.md) | Phase Plan — Phase 0 (PoC) + 3단계 구현 계획 |
+| 4 | [04_PROJECT_SPEC.md](./04_PROJECT_SPEC.md) | Project Spec — 기술 스택, 규칙, 테스트, 배포 |
 
-## 문서 구성
+## Decision Summary
 
-| 문서 | 내용 | 언제 읽나 |
-|------|------|----------|
-| [01_PRD.md](./01_PRD.md) | 뭘 만드는지, 왜 만드는지, 성공 기준 | 프로젝트 시작 전 |
-| [02_DATA_MODEL.md](./02_DATA_MODEL.md) | 데이터 구조 (WhitelistConfig, AttackStage, ProfitFlow 등) | 타입 설계할 때 |
-| [03_PHASES.md](./03_PHASES.md) | 3단계 계획 (화이트리스트 → 다단계 매핑 → 백테스트) | 개발 순서 정할 때 |
-| [04_PROJECT_SPEC.md](./04_PROJECT_SPEC.md) | AI 규칙, 절대 하지 마 목록, 테스트/배포 가이드 | AI에게 코드 시킬 때마다 |
+| 결정 항목 | 선택 |
+|----------|------|
+| 운영 범위 | 실시간 (2-pass 비동기) + 사후분석 통합 |
+| AI 입력 | AgentContext (opcode trace에서 추출한 구조화된 JSON) |
+| 월 비용 | $150 이하 (prompt caching 적용) |
+| MVP 범위 | 중간 (AI 판단 엔진 + 컨텍스트 추출기 + Autopsy AI + 비용 가드레일) |
+| AI SDK | anthropic-sdk-rust (MVP) → LiteLLM 전환 가능 설계 |
+| 모델 | Haiku 4.5 (스크리닝) + Sonnet 4.6 (심층) |
+| API 키 | 환경변수 (ANTHROPIC_API_KEY) |
+| Feature flag | `ai_agent` (언더스코어) |
 
-## 다음 단계
+## Blockers (Phase 1 착수 전 필수)
 
-Phase 1을 시작하려면 [03_PHASES.md](./03_PHASES.md)의 "Phase 1 시작 프롬프트"를 복사하여 사용하세요.
+Phase 0 전제조건 및 PoC 작업 전체 목록은 [03_PHASES.md § Phase 0](./03_PHASES.md#phase-0-poc-검증-1-2-weeks) 참조.
 
-## 미결 사항 종합
+핵심 블로커 요약:
+- [ ] Phase 0 PoC 정확도 80% 이상
+- [ ] `rpc_service.rs` 버그 수정 완료
+- [ ] `anthropic-sdk-rust` 호환성 검증 (또는 대안 확인)
 
-- [ ] 초기 화이트리스트에 포함할 프로토콜 목록 확정
-- [ ] score_modifier 값 결정 (-0.3 vs -0.5 vs 차등)
-- [ ] ProfitFlow is_circular 판정 기준 (1-hop vs multi-hop)
-- [ ] HistoricalLabel 데이터 형식 (JSONL vs Rust 상수)
-- [ ] 화이트리스트 로드 시점 (시작 시 1회 vs 주기적)
-- [ ] 새 SuspicionReason의 기본 AttackStage
+## Phase 0 필수 준비 (PoC와 병행)
 
-## 참고 자료
+- [ ] Phase 0: 공격 3 + 정상 10 = 13개로 PoC 검증 → Phase 1에서 공격 10 + 정상 10 = 20개+로 확장
 
-- [Forta Attack Detector](https://docs.forta.network/en/latest/attack-detector-bot/) — 다단계 공격 매핑 참조
-- [BlockSec Phalcon](https://blocksec.com/blog/what-is-the-best-de-fi-hack-detection-and-prevention-system) — FP rate < 0.001%
-- [HOUSTON (NDSS)](https://www.ndss-symposium.org/ndss-paper/houston-real-time-anomaly-detection-of-attacks-against-ethereum-defi-protocols/) — Cross-contract anomaly detection
+## Nice-to-have (착수 후 가능)
+
+- [ ] LiteLLM 프록시 배포 방식 결정 (사이드카 vs 별도 서비스)
+- [ ] Haiku/Sonnet 프롬프트 초안 작성
+- [ ] ECS Fargate 배포 시 Secrets Manager에 ANTHROPIC_API_KEY 추가

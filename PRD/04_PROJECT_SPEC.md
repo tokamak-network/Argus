@@ -1,176 +1,201 @@
-# Argus Sentinel 오탐률 개선 -- 프로젝트 스펙
+# Argus AI Agent — Project Spec
 
-> AI가 코드를 짤 때 지켜야 할 규칙과 절대 하면 안 되는 것.
-> 이 문서를 AI에게 항상 함께 공유하세요.
+> **문체:** 이 문서는 명령체("~하라")를 사용한다. 개발 규칙 문서이기 때문이다.
 
----
+## Glossary (용어집)
 
-## 기술 스택
+업계 표준 영어 용어는 원문을 유지한다. Argus 자체 개념은 한글로 기술한다.
 
-| 영역 | 선택 | 이유 |
+| 용어 | 의미 |
+|------|------|
+| AgentContext | AI에게 전달되는 TX 분석 컨텍스트 (구조화된 JSON) |
+| AgentVerdict | AI의 판단 결과 |
+| CostTracker | 비용 추적/제한 엔티티 |
+| Hallucination Guard | AI evidence가 실제 데이터에 존재하는지 검증하는 후처리 레이어 |
+| Circuit breaker | 연속 실패 시 자동으로 기능을 비활성화하는 안전 장치 |
+| Prompt caching | 반복되는 시스템 프롬프트를 캐싱하여 비용 90% 절감하는 Anthropic 기능 |
+| 2-pass 알림 | 규칙 기반 결과를 즉시 발행 → AI 결과로 보강/취소하는 비동기 구조 |
+
+## Tech Stack
+
+| 구분 | 선택 | 이유 |
 |------|------|------|
-| 언어 | Rust 1.85+ (edition 2024) | 기존 코드베이스. 타입 안전성 + 성능 |
-| EVM 엔진 | ethrex LEVM (rev 03fc1858) | 기존 의존성. opcode-level 분석 |
-| HTTP 서버 | axum | 기존 Sentinel 서버 |
-| 비동기 런타임 | tokio | 기존 폴링 + WS 파이프라인 |
-| 설정 | TOML (toml crate) | 기존 config.rs 패턴. 화이트리스트 추가 |
-| 테스트 | cargo test (built-in) | CI 통합, fixture 기반 |
-| 배포 | AWS ECS Fargate (ap-northeast-2) | 기존 인프라 |
-| 컨테이너 | Docker | 기존 Dockerfile |
+| AI SDK | `anthropic-sdk-rust` (crates.io) 또는 LiteLLM 프록시 | 아래 비교표 참조. 커뮤니티 crate이므로 관리 중단 리스크 있음 — [01_PRD.md § Risks](./01_PRD.md#6-risks--mitigations) 참조 |
+| 모델 (스크리닝) | Claude Haiku 4.5 | ~$0.005/req (prompt caching 적용 시), 빠른 응답. 공식 단가: input $1/MTok, output $5/MTok |
+| 모델 (심층) | Claude Sonnet 4.6 | ~$0.02/req, 높은 정확도 |
+| API 키 관리 | 환경변수 (`ANTHROPIC_API_KEY`). LiteLLM 시 TOML에 `litellm_api_base` (프록시 URL) + `litellm_api_key_env` (키 환경변수명) 설정 | 시크릿 노출 방지 |
+| 직렬화 | serde_json | AgentContext/AgentVerdict JSON 변환 |
+| 비용 영속성 | 파일 기반 (JSON) | 외부 DB 의존성 없음 |
+| Feature flag | `ai_agent` | 기존 빌드 격리 |
 
----
+### AI SDK 선택지: anthropic-sdk-rust vs LiteLLM
 
-## 프로젝트 구조 (변경 대상)
+| 항목 | anthropic-sdk-rust | LiteLLM 프록시 |
+|------|-------------------|---------------|
+| 통합 방식 | Rust crate 직접 의존 | HTTP 프록시 서버 (OpenAI-compatible API) |
+| 모델 교체 | Anthropic 전용 | 100+ 프로바이더 (OpenAI, Gemini, Mistral, Ollama 등) |
+| 추가 인프라 | 없음 | LiteLLM 프록시 서버 운영 필요 (Python) |
+| Rust 호환 | 네이티브 | reqwest로 OpenAI API 호출 (간단) |
+| 비용 추적 | 자체 CostTracker 구현 | LiteLLM 내장 비용 추적 + 예산 관리 |
+| 로드밸런싱 | 없음 (단일 프로바이더) | 프로바이더 간 자동 폴백/로드밸런싱 |
+| 레이턴시 | 직접 호출 (최소) | 프록시 경유 (Python 처리 포함 수십ms 추가) |
+| 운영 복잡도 | 낮음 (crate만 추가) | 중간 (Python 프록시 서버 별도 운영) |
+
+### 추천 전략
+
+**MVP: `anthropic-sdk-rust`로 시작** — 추가 인프라 없이 빠르게 검증.
+
+**Phase 2+: LiteLLM 전환 고려** — 다음 시점에 전환 검토:
+- 다른 모델(GPT-4o, Gemini)과 A/B 테스트가 필요할 때
+- 프로바이더 장애 시 자동 폴백이 필요할 때
+- 셀프호스팅 모델(Ollama)로 비용 절감을 시도할 때
+
+**전환 비용 최소화 설계**: `client.rs`를 trait 기반으로 설계하여 `AnthropicClient`와 `LiteLLMClient`를 교체 가능하게 구현.
+
+```rust
+#[async_trait]
+trait AiClient: Send + Sync {
+    async fn judge(&self, context: &AgentContext) -> Result<AgentVerdict, AiError>;
+}
+
+struct AnthropicClient { /* anthropic-sdk-rust 직접 호출 */ }
+struct LiteLLMClient { /* OpenAI-compatible HTTP 호출 */ }
+```
+
+## Project Structure
 
 ```
-src/sentinel/
-├── whitelist.rs       # [신규] WhitelistConfig, WhitelistCategory, TOML 파서
-├── profit_analyzer.rs # [신규] ProfitFlow 분석기
-├── types.rs           # [수정] AttackStage enum, SuspicionReason 확장, SentinelAlert 확장
-├── pre_filter.rs      # [수정] 화이트리스트 체크 + 다단계 매핑 통합
-├── pipeline.rs        # [수정] profit 분석 단계 추가
-├── config.rs          # [수정] whitelist 섹션 파싱
-├── mod.rs             # [수정] 새 모듈 등록
-└── ...                # 기존 파일 유지
-
-src/tests/
-├── backtest.rs        # [신규] 백테스트 러너
-└── fixtures/          # [신규] 공격/정상 TX fixture 데이터
+src/sentinel/ai/
+├── mod.rs          # Module exports + feature gate
+├── types.rs        # AgentContext, AgentVerdict, CostTracker, AttackType enum
+├── context.rs      # ContextExtractor (trace → AgentContext)
+├── judge.rs        # AiJudge (2-tier Haiku/Sonnet pipeline)
+├── guard.rs        # Hallucination Guard (evidence 검증)
+├── client.rs       # AiClient trait + AnthropicClient / LiteLLMClient
+├── cost.rs         # CostTracker + circuit breaker
+└── prompts.rs      # System/user prompt templates
 ```
 
----
+## Feature Flag
 
-## 절대 하지 마 (DO NOT)
+```toml
+# Cargo.toml
+[features]
+default = ["sentinel", "autopsy"]
+sentinel = ["axum", "tokio", ...]
+autopsy = ["reqwest", "sha3", ...]
+ai_agent = ["anthropic-sdk-rust", "sentinel"]
+cli = ["clap", "rustyline"]
+```
 
-> AI에게 코드를 시킬 때 이 목록을 반드시 함께 공유하세요.
+> Cargo에서 하이픈(`-`)은 언더스코어(`_`)로 자동 변환되므로 `ai_agent`로 통일한다.
 
-- [ ] **기존 SentinelAlert JSON 직렬화를 깨뜨리지 마** — 새 필드는 `#[serde(default)]`로 추가. 대시보드 API 호환성 유지
-- [ ] **기존 테스트 397개를 깨뜨리지 마** — 새 로직은 새 테스트로 검증
-- [ ] **하드코딩된 주소를 소스 코드에 넣지 마** — 모든 화이트리스트 주소는 TOML 설정
-- [ ] **외부 API 호출을 추가하지 마** — DeFiLlama, Etherscan 등 네트워크 의존성 금지
-- [ ] **pre_filter의 기존 로직을 삭제하지 마** — 화이트리스트와 다단계 매핑은 기존 로직 위에 추가하는 레이어
-- [ ] **unsafe 코드를 사용하지 마** — 기존 코드베이스에 unsafe 없음
-- [ ] **clippy 경고를 무시하지 마** — `cargo clippy --all-features -- -D warnings` 통과 필수
-- [ ] **feature gate 없이 새 의존성을 추가하지 마** — 기존 sentinel feature 안에서만
-- [ ] **TOML 파서에 unwrap()을 쓰지 마** — 설정 파싱 실패는 graceful error로 처리
-- [ ] **테스트에서 실제 RPC를 호출하지 마** — fixture 기반으로만 (CI에서 RPC 없음)
+## Configuration (TOML)
 
----
+```toml
+[ai]
+enabled = true
+backend = "anthropic"               # "anthropic" | "litellm"
 
-## 항상 해 (ALWAYS DO)
+# Anthropic 직접 호출 설정
+anthropic_api_key_env = "ANTHROPIC_API_KEY"
 
-- [ ] **변경하기 전에 기존 코드를 읽어라** — pre_filter.rs, types.rs, config.rs 구조 파악 먼저
-- [ ] **새 타입은 `#[derive(Debug, Clone, Serialize, Deserialize)]`** — 기존 패턴 준수
-- [ ] **에러는 `thiserror`로 정의** — `DebuggerError` enum에 variant 추가
-- [ ] **테스트 먼저 작성 (TDD)** — RED → GREEN → IMPROVE
-- [ ] **cargo clippy + cargo fmt 실행** — 커밋 전 필수
-- [ ] **새 필드에 `#[serde(default)]` 적용** — 기존 JSONL 데이터와 역호환
-- [ ] **기존 fund_flow 데이터 활용** — ProfitFlow는 이미 있는 fund_flows 필드 기반
-- [ ] **WhitelistConfig 로드 실패 시 빈 리스트로 폴백** — 화이트리스트 없이도 동작해야 함
+# LiteLLM 프록시 설정 (backend = "litellm" 일 때)
+# litellm_api_base = "http://localhost:4000"  # LiteLLM 프록시 서버 URL (API 키가 아님)
+# litellm_api_key_env = "LITELLM_API_KEY"     # LiteLLM 프록시 인증 키 (선택)
 
----
+screening_model = "claude-haiku-4-5-20251001"
+deep_model = "claude-sonnet-4-6"
 
-## 테스트 방법
+# 공격 의심도가 이 값 이상이면 Sonnet으로 에스컬레이션.
+# 높을수록: Sonnet 요청 감소 (비용 절감, 정밀도 하락)
+# 낮을수록: Sonnet 요청 증가 (비용 증가, 정밀도 향상)
+is_suspicious_confidence_threshold = 0.6
+
+monthly_budget_usd = 150.0          # 산출 근거: 01_PRD.md § 비용 추정 근거
+daily_limit_usd = 10.0
+hourly_rate_limit = 100              # 시간당 최대 요청 수
+max_concurrent_per_block = 3         # 블록당 최대 동시 AI 요청
+request_timeout_secs = 30
+max_retries = 3
+max_context_tokens = 4000            # 컨텍스트 크기 제한
+
+# Circuit breaker
+circuit_breaker_threshold = 5        # 연속 실패 횟수
+circuit_breaker_cooldown_secs = 600  # 비활성화 기간 (10분)
+```
+
+## DO NOT Rules
+
+1. **DO NOT** mutate existing struct fields — 새 필드 추가 시 `Option<T>`으로 하위 호환 유지
+2. **DO NOT** 기존 테스트 깨뜨리기 — `ai_agent` feature 없이 `cargo test` 통과 필수
+3. **DO NOT** API 키를 코드에 하드코딩 — 환경변수만 사용
+4. **DO NOT** AI 응답을 파싱 없이 신뢰 — JSON schema 검증 + Hallucination Guard 필수
+5. **DO NOT** 비용 제한 없이 API 호출 — CostTracker 체크 선행
+6. **DO NOT** 동기 API 호출 — 모든 AI 호출은 async
+7. **DO NOT** CostTracker 확인 없이 Sonnet을 직접 호출 — Haiku 스크리닝 필수
+8. **DO NOT** AI 장애 시 전체 파이프라인 중단 — circuit breaker + 규칙 기반 폴백
+9. **DO NOT** 800줄 이상의 파일 생성 — 모듈 분리
+10. **DO NOT** `#[cfg(feature = "ai_agent")]` 없이 AI 코드 노출
+
+## ALWAYS DO Rules
+
+1. **ALWAYS** `#[cfg(feature = "ai_agent")]`로 AI 코드 게이트
+2. **ALWAYS** CostTracker 잔액 확인 후 API 호출
+3. **ALWAYS** API 응답에 타임아웃 설정 (default 30초)
+4. **ALWAYS** AgentVerdict를 JSON으로 파싱하고 schema 검증
+5. **ALWAYS** 토큰 사용량과 비용을 CostTracker에 기록
+6. **ALWAYS** API 실패 시 exponential backoff 재시도 (최대 3회)
+7. **ALWAYS** fixture TX 20개+로 회귀 테스트 유지 (공격 10 + 정상 10)
+8. **ALWAYS** 프롬프트 변경 시 기존 fixture 테스트 재실행
+9. **ALWAYS** Haiku 스크리닝을 거친 후 Sonnet 에스컬레이션
+10. **ALWAYS** Hallucination Guard로 AI evidence를 AgentContext 데이터와 대조 검증
+
+## Test Strategy
 
 ```bash
-# 전체 테스트 (기존 + 신규)
-cargo test --all-features
+# AI 코드 포함 빌드
+cargo check --features ai_agent
 
-# 화이트리스트 테스트만
-cargo test whitelist --all-features
+# AI 테스트 (ANTHROPIC_API_KEY 필요)
+cargo test --features ai_agent -- ai
 
-# 다단계 매핑 테스트만
-cargo test attack_stage --all-features
+# 기존 테스트 영향 없음 확인
+cargo test
 
-# 백테스트만
-cargo test backtest --all-features
-
-# Clippy 검사
-cargo clippy --all-features -- -D warnings
-
-# 포맷 검사
-cargo fmt --check
+# Clippy
+cargo clippy --features ai_agent -- -D warnings
 ```
 
----
+### 테스트 분류
 
-## 배포 방법
+| 유형 | 대상 | API 필요 |
+|------|------|----------|
+| Unit | types.rs, cost.rs, context.rs, guard.rs | No |
+| Integration | judge.rs (mock response) | No |
+| E2E | 전체 파이프라인 | Yes (ignored by default) |
+| Fixture | 공격 TX 10개 + 정상 TX 10개 판단 | Yes (ignored by default) |
+
+## Deployment
 
 ```bash
-# 1. 로컬 빌드 + 테스트
-cargo test --all-features
-cargo clippy --all-features -- -D warnings
+# 환경변수 설정 (.env 파일 또는 Secrets Manager 사용 권장)
+# .env 파일에 ANTHROPIC_API_KEY=sk-ant-xxx... 설정 후:
+set -a; source .env; set +a    # set -a로 export를 자동 적용
 
-# 2. Docker 빌드
-docker build -t argus:v0.3.0 .
+# AI 모드로 Sentinel 실행
+cargo run --bin argus --features "cli,ai_agent" -- sentinel \
+  --rpc https://eth-mainnet.g.alchemy.com/v2/KEY \
+  --config sentinel.toml
 
-# 3. ECS 배포
-./scripts/ecs-deploy.sh --tag v0.3.0 --region ap-northeast-2
+# AI 모드로 Autopsy 실행
+cargo run --bin argus --features "cli,ai_agent" -- autopsy \
+  --tx 0x... --rpc https://... --ai
 
-# 4. 배포 후 확인
-curl http://<TASK_IP>:9090/health
-curl http://<TASK_IP>:9090/sentinel/metrics
-curl http://<TASK_IP>:9090/sentinel/history
+# 실행 후 메트릭 확인
+curl http://localhost:9090/metrics | grep argus_ai_requests_total
+
+# Docker (AI 포함) — .env 파일로 시크릿 전달
+docker build --build-arg FEATURES="sentinel,autopsy,ai_agent" -t argus-ai .
+docker run --env-file .env argus-ai
 ```
-
----
-
-## 환경변수
-
-| 변수명 | 설명 | 어디서 발급 |
-|--------|------|------------|
-| `ARGUS_RPC_URL` | 메인넷 RPC endpoint | Alchemy Dashboard |
-| `ARGUS_METRICS_PORT` | 메트릭 서버 포트 (기본 9090) | 자체 설정 |
-
-> .env 파일에 저장. 절대 GitHub에 올리지 마세요.
-
----
-
-## Scoring 알고리즘 (변경 후)
-
-```
-base_score = 기존 pre_filter 계산값
-
-# Phase 1: 화이트리스트 감점
-for each suspicion_reason:
-    if reason.contract in whitelist:
-        base_score += whitelist_entry.score_modifier  # 음수값
-
-# Phase 2: 다단계 보정
-stages_confirmed = unique(reason.stage for reason in reasons)
-if len(stages_confirmed) == 1:
-    stage_multiplier = 0.6   # 1단계만 → 감점
-elif len(stages_confirmed) == 2:
-    stage_multiplier = 1.0   # 2단계 → 유지
-elif len(stages_confirmed) >= 3:
-    stage_multiplier = 1.3   # 3단계+ → 가점
-# NOTE: 초기값. Phase 3 Historical Labeling 백테스트 결과로 조정 예정.
-
-# Phase 2: Profit 보정
-if profit_flow.is_circular:
-    profit_modifier = -0.2   # 정상 arb → 감점
-elif profit_flow.drain_target.is_some():
-    profit_modifier = +0.15  # drain 패턴 → 가점
-else:
-    profit_modifier = 0.0
-
-final_score = clamp(base_score * stage_multiplier + profit_modifier, 0.0, 1.0)
-
-# Priority 결정
-if final_score >= 0.85:  Critical
-elif final_score >= 0.65: High
-else:                     Medium
-```
-
----
-
-## 결정 완료 (Phase 1)
-
-- [x] 화이트리스트 로드 시점: **Sentinel 시작 시 1회** (TOML → WhitelistEngine 변환)
-- [x] 화이트리스트 로드 실패 시: 개별 entry skip + eprintln 경고, 전체 실패하지 않음
-
-## [NEEDS CLARIFICATION] (Phase 2-3)
-
-- [ ] 주기적 화이트리스트 리로드 (hot reload) 필요 여부
-- [ ] ProfitFlow에서 "circular" 판정의 hop depth 제한 (1-hop? 3-hop?)
-- [ ] Stage 매핑이 확정되지 않은 새 SuspicionReason 타입이 추가될 때의 기본 stage

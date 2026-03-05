@@ -64,6 +64,14 @@ src/
 │   ├── metrics.rs      #   Prometheus-compatible
 │   ├── history.rs      #   Alert history storage
 │   └── config.rs       #   TOML config parsing
+│   ├── ai/             #   [Planned] AI Agent (feature: ai_agent)
+│   │   ├── types.rs    #     AgentContext, AgentVerdict, AttackType
+│   │   ├── context.rs  #     ContextExtractor (trace → AgentContext)
+│   │   ├── judge.rs    #     AiJudge (2-tier Haiku/Sonnet)
+│   │   ├── guard.rs    #     Hallucination Guard
+│   │   ├── client.rs   #     AiClient trait + providers
+│   │   ├── cost.rs     #     CostTracker + circuit breaker
+│   │   └── prompts.rs  #     Prompt templates
 ├── autopsy/            # Post-hack forensics (3,544 LoC)
 │   ├── types.rs        #   AttackPattern, FundFlow
 │   ├── classifier.rs   #   Reentrancy, flash loan, price manipulation
@@ -87,6 +95,7 @@ docs/                   # Case studies
 | `sentinel` | Yes | Real-time detection pipeline, axum, tokio |
 | `autopsy` | Yes | Forensic analysis, reqwest, sha3 |
 | `cli` | No | Interactive debugger shell, clap, rustyline |
+| `ai_agent` | No | LLM-assisted detection (anthropic-sdk-rust, Haiku/Sonnet). See PRD/ |
 
 ## Key Dependencies
 

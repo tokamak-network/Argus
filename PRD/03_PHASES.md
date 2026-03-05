@@ -1,216 +1,168 @@
-# Argus Sentinel 오탐률 개선 -- Phase 분리 계획
+# Argus AI Agent — Phase Plan
 
-> 한 번에 다 만들면 복잡해져서 품질이 떨어집니다.
-> Phase별로 나눠서 각각 측정 가능한 precision 개선을 달성합니다.
+> 파일 구조 및 기술 상세는 [04_PROJECT_SPEC.md](./04_PROJECT_SPEC.md) 참조.
 
----
+## Phase 0: PoC 검증 (1-2 weeks)
 
-## Phase 1: 화이트리스트 엔진 (1-2일)
+**목적:** LLM이 EVM opcode trace를 분석하여 공격을 탐지할 수 있는지 검증한다.
+Phase 0이 실패하면 이후 모든 Phase는 중단하고 PRD를 재검토한다.
 
-### 목표
-즉각적인 오탐 감소. Balancer Vault 등 알려진 DeFi 프로토콜의 정상 TX를 필터링하여 precision 20% → 50%+ 달성.
+> **일정 근거:** 핵심 경로는 fixture 변환(2일) + API 테스트(2일) + 문서화(1일) = 1주. SDK 호환성 이슈 발생 시 대안 조사(reqwest 직접 호출)에 추가 3-5일 소요 가능하므로 버퍼 포함 최대 2주.
 
-### 기능
-- [ ] `WhitelistConfig` 타입 정의 (`sentinel/whitelist.rs`)
-- [ ] `WhitelistCategory` enum 정의 (FlashLoan, DEX, Lending, Bridge)
-- [ ] TOML 파서 구현 (`[sentinel.whitelist]` 섹션)
-- [ ] `pre_filter.rs`에 화이트리스트 체크 로직 통합
-- [ ] `score_modifier` 적용 로직 (화이트리스트 매칭 시 score 감점)
-- [ ] `FlashLoanSignature` 단독 트리거 제거 (flash loan만으로는 Critical 불가)
-- [ ] `suspicion_threshold` 0.7 → 0.85 상향
-- [ ] 테스트 10건+ (화이트리스트 매칭/미매칭, score 감점, threshold 경계)
-- [ ] ECS 재배포 + 24시간 모니터링
+**전제 조건:**
+- [ ] `rpc_service.rs`의 `detected_patterns` 빈 벡터 버그 수정 (RPC 모드 deep analysis 연결)
+- [ ] 현재 14일 운영 데이터에서 오탐률 베이스라인 측정
 
-### 데이터
-- WhitelistConfig (TOML에서 로드)
-- SuspicionReason.whitelisted 필드 추가
+**PoC 작업:**
+- [ ] ethrex LEVM `StepRecord` 구조 분석 — AgentContext 각 필드([02_DATA_MODEL.md](./02_DATA_MODEL.md))에 매핑 가능 여부 검증, 누락 정보 식별
+- [ ] 기존 fixture TX 3개(Balancer, Bybit, Poly Network)를 수동으로 AgentContext JSON으로 변환
+- [ ] 정상 TX 10개도 동일 형식으로 변환 (총 13개로 PoC 검증. Phase 1에서 공격 10 + 정상 10 = 20개+로 확장)
+- [ ] Claude API에 직접 프롬프트를 보내 판별 정확도 측정
+- [ ] 비용 시뮬레이션: 실제 토큰 수 기반 req당 비용 산출
+- [ ] `is_suspicious_confidence_threshold` 에스컬레이션 비율 추정
+- [ ] `anthropic-sdk-rust` API 호환성 검증 (streaming, JSON mode, prompt caching). 미지원 시 reqwest 직접 호출로 전환 가능 여부 확인
+- [ ] 결과 문서화 → PoC 정확도 80% 미만이면 Phase 1 중단
 
-### 변경 대상 파일
-| 파일 | 변경 |
-|------|------|
-| `src/sentinel/whitelist.rs` | 신규 — 화이트리스트 타입 + TOML 파서 |
-| `src/sentinel/pre_filter.rs` | 수정 — 화이트리스트 체크 + score_modifier 적용 |
-| `src/sentinel/config.rs` | 수정 — whitelist 섹션 파싱 추가 |
-| `src/sentinel/types.rs` | 수정 — SuspicionReason에 whitelisted 필드 |
-| `src/sentinel/mod.rs` | 수정 — whitelist 모듈 등록 |
-| `src/tests/` | 신규 — 화이트리스트 테스트 |
+**인원:** 1인 풀타임
 
-### "진짜 동작" 체크리스트
-- [ ] 기존 397 테스트 전부 통과
-- [ ] 새 테스트 10건+ 통과
-- [ ] ECS에서 Balancer Vault arb TX가 Critical에서 제외됨
-- [ ] 24시간 운영 후 오탐률 50% 이하 확인
+## Phase 1: MVP (6-8 weeks 개발 + 1-2 weeks 스테이징 = 총 7-10 weeks)
 
-### Phase 1 시작 프롬프트
-```
-이 PRD를 읽고 Phase 1을 구현해주세요.
-@PRD/01_PRD.md
-@PRD/02_DATA_MODEL.md
-@PRD/04_PROJECT_SPEC.md
+AI 판단 엔진의 핵심 파이프라인을 구축한다.
 
-Phase 1 범위:
-- WhitelistConfig 타입 + TOML 파서
-- pre_filter.rs에 화이트리스트 체크 통합
-- score_modifier 적용
-- FlashLoan 단독 트리거 제거
-- suspicion_threshold 0.7 → 0.85
-- 테스트 10건+
+> **일정 변동 요인:** 6주(최선) = StepRecord가 call_graph, storage_mutations 등을 직접 제공하는 경우. 8주(최악) = StepRecord에서 수동 opcode 파싱이 필요하거나, Hallucination Guard 정밀도 조정에 추가 반복이 필요한 경우.
 
-반드시 지켜야 할 것:
-- 04_PROJECT_SPEC.md의 "절대 하지 마" 목록 준수
-- 기존 397 테스트가 깨지면 안 됨
-- 새 모듈은 sentinel/whitelist.rs에 생성
-```
+**전제 조건:**
+- Phase 0 PoC 정확도 80% 이상
+- `rpc_service.rs` 버그 수정 완료
 
----
+**인원 가정:** 1인 풀타임
 
-## Phase 2: 다단계 공격 매핑 + Profit 분석 (3-5일)
+### Phase 1-1: 기반 구조 (1-1.5 weeks)
 
-### 전제 조건
-- Phase 1이 ECS에 배포되고 24시간 안정 운영된 상태
+- [ ] `ai_agent` feature flag 추가 (Cargo.toml)
+- [ ] `anthropic-sdk-rust` 의존성 추가
+- [ ] `src/sentinel/ai/` 모듈 구조 생성 (상세는 04_PROJECT_SPEC.md 참조)
+- [ ] CostTracker 구현 (파일 기반 영속성, 일/월 리셋, 시간당 rate limit)
+- [ ] Circuit breaker 구현 (연속 5회 API 실패 시 10분간 비활성화, `auto_pause.rs` 패턴 재사용)
+- [ ] 환경변수 `ANTHROPIC_API_KEY` 검증
+- [ ] 기반 구조 테스트 (types serialization, cost tracking, circuit breaker)
 
-### 목표
-precision 50% → 70%+ 달성. flash loan 사용 여부가 아닌 "공격의 완결성"으로 판단.
+### Phase 1-2: 컨텍스트 추출기 (2-3 weeks)
 
-### 기능
-- [ ] `AttackStage` enum 정의 (Funding, Preparation, Exploitation, MoneyLaundering)
-- [ ] `SuspicionReason.stage` 필드 추가
-- [ ] 기존 reason 타입별 stage 매핑 테이블
-  - FlashLoanSignature → Funding
-  - MultipleErc20Transfers → Exploitation
-  - HighValueWithRevert → Exploitation
-  - SelfDestruct → MoneyLaundering
-  - KnownContractInteraction → (화이트리스트 결과에 따라)
-  - UnusualGasPattern → Preparation or MoneyLaundering
-- [ ] 복합 단계 검증 로직: 확인된 단계 수 → priority 재계산
-  - 1단계: Medium (감시 대상)
-  - 2단계: High (주의 필요)
-  - 3-4단계: Critical (실제 공격 가능성 높음)
-- [ ] `ProfitFlow` 타입 구현
-- [ ] fund_flow 데이터에서 circular 패턴 탐지 (sender → ... → sender = arb)
-- [ ] drain 패턴 탐지 (피해 컨트랙트에서 새 주소로 자금 이동)
-- [ ] `SentinelAlert`에 `attack_stages`, `profit_flow`, `whitelist_matches` 필드 추가
-- [ ] alert_priority 재계산 로직 (stages + profit + whitelist 종합)
-- [ ] 테스트 15건+ (단계 매핑, profit 분석, priority 재계산)
+> ethrex LEVM의 `StepRecord` 구조가 필요한 정보를 직접 제공하는지에 따라 난이도가 크게 달라진다.
+> `StepRecord` 분석이 Phase 0에서 완료되어 있어야 한다.
 
-### 추가 데이터
-- AttackStage, ProfitFlow (02_DATA_MODEL.md 참조)
-- SentinelAlert 확장 필드
+- [ ] `src/sentinel/ai/context.rs` — ContextExtractor 구현
+- [ ] opcode trace → AgentContext 변환 로직
+  - call_graph 추출 (CALL/STATICCALL/DELEGATECALL/CALLCODE) + **input_selector (4byte)**
+  - storage_mutations 추출 (SSTORE)
+  - erc20_transfers 추출 (LOG3 + Transfer topic)
+  - log_events 추출 (Transfer 외 이벤트: Approval, Swap, Sync 등)
+  - eth_transfers 추출 (CALL with value)
+  - revert_count 집계
+  - delegatecalls 추출
+  - contract_creations 추출 (CREATE/CREATE2)
+- [ ] AgentContext → JSON 직렬화 (~2-5KB 타겟)
+- [ ] 기존 fixture TX로 추출기 테스트 (Phase 0 수동 변환 결과와 대조)
 
-### 변경 대상 파일
-| 파일 | 변경 |
-|------|------|
-| `src/sentinel/types.rs` | 수정 — AttackStage enum, ProfitFlow 구조체, SentinelAlert 확장 |
-| `src/sentinel/pre_filter.rs` | 수정 — stage 매핑 + 다단계 검증 로직 |
-| `src/sentinel/pipeline.rs` | 수정 — profit 분석 단계 통합 |
-| `src/sentinel/profit_analyzer.rs` | 신규 — ProfitFlow 분석기 |
-| `src/tests/` | 신규/수정 — 다단계 + profit 테스트 |
+### Phase 1-3: AI 판단 엔진 (2 weeks)
 
-### 통합 테스트
-- Phase 1 화이트리스트 기능이 여전히 정상 동작하는지 확인
-- 화이트리스트 + 다단계 매핑 조합 테스트
+- [ ] `src/sentinel/ai/judge.rs` — AiJudge 구현
+- [ ] Haiku 스크리닝 프롬프트 작성 + 반복 실험
+- [ ] Sonnet 심층 분석 프롬프트 작성 + 반복 실험
+- [ ] 2-tier 파이프라인 (Haiku → `is_suspicious_confidence >= 0.6` → Sonnet)
+- [ ] AgentVerdict 파싱 (JSON response → struct, `AttackType` enum 매핑)
+- [ ] Hallucination Guard: AI evidence가 AgentContext에 존재하는지 프로그래밍적 검증
+- [ ] Prompt caching 적용 (시스템 프롬프트 90% 비용 절감)
+- [ ] 타임아웃 + 재시도 로직 (3회, exponential backoff)
+- [ ] API 장애 시 circuit breaker 연동
+- [ ] fixture 20개+ 기반 판단 정확도 테스트 (공격 10 + 정상 10)
 
-### Phase 2 시작 프롬프트
-```
-Phase 1이 완료된 상태에서 Phase 2를 구현해주세요.
-@PRD/01_PRD.md
-@PRD/02_DATA_MODEL.md
-@PRD/04_PROJECT_SPEC.md
+### Phase 1-4: 파이프라인 통합 (1-1.5 weeks)
 
-Phase 2 범위:
-- AttackStage enum + reason별 stage 매핑
-- 복합 단계 검증 (≥2단계 = Critical)
-- ProfitFlow 분석기 (circular vs drain)
-- SentinelAlert 확장 필드
-- alert_priority 재계산
+- [ ] Sentinel pipeline에 AI 단계를 **비동기**로 삽입 (2-pass: 규칙 기반 즉시 → AI 보강)
+- [ ] 블록당 최대 동시 AI 요청 수 제한 (default: 3)
+- [ ] SentinelAlert에 `agent_verdict: Option<AgentVerdict>` 필드 추가
+- [ ] Autopsy에 `--ai` CLI 플래그 추가
+- [ ] 포렌식 리포트에 AI 판단 섹션 추가
+- [ ] TOML 설정 항목 추가 (`[ai]` 섹션)
+- [ ] 통합 테스트 (전체 파이프라인 e2e)
+- [ ] `examples/sentinel_ai_demo.rs` 데모
 
-반드시 지켜야 할 것:
-- Phase 1 화이트리스트가 정상 동작
-- 기존 전체 테스트 통과
-- ProfitFlow는 fund_flow 데이터 기반 (추가 RPC 호출 없음)
-```
+**Phase 1-4 완료 후 스테이징 (1-2 weeks 추가):**
+- [ ] AI 통합 Sentinel 메인넷 스테이징 배포
+- [ ] 1-2주 운영 데이터 수집 (Phase 2 프롬프트 튜닝 데이터 확보)
 
----
+**Phase 1 → Phase 2 착수 기준:**
+- AI 판단 정확도 80%+ (fixture 기반)
+- 월 비용 추정 $200 미만
+- Circuit breaker 정상 작동 확인
+- 메인넷 스테이징 1주+ 무장애 운영
 
-## Phase 3: 백테스트 검증 (3-5일)
+## Phase 2: 최적화 (2-3 weeks)
 
-### 전제 조건
-- Phase 1 + 2가 ECS에서 안정적으로 운영 중
+정확도와 비용 효율을 개선한다.
 
-### 목표
-precision/recall을 수치로 증명. 알려진 해킹 TX와 정상 TX로 regression test 구축.
+### Phase 2-1: 프롬프트 최적화 (1 week)
 
-### 기능
-- [ ] `HistoricalLabel` 타입 정의 (`#[cfg(test)]`)
-- [ ] 공격 TX 데이터셋 수집 (20건+)
-  - Euler Finance (2023-03, $197M flash loan)
-  - Curve Finance (2023-07, reentrancy)
-  - Balancer (2023-08, flash loan)
-  - KyberSwap (2023-11, price manipulation)
-  - 기타 rekt.news 상위 해킹 TX
-- [ ] 정상 TX 데이터셋 수집 (50건+)
-  - Balancer Vault 차익거래
-  - Uniswap batch swap
-  - Aave flash loan repay (정상 청산)
-  - 대규모 DEX 거래
-- [ ] 백테스트 러너 구현 (`src/tests/backtest.rs`)
-  - fixture 기반 (RPC 불필요)
-  - pre_filter + 화이트리스트 + 다단계 매핑 파이프라인 실행
-  - True Positive / False Positive / False Negative / True Negative 계산
-- [ ] Precision/Recall/F1 assertion 테스트
-  - `precision >= 0.70`
-  - `recall >= 0.60`
-- [ ] threshold 튜닝 (score_modifier, suspicion_threshold 최적화)
-- [ ] 결과 리포트 생성 (테스트 출력에 포함)
+- [ ] 메인넷 운영 데이터 기반 프롬프트 튜닝
+- [ ] Few-shot 예제 추가 (알려진 공격 TX 5-10개)
+- [ ] 오탐 패턴 분석 및 프롬프트 보정
+- [ ] 프롬프트 버전 관리 시스템 (TOML 기반)
 
-### 추가 데이터
-- HistoricalLabel (테스트 전용)
-- 공격 TX fixtures (JSONL 또는 Rust 상수)
-- 정상 TX fixtures
+### Phase 2-2: 컨텍스트 압축 + 비용 절감 (1 week)
 
-### 변경 대상 파일
-| 파일 | 변경 |
-|------|------|
-| `src/tests/backtest.rs` | 신규 — 백테스트 러너 + fixtures |
-| `src/tests/fixtures/` | 신규 — 공격/정상 TX 데이터 |
-| 설정 파일 | 수정 — 튜닝된 threshold/modifier 값 |
+- [ ] 대형 TX 컨텍스트 압축 전략 (토큰 절약)
+- [ ] call_graph depth 제한 + 요약
+- [ ] 중복 storage_mutation 병합
+- [ ] 컨텍스트 크기별 비용 분석
+- [ ] Prompt caching 효율 모니터링 + 최적화
 
-### 주의사항
-- fixture 데이터는 실제 TX의 receipt + log 정보를 포함해야 함
-- RPC 없이 실행 가능하도록 fixture 기반으로 구현
-- CI에서 자동 실행되어 regression 방지
+### Phase 2-3: 메트릭 & 대시보드 (0.5-1 week)
 
-### Phase 3 시작 프롬프트
-```
-Phase 1+2가 완료된 상태에서 Phase 3을 구현해주세요.
-@PRD/01_PRD.md
-@PRD/02_DATA_MODEL.md
-@PRD/04_PROJECT_SPEC.md
+- [ ] AI 관련 Prometheus 메트릭 추가
+  - `argus_ai_requests_total{model, result}`
+  - `argus_ai_latency_seconds{model}`
+  - `argus_ai_cost_usd_total`
+  - `argus_ai_budget_remaining_usd`
+  - `argus_ai_hallucination_guard_rejected_total`
+- [ ] 대시보드에 AI 판단 결과 표시
+- [ ] 비용 알림 (50%, 80%, 100% 임계값)
 
-Phase 3 범위:
-- HistoricalLabel 타입 (#[cfg(test)])
-- 공격 TX 20건 + 정상 TX 50건 fixtures
-- 백테스트 러너 (precision/recall/F1 측정)
-- precision >= 0.70, recall >= 0.60 assertion
+**Phase 2 → Phase 3 착수 기준:**
+- 오탐 감소율 30%+ (14일 메인넷 비교)
+- 월 비용 실측 $150 이내
+- Hallucination Guard 거부율 < 10% (절대 상한 20%. PoC에서 초기 거부율 측정 후 확정)
 
-반드시 지켜야 할 것:
-- RPC 불필요 (fixture 기반)
-- CI에서 cargo test로 자동 실행
-- 기존 전체 테스트 통과
-```
+## Phase 3: 고도화 (3-4 weeks)
 
----
+고급 탐지 기능을 추가한다.
 
-## Phase 로드맵 요약
+### Phase 3-1: Tool-use 통합 (2 weeks)
 
-| Phase | 핵심 기능 | 예상 기간 | precision 목표 | 상태 |
-|-------|----------|-----------|---------------|------|
-| Phase 1 (화이트리스트) | DeFi 화이트리스트 + threshold 조정 | 1-2일 | 50%+ | 시작 전 |
-| Phase 2 (다단계+Profit) | 공격 단계 매핑 + 수익 흐름 분석 | 3-5일 | 70%+ | Phase 1 완료 후 |
-| Phase 3 (백테스트) | Historical labeling + precision 검증 | 3-5일 | 70%+ 검증 | Phase 2 완료 후 |
+- [ ] AI가 외부 도구를 호출하여 추가 정보 수집
+  - Etherscan 컨트랙트 소스 조회
+  - 4byte.directory 함수 시그니처 조회
+  - 컨트랙트 생성 시점 조회 (신규 컨트랙트 = 높은 위험)
+- [ ] Tool 호출 비용 포함 관리
 
-```
-Phase 1 ──▶ Phase 2 ──▶ Phase 3
-(화이트)   (다단계+     (백테스트
-            Profit)     검증)
-```
+### Phase 3-2: Sandwich/MEV 탐지 (1-2 weeks)
+
+- [ ] 블록 내 멀티-TX 컨텍스트 분석
+- [ ] TX 순서 기반 sandwich attack 패턴 감지
+- [ ] MEV bot 식별 휴리스틱
+
+### Phase 3-3: 학습 루프 (1-2 weeks)
+
+- [ ] 운영자 피드백 수집 API (true positive / false positive 태깅) — **MVP: 이것만 1주**
+- [ ] 피드백 기반 few-shot 예제 자동 업데이트 (피드백 수집 후 추가)
+- [ ] 주간 정확도 리포트 자동 생성 (피드백 수집 후 추가)
+
+## 이후 방향
+
+Phase 3 완료 후 메인넷 6개월 운영 데이터를 기반으로 다음 방향을 재평가한다:
+
+- **Self-hosted 모델:** 비용 절감 + 분석 패턴 노출 제거. Ollama 기반 로컬 추론 검토
+- **멀티체인 확장:** L2 (OP Stack, Arbitrum) 및 ethrex L2 지원
+- **Fine-tuning:** 6개월 피드백 데이터로 EVM 공격 탐지 특화 모델 학습
+- **유지보수:** 프롬프트 분기별 검토, Anthropic API 변경 대응, fixture 확장

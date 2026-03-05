@@ -89,6 +89,28 @@ Argus의 코드 품질은 높지만, 외부 경쟁력에는 구조적 문제가 
 
 ---
 
+## Phase AI-0: LLM 통합 PoC 검증 (Phase 2-2 이후, 1-2주)
+
+목표: **LLM이 EVM opcode trace를 분석하여 공격을 탐지할 수 있는지 검증한다.**
+
+상세 설계: [`PRD/`](../PRD/README.md) 참조 (5개 문서).
+
+| # | 항목 | 설명 |
+|---|------|------|
+| AI-0-1 | **StepRecord→AgentContext 매핑 분석** | ethrex LEVM StepRecord가 call_graph, storage_mutations 등을 제공하는지 검증 |
+| AI-0-2 | **Fixture 변환** | 공격 TX 3개(Balancer, Bybit, Poly) + 정상 TX 10개 → AgentContext JSON |
+| AI-0-3 | **Claude API 정확도 측정** | 13개 fixture로 Haiku/Sonnet 판별 정확도 80%+ 검증 |
+| AI-0-4 | **SDK 호환성 검증** | anthropic-sdk-rust: streaming, JSON mode, prompt caching |
+| AI-0-5 | **비용 시뮬레이션** | 실제 토큰 수 기반 req당 비용 ($0.009/TX 목표) |
+
+**전제 조건:** `rpc_service.rs` detected_patterns 버그 수정, 14일 운영 오탐률 베이스라인 측정
+
+**진행/중단 기준:** 정확도 80% 미만 → Phase AI-1 중단, PRD 재검토
+
+Phase AI-0 통과 시 → Phase AI-1 (MVP, 6-8주) → AI-2 (최적화, 2-3주) → AI-3 (고도화, 3-4주)
+
+---
+
 ## Phase 3: 채택 확대 (Q3-Q4 2026)
 
 목표: **첫 번째 외부 사용자를 확보한다.**
