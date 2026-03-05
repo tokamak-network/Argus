@@ -132,7 +132,7 @@ impl DeepAnalyzer {
 
 /// Compute total value at risk across all fund flows (ETH only for now).
 #[cfg(feature = "autopsy")]
-fn compute_total_value(flows: &[FundFlow]) -> U256 {
+pub(super) fn compute_total_value(flows: &[FundFlow]) -> U256 {
     flows
         .iter()
         .filter(|f| f.token.is_none()) // Only count native ETH

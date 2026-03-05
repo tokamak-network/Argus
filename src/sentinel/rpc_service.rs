@@ -304,11 +304,11 @@ async fn process_rpc_block(
 
         let alert = match replay_result {
             Ok(replay) => {
-                // Deep analysis succeeded — build enriched alert
+                // Deep analysis succeeded — build enriched alert with classifier + fund flow
                 build_deep_alert(
                     rpc_block,
                     suspicion,
-                    replay.trace.steps.len(),
+                    &replay.trace.steps,
                     replay.trace.success,
                 )
             }
@@ -381,12 +381,25 @@ fn build_prefilter_alert(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> Sent
 }
 
 /// Build an enriched `SentinelAlert` after successful RPC replay.
+///
+/// Runs `AttackClassifier` and `FundFlowTracer` on the replay steps to populate
+/// `detected_patterns`, `fund_flows`, and `total_value_at_risk` — mirroring
+/// the Store-mode `DeepAnalyzer::analyze()` logic.
 fn build_deep_alert(
     rpc_block: &RpcBlock,
     suspicion: &SuspiciousTx,
-    total_steps: usize,
+    steps: &[crate::types::StepRecord],
     success: bool,
 ) -> SentinelAlert {
+    use crate::autopsy::classifier::AttackClassifier;
+    use crate::autopsy::fund_flow::FundFlowTracer;
+    use crate::sentinel::analyzer::compute_total_value;
+
+    let total_steps = steps.len();
+    let detected_patterns = AttackClassifier::classify_with_confidence(steps);
+    let fund_flows = FundFlowTracer::trace(steps);
+    let total_value_at_risk = compute_total_value(&fund_flows);
+
     let reason_names: Vec<&str> = suspicion.reasons.iter().map(reason_display_name).collect();
     let summary = format!(
         "Deep RPC alert: {} (score={:.2}, steps={total_steps}, success={success})",
@@ -396,6 +409,9 @@ fn build_deep_alert(
     SentinelAlert {
         summary,
         total_steps,
+        detected_patterns,
+        fund_flows,
+        total_value_at_risk,
         ..build_alert_base(rpc_block, suspicion)
     }
 }
@@ -630,12 +646,134 @@ mod tests {
             whitelist_matches: 0,
         };
 
-        let alert = build_deep_alert(&rpc_block, &suspicion, 5000, true);
+        // Pass empty steps — no patterns expected, just verify alert fields
+        let empty_steps: Vec<crate::types::StepRecord> = Vec::new();
+        let alert = build_deep_alert(&rpc_block, &suspicion, &empty_steps, true);
         assert_eq!(alert.block_number, 100);
-        assert_eq!(alert.total_steps, 5000);
+        assert_eq!(alert.total_steps, 0);
         assert!(alert.summary.contains("Deep RPC alert"));
-        assert!(alert.summary.contains("steps=5000"));
+        assert!(alert.summary.contains("steps=0"));
         assert!(alert.summary.contains("success=true"));
         assert!(alert.summary.contains("erc20-transfers"));
+    }
+
+    // --- RED: build_deep_alert should populate detected_patterns from replay steps ---
+
+    /// Create minimal StepRecords that trigger the reentrancy classifier.
+    /// Pattern: CALL at depth 0 from victim → attacker, then CALL at depth 1
+    /// back to victim (re-entry), then SSTORE in victim.
+    fn make_reentrancy_steps() -> Vec<crate::types::StepRecord> {
+        let victim = Address::from_low_u64_be(0x01C);
+        let attacker = Address::from_low_u64_be(0xA77);
+
+        // Encode addresses as U256 for stack_top[1] (CALL target)
+        let attacker_u256 = U256::from_big_endian(attacker.as_bytes());
+        let victim_u256 = U256::from_big_endian(victim.as_bytes());
+
+        vec![
+            // Step 0: Victim calls attacker (CALL opcode = 0xF1)
+            crate::types::StepRecord {
+                step_index: 0,
+                pc: 0,
+                opcode: 0xF1, // CALL
+                depth: 0,
+                gas_remaining: 1_000_000,
+                stack_top: vec![U256::zero(), attacker_u256, U256::from(1_000)],
+                stack_depth: 7,
+                memory_size: 0,
+                code_address: victim,
+                call_value: Some(U256::from(1_000)),
+                storage_writes: None,
+                log_topics: None,
+                log_data: None,
+            },
+            // Step 1: Attacker re-enters victim (CALL at depth > 0, target = victim)
+            crate::types::StepRecord {
+                step_index: 1,
+                pc: 0,
+                opcode: 0xF1, // CALL
+                depth: 1,
+                gas_remaining: 900_000,
+                stack_top: vec![U256::zero(), victim_u256, U256::zero()],
+                stack_depth: 7,
+                memory_size: 0,
+                code_address: attacker,
+                call_value: None,
+                storage_writes: None,
+                log_topics: None,
+                log_data: None,
+            },
+            // Step 2: SSTORE in victim contract after re-entry
+            crate::types::StepRecord {
+                step_index: 2,
+                pc: 10,
+                opcode: 0x55, // SSTORE
+                depth: 2,
+                gas_remaining: 800_000,
+                stack_top: vec![U256::from(1), U256::zero()],
+                stack_depth: 2,
+                memory_size: 0,
+                code_address: victim,
+                call_value: None,
+                storage_writes: Some(vec![crate::types::StorageWrite {
+                    address: victim,
+                    slot: H256::zero(),
+                    old_value: U256::zero(),
+                    new_value: U256::from(1),
+                }]),
+                log_topics: None,
+                log_data: None,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_build_deep_alert_populates_detected_patterns_from_steps() {
+        // RED: This test MUST FAIL until we fix build_deep_alert to run
+        // AttackClassifier on the replay steps.
+        let rpc_block = make_rpc_block(200);
+        let suspicion = SuspiciousTx {
+            tx_hash: H256::from_low_u64_be(0xdead),
+            tx_index: 0,
+            reasons: vec![SuspicionReason::SelfDestructDetected],
+            score: 0.9,
+            priority: AlertPriority::Critical,
+            whitelist_matches: 0,
+        };
+
+        let steps = make_reentrancy_steps();
+        let alert = build_deep_alert(&rpc_block, &suspicion, &steps, true);
+
+        assert!(
+            !alert.detected_patterns.is_empty(),
+            "deep alert should populate detected_patterns from replay steps, \
+             but got empty vec. This is the detected_patterns bug."
+        );
+    }
+
+    #[test]
+    fn test_build_deep_alert_populates_fund_flows_from_steps() {
+        // RED: fund_flows should also be populated from replay steps.
+        let rpc_block = make_rpc_block(201);
+        let suspicion = SuspiciousTx {
+            tx_hash: H256::from_low_u64_be(0xbeef),
+            tx_index: 0,
+            reasons: vec![SuspicionReason::SelfDestructDetected],
+            score: 0.9,
+            priority: AlertPriority::Critical,
+            whitelist_matches: 0,
+        };
+
+        let steps = make_reentrancy_steps();
+        // The reentrancy steps include a CALL with value=1000 — should produce
+        // at least one ETH fund flow.
+        let alert = build_deep_alert(&rpc_block, &suspicion, &steps, true);
+
+        // When steps contain value transfers, fund_flows should be non-empty.
+        assert!(
+            !alert.fund_flows.is_empty(),
+            "deep alert should populate fund_flows from replay steps, \
+             but got empty vec."
+        );
     }
 }
