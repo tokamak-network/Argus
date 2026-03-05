@@ -11,4 +11,5 @@ pub mod metrics;
 pub mod remote_db;
 pub mod report;
 pub mod rpc_client;
+pub mod rpc_types;
 pub mod types;

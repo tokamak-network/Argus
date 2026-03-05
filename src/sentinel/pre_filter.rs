@@ -5,7 +5,7 @@
 
 use ethrex_common::types::{BlockHeader, Log, Receipt, Transaction, TxKind};
 use ethrex_common::{Address, U256};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::types::*;
 use super::whitelist::WhitelistEngine;
@@ -129,7 +129,7 @@ pub struct PreFilter {
     config: SentinelConfig,
     flash_loan_prefixes: Vec<[u8; 4]>,
     /// (address → label) for all known contracts.
-    address_labels: Vec<(Address, &'static str)>,
+    address_labels: FxHashMap<Address, &'static str>,
     oracle_addresses: FxHashSet<Address>,
     dex_addresses: FxHashSet<Address>,
     /// DeFi protocol whitelist for false-positive reduction.
@@ -148,7 +148,7 @@ impl PreFilter {
 
         let db = known_address_db();
 
-        let address_labels: Vec<(Address, &'static str)> =
+        let address_labels: FxHashMap<Address, &'static str> =
             db.iter().map(|(a, l, _)| (*a, *l)).collect();
 
         let oracle_addresses: FxHashSet<Address> = db
@@ -412,9 +412,8 @@ impl PreFilter {
     /// Return a static label for known contract addresses.
     fn label_address(&self, address: &Address) -> Option<String> {
         self.address_labels
-            .iter()
-            .find(|(a, _)| a == address)
-            .map(|(_, label)| label.to_string())
+            .get(address)
+            .map(|label| label.to_string())
     }
 }
 

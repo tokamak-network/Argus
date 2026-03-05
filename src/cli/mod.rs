@@ -251,41 +251,13 @@ fn make_cli_db(
     ))
 }
 
+// ---------------------------------------------------------------------------
+// Autopsy helper functions
+// ---------------------------------------------------------------------------
+
+/// Parse a hex-encoded transaction hash string into an H256.
 #[cfg(feature = "autopsy")]
-#[allow(clippy::too_many_arguments)]
-fn run_autopsy(
-    tx_hash_hex: &str,
-    rpc_url: &str,
-    block_number_override: Option<u64>,
-    output_format: &str,
-    output_path: Option<&str>,
-    rpc_timeout: u64,
-    rpc_retries: u32,
-    _quiet: bool,
-    interactive: bool,
-) -> Result<(), DebuggerError> {
-    use std::time::Duration;
-
-    use ethrex_common::H256;
-
-    use crate::autopsy::{
-        classifier::AttackClassifier,
-        enrichment::{collect_sstore_slots, enrich_storage_writes},
-        fund_flow::FundFlowTracer,
-        remote_db::RemoteVmDatabase,
-        report::AutopsyReport,
-        rpc_client::{EthRpcClient, RpcConfig},
-    };
-
-    let rpc_config = RpcConfig {
-        timeout: Duration::from_secs(rpc_timeout),
-        max_retries: rpc_retries,
-        ..RpcConfig::default()
-    };
-
-    eprintln!("[autopsy] Fetching transaction...");
-
-    // Parse tx hash
+fn parse_tx_hash(tx_hash_hex: &str) -> Result<ethrex_common::H256, DebuggerError> {
     let hash_hex = tx_hash_hex.strip_prefix("0x").unwrap_or(tx_hash_hex);
     if !hash_hex.len().is_multiple_of(2) {
         return Err(crate::error::RpcError::simple("tx hash hex must have even length").into());
@@ -303,16 +275,24 @@ fn run_autopsy(
     if hash_bytes.len() != 32 {
         return Err(crate::error::RpcError::simple("tx hash must be 32 bytes").into());
     }
-    let tx_hash = H256::from_slice(&hash_bytes);
+    Ok(ethrex_common::H256::from_slice(&hash_bytes))
+}
 
-    // Use a temporary client to fetch the transaction and determine block
-    let temp_client = EthRpcClient::with_config(rpc_url, 0, rpc_config.clone());
+/// Fetch a transaction by hash and determine its block number.
+#[cfg(feature = "autopsy")]
+fn fetch_tx_and_block(
+    rpc_url: &str,
+    tx_hash: ethrex_common::H256,
+    block_number_override: Option<u64>,
+    rpc_config: &crate::autopsy::rpc_client::RpcConfig,
+) -> Result<(crate::autopsy::rpc_client::RpcTransaction, u64), DebuggerError> {
+    let temp_client =
+        crate::autopsy::rpc_client::EthRpcClient::with_config(rpc_url, 0, rpc_config.clone());
     let rpc_tx = temp_client
         .eth_get_transaction_by_hash(tx_hash)
         .map_err(|e| {
             DebuggerError::Rpc(crate::error::RpcError::simple(format!("fetch tx: {e}")))
         })?;
-
     let block_num = block_number_override
         .or(rpc_tx.block_number)
         .ok_or_else(|| {
@@ -320,33 +300,47 @@ fn run_autopsy(
                 "could not determine block number — provide --block-number",
             ))
         })?;
+    Ok((rpc_tx, block_num))
+}
 
-    eprintln!("[autopsy] Block #{block_num}, setting up remote database...");
+/// Create a remote VM database and build the EVM environment + transaction.
+#[cfg(feature = "autopsy")]
+fn setup_replay(
+    rpc_url: &str,
+    block_num: u64,
+    rpc_tx: &crate::autopsy::rpc_client::RpcTransaction,
+    rpc_config: &crate::autopsy::rpc_client::RpcConfig,
+) -> Result<
+    (
+        GeneralizedDatabase,
+        Environment,
+        Transaction,
+        u64, // pre_block
+    ),
+    DebuggerError,
+> {
+    use crate::autopsy::remote_db::RemoteVmDatabase;
 
-    // Create remote database at the block BEFORE the tx
     let pre_block = block_num.saturating_sub(1);
     let remote_db = RemoteVmDatabase::from_rpc_with_config(rpc_url, pre_block, rpc_config.clone())
         .map_err(|e| {
             DebuggerError::Rpc(crate::error::RpcError::simple(format!("remote db: {e}")))
         })?;
 
-    // Fetch block header for environment
     let client = remote_db.client();
     let block_header = client.eth_get_block_by_number(block_num).map_err(|e| {
         DebuggerError::Rpc(crate::error::RpcError::simple(format!("fetch block: {e}")))
     })?;
 
-    // Build environment and transaction using shared rpc_types helpers (DRY)
     #[cfg(feature = "sentinel")]
     let (env, tx) = {
         use crate::sentinel::rpc_types::{build_env_from_rpc, rpc_tx_to_ethrex};
-        let env = build_env_from_rpc(&rpc_tx, &block_header);
-        let tx = rpc_tx_to_ethrex(&rpc_tx)
+        let env = build_env_from_rpc(rpc_tx, &block_header);
+        let tx = rpc_tx_to_ethrex(rpc_tx)
             .map_err(|e| DebuggerError::Rpc(crate::error::RpcError::simple(format!("{e}"))))?;
         (env, tx)
     };
 
-    // Fallback for sentinel-less builds: inline env + tx construction
     #[cfg(not(feature = "sentinel"))]
     let (env, tx) = {
         let base_fee = block_header.base_fee_per_gas.unwrap_or(0);
@@ -397,20 +391,39 @@ fn run_autopsy(
         (env, tx)
     };
 
-    eprintln!("[autopsy] Replaying transaction...");
+    let db = GeneralizedDatabase::new(Arc::new(remote_db));
+    Ok((db, env, tx, pre_block))
+}
 
-    let mut db = GeneralizedDatabase::new(Arc::new(remote_db));
-    let engine = ReplayEngine::record(&mut db, env, &tx, ReplayConfig::default())?;
+/// Parameters for post-replay analysis and report generation.
+#[cfg(feature = "autopsy")]
+struct AnalysisContext<'a> {
+    rpc_url: &'a str,
+    pre_block: u64,
+    rpc_config: crate::autopsy::rpc_client::RpcConfig,
+    tx_hash: ethrex_common::H256,
+    tx_hash_hex: &'a str,
+    block_num: u64,
+    output_format: &'a str,
+    output_path: Option<&'a str>,
+}
 
-    eprintln!("[autopsy] Recorded {} steps. Analyzing...", engine.len());
+/// Analyze a replayed trace: classify attacks, trace funds, enrich storage, and write report.
+#[cfg(feature = "autopsy")]
+fn analyze_and_report(engine: &ReplayEngine, ctx: &AnalysisContext) -> Result<(), DebuggerError> {
+    use crate::autopsy::{
+        classifier::AttackClassifier,
+        enrichment::{collect_sstore_slots, enrich_storage_writes},
+        fund_flow::FundFlowTracer,
+        report::AutopsyReport,
+        rpc_client::EthRpcClient,
+    };
 
-    // Clone trace so the engine stays alive for optional interactive mode
     let mut trace = engine.trace().clone();
     let slots = collect_sstore_slots(&trace.steps);
     let mut initial_values = rustc_hash::FxHashMap::default();
 
-    // Fetch initial storage values for SSTORE slots from the pre-block state
-    let pre_client = EthRpcClient::with_config(rpc_url, pre_block, rpc_config);
+    let pre_client = EthRpcClient::with_config(ctx.rpc_url, ctx.pre_block, ctx.rpc_config.clone());
     for (addr, slot) in &slots {
         if let Ok(val) = pre_client.eth_get_storage_at(*addr, *slot) {
             initial_values.insert((*addr, *slot), val);
@@ -418,13 +431,9 @@ fn run_autopsy(
     }
     enrich_storage_writes(&mut trace, &initial_values);
 
-    // Classify attack patterns
     let patterns = AttackClassifier::classify(&trace.steps);
-
-    // Trace fund flows
     let flows = FundFlowTracer::trace(&trace.steps);
 
-    // Collect storage diffs
     let storage_diffs: Vec<_> = trace
         .steps
         .iter()
@@ -433,23 +442,25 @@ fn run_autopsy(
         .cloned()
         .collect();
 
-    // Build report
     let report = AutopsyReport::build(
-        tx_hash,
-        block_num,
+        ctx.tx_hash,
+        ctx.block_num,
         &trace.steps,
         patterns.clone(),
         flows.clone(),
         storage_diffs,
     );
 
-    // Print terminal summary to stderr
-    let summary =
-        formatter::format_autopsy_summary(&patterns, &flows, &trace, tx_hash_hex, block_num);
+    let summary = formatter::format_autopsy_summary(
+        &patterns,
+        &flows,
+        &trace,
+        ctx.tx_hash_hex,
+        ctx.block_num,
+    );
     eprintln!("{summary}");
 
-    // Render output
-    let (content, ext) = match output_format {
+    let (content, ext) = match ctx.output_format {
         "json" => {
             let json = report
                 .to_json()
@@ -459,13 +470,13 @@ fn run_autopsy(
         _ => (report.to_markdown(), "md"),
     };
 
-    // Determine output file path
-    let file_path = match output_path {
+    let file_path = match ctx.output_path {
         Some(p) => p.to_string(),
         None => {
-            let hash_prefix = tx_hash_hex
+            let hash_prefix = ctx
+                .tx_hash_hex
                 .strip_prefix("0x")
-                .unwrap_or(tx_hash_hex)
+                .unwrap_or(ctx.tx_hash_hex)
                 .get(..8)
                 .unwrap_or("unknown");
             format!("autopsy-{hash_prefix}.{ext}")
@@ -476,8 +487,62 @@ fn run_autopsy(
         .map_err(|e| DebuggerError::Report(format!("write {file_path}: {e}")))?;
 
     eprintln!("[autopsy] Report saved to {file_path}");
+    Ok(())
+}
 
-    // Enter interactive debugger REPL if requested
+// ---------------------------------------------------------------------------
+// Autopsy orchestrator
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "autopsy")]
+#[allow(clippy::too_many_arguments)]
+fn run_autopsy(
+    tx_hash_hex: &str,
+    rpc_url: &str,
+    block_number_override: Option<u64>,
+    output_format: &str,
+    output_path: Option<&str>,
+    rpc_timeout: u64,
+    rpc_retries: u32,
+    _quiet: bool,
+    interactive: bool,
+) -> Result<(), DebuggerError> {
+    use std::time::Duration;
+
+    use crate::autopsy::rpc_client::RpcConfig;
+
+    let rpc_config = RpcConfig {
+        timeout: Duration::from_secs(rpc_timeout),
+        max_retries: rpc_retries,
+        ..RpcConfig::default()
+    };
+
+    eprintln!("[autopsy] Fetching transaction...");
+    let tx_hash = parse_tx_hash(tx_hash_hex)?;
+    let (rpc_tx, block_num) =
+        fetch_tx_and_block(rpc_url, tx_hash, block_number_override, &rpc_config)?;
+
+    eprintln!("[autopsy] Block #{block_num}, setting up remote database...");
+    let (mut db, env, tx, pre_block) = setup_replay(rpc_url, block_num, &rpc_tx, &rpc_config)?;
+
+    eprintln!("[autopsy] Replaying transaction...");
+    let engine = ReplayEngine::record(&mut db, env, &tx, ReplayConfig::default())?;
+    eprintln!("[autopsy] Recorded {} steps. Analyzing...", engine.len());
+
+    analyze_and_report(
+        &engine,
+        &AnalysisContext {
+            rpc_url,
+            pre_block,
+            rpc_config,
+            tx_hash,
+            tx_hash_hex,
+            block_num,
+            output_format,
+            output_path,
+        },
+    )?;
+
     if interactive {
         eprintln!("[autopsy] Entering interactive debugger...");
         repl::start(engine)?;
@@ -716,103 +781,5 @@ async fn run_sentinel_async(
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(all(test, feature = "sentinel", feature = "autopsy"))]
-mod sentinel_cli_tests {
-    use super::{Args, InputMode};
-    use clap::Parser;
-    use std::path::PathBuf;
-
-    #[test]
-    fn test_sentinel_args_basic() {
-        let args = Args::try_parse_from(["argus", "sentinel", "--rpc", "http://localhost:8545"])
-            .expect("basic sentinel args should parse");
-        let InputMode::Sentinel {
-            rpc_url,
-            prefilter_only,
-            metrics_port,
-            poll_interval,
-            alert_file,
-            webhook_url,
-            ..
-        } = args.command
-        else {
-            panic!("expected Sentinel variant");
-        };
-        assert_eq!(rpc_url, "http://localhost:8545");
-        assert!(!prefilter_only);
-        assert_eq!(metrics_port, 9090);
-        assert_eq!(poll_interval, 2);
-        assert!(alert_file.is_none());
-        assert!(webhook_url.is_none());
-    }
-
-    #[test]
-    fn test_sentinel_args_defaults() {
-        let args = Args::try_parse_from([
-            "argus",
-            "sentinel",
-            "--rpc-url",
-            "https://mainnet.infura.io",
-        ])
-        .expect("sentinel args with --rpc-url alias should parse");
-        let InputMode::Sentinel {
-            rpc_url,
-            prefilter_only,
-            metrics_port,
-            poll_interval,
-            ..
-        } = args.command
-        else {
-            panic!("expected Sentinel variant");
-        };
-        assert_eq!(rpc_url, "https://mainnet.infura.io");
-        assert!(!prefilter_only);
-        assert_eq!(metrics_port, 9090);
-        assert_eq!(poll_interval, 2);
-    }
-
-    #[test]
-    fn test_sentinel_args_all_options() {
-        let args = Args::try_parse_from([
-            "argus",
-            "sentinel",
-            "--rpc",
-            "https://eth.example.com",
-            "--alert-file",
-            "/tmp/alerts.jsonl",
-            "--prefilter-only",
-            "--metrics-port",
-            "9100",
-            "--webhook-url",
-            "https://hooks.slack.com/services/XXX",
-            "--poll-interval",
-            "5",
-        ])
-        .expect("sentinel args with all options should parse");
-        let InputMode::Sentinel {
-            rpc_url,
-            alert_file,
-            prefilter_only,
-            metrics_port,
-            webhook_url,
-            poll_interval,
-            ..
-        } = args.command
-        else {
-            panic!("expected Sentinel variant");
-        };
-        assert_eq!(rpc_url, "https://eth.example.com");
-        assert_eq!(alert_file, Some(PathBuf::from("/tmp/alerts.jsonl")));
-        assert!(prefilter_only);
-        assert_eq!(metrics_port, 9100);
-        assert_eq!(
-            webhook_url.as_deref(),
-            Some("https://hooks.slack.com/services/XXX")
-        );
-        assert_eq!(poll_interval, 5);
-    }
-}
+mod tests;

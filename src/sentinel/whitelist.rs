@@ -8,6 +8,7 @@
 //! hardcoded in source code.
 
 use ethrex_common::Address;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 /// Category of a whitelisted DeFi protocol.
@@ -69,7 +70,7 @@ pub struct WhitelistConfig {
 /// fails to load, an empty engine is created (no addresses whitelisted).
 #[derive(Debug, Clone)]
 pub struct WhitelistEngine {
-    entries: Vec<WhitelistEntry>,
+    entries: FxHashMap<Address, WhitelistEntry>,
 }
 
 /// Result of checking an address against the whitelist.
@@ -83,28 +84,24 @@ pub struct WhitelistMatch {
 impl WhitelistEngine {
     /// Create a new engine from configuration.
     pub fn new(config: WhitelistConfig) -> Self {
-        Self {
-            entries: config.entries,
-        }
+        let entries = config.entries.into_iter().map(|e| (e.address, e)).collect();
+        Self { entries }
     }
 
     /// Create an empty engine (no whitelisted addresses).
     pub fn empty() -> Self {
         Self {
-            entries: Vec::new(),
+            entries: FxHashMap::default(),
         }
     }
 
     /// Check if an address is whitelisted. Returns the match details if found.
     pub fn check_address(&self, address: &Address) -> Option<WhitelistMatch> {
-        self.entries
-            .iter()
-            .find(|entry| entry.address == *address)
-            .map(|entry| WhitelistMatch {
-                protocol: entry.protocol.clone(),
-                category: entry.category.clone(),
-                score_modifier: entry.score_modifier,
-            })
+        self.entries.get(address).map(|entry| WhitelistMatch {
+            protocol: entry.protocol.clone(),
+            category: entry.category.clone(),
+            score_modifier: entry.score_modifier,
+        })
     }
 
     /// Check multiple addresses and return all matches with the total score modifier.
