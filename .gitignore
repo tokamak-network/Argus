@@ -10,7 +10,8 @@ dashboard/fixtures/
 docs/awesome-ethereum-security-pr.md
 autopsy-*.md
 
-# Internal reports (not for public release)
+# Internal documents (not for public release)
+PRD/
 kkirikkiri-report-*
 .kkirikkiri/
 docs/docker-hub-setup.md
