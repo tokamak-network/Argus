@@ -13,6 +13,7 @@ use crate::error::{DebuggerError, RpcError};
 // Re-export types and parsers so existing `use crate::autopsy::rpc_client::*` still works.
 pub use super::rpc_types::{
     RpcBlock, RpcBlockHeader, RpcConfig, RpcLog, RpcReceipt, RpcTransaction,
+    build_env_from_rpc, rpc_tx_to_ethrex,
 };
 use super::rpc_types::{
     hex_decode, parse_block_header, parse_rpc_block, parse_rpc_receipt, parse_transaction,

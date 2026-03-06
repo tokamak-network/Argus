@@ -9,8 +9,6 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use clap::{Parser, Subcommand};
-#[cfg(not(feature = "sentinel"))]
-use ethrex_common::types::LegacyTransaction;
 use ethrex_common::{
     Address, U256,
     constants::EMPTY_TRIE_HASH,
@@ -341,80 +339,11 @@ fn setup_replay(
         DebuggerError::Rpc(crate::error::RpcError::simple(format!("fetch block: {e}")))
     })?;
 
-    #[cfg(feature = "sentinel")]
-    let (env, tx) = {
-        use crate::sentinel::rpc_types::{build_env_from_rpc, rpc_tx_to_ethrex};
-        let env = build_env_from_rpc(rpc_tx, &block_header);
-        let tx = rpc_tx_to_ethrex(rpc_tx)
-            .map_err(|e| DebuggerError::Rpc(crate::error::RpcError::simple(format!("{e}"))))?;
-        (env, tx)
-    };
-
-    #[cfg(not(feature = "sentinel"))]
-    let (env, tx) = build_env_and_tx_fallback(rpc_tx, &block_header)?;
+    let env = crate::autopsy::rpc_types::build_env_from_rpc(rpc_tx, &block_header);
+    let tx = crate::autopsy::rpc_types::rpc_tx_to_ethrex(rpc_tx);
 
     let db = GeneralizedDatabase::new(Arc::new(remote_db));
     Ok((db, env, tx, pre_block))
-}
-
-/// Build EVM `Environment` and `Transaction` from RPC types without the sentinel feature.
-///
-/// This is the fallback path used when `sentinel::rpc_types` is unavailable.
-/// Extracted from `setup_replay` to keep the cfg-gated block small.
-///
-/// TODO: When sentinel and autopsy share a unified type-conversion module,
-/// replace this with the shared `build_env_from_rpc` + `rpc_tx_to_ethrex` helpers.
-#[cfg(all(feature = "autopsy", not(feature = "sentinel")))]
-fn build_env_and_tx_fallback(
-    rpc_tx: &crate::autopsy::rpc_client::RpcTransaction,
-    block_header: &crate::autopsy::rpc_client::RpcBlockHeader,
-) -> Result<(Environment, Transaction), DebuggerError> {
-    let base_fee = block_header.base_fee_per_gas.unwrap_or(0);
-    let effective_gas_price = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
-        let priority = rpc_tx.max_priority_fee_per_gas.unwrap_or(0);
-        std::cmp::min(max_fee, base_fee + priority)
-    } else {
-        rpc_tx.gas_price.unwrap_or(0)
-    };
-    let env = Environment {
-        origin: rpc_tx.from,
-        gas_limit: rpc_tx.gas,
-        block_gas_limit: block_header.gas_limit,
-        block_number: block_header.number.into(),
-        coinbase: block_header.coinbase,
-        timestamp: block_header.timestamp.into(),
-        base_fee_per_gas: U256::from(base_fee),
-        gas_price: U256::from(effective_gas_price),
-        tx_max_fee_per_gas: rpc_tx.max_fee_per_gas.map(U256::from),
-        tx_max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.map(U256::from),
-        tx_nonce: rpc_tx.nonce,
-        ..Default::default()
-    };
-    let tx_to = rpc_tx.to.map(TxKind::Call).unwrap_or(TxKind::Create);
-    let tx_data = Bytes::from(rpc_tx.input.clone());
-    let tx = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
-        Transaction::EIP1559Transaction(EIP1559Transaction {
-            to: tx_to,
-            data: tx_data,
-            value: rpc_tx.value,
-            nonce: rpc_tx.nonce,
-            gas_limit: rpc_tx.gas,
-            max_fee_per_gas: max_fee,
-            max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.unwrap_or(0),
-            ..Default::default()
-        })
-    } else {
-        Transaction::LegacyTransaction(LegacyTransaction {
-            to: tx_to,
-            data: tx_data,
-            value: rpc_tx.value,
-            nonce: rpc_tx.nonce,
-            gas: rpc_tx.gas,
-            gas_price: U256::from(rpc_tx.gas_price.unwrap_or(0)),
-            ..Default::default()
-        })
-    };
-    Ok((env, tx))
 }
 
 /// Parameters for post-replay analysis and report generation.
@@ -431,8 +360,11 @@ struct AnalysisContext<'a> {
 }
 
 /// Analyze a replayed trace: classify attacks, trace funds, enrich storage, and write report.
+///
+/// Takes ownership of the `ReplayTrace` to avoid unnecessary cloning.
+/// Callers should clone the trace before calling this if they need it afterward.
 #[cfg(feature = "autopsy")]
-fn analyze_and_report(engine: &ReplayEngine, ctx: &AnalysisContext) -> Result<(), DebuggerError> {
+fn analyze_and_report(mut trace: crate::types::ReplayTrace, ctx: &AnalysisContext) -> Result<(), DebuggerError> {
     use crate::autopsy::{
         classifier::AttackClassifier,
         enrichment::{collect_sstore_slots, enrich_storage_writes},
@@ -440,8 +372,6 @@ fn analyze_and_report(engine: &ReplayEngine, ctx: &AnalysisContext) -> Result<()
         report::AutopsyReport,
         rpc_client::EthRpcClient,
     };
-
-    let mut trace = engine.trace().clone();
     let slots = collect_sstore_slots(&trace.steps);
     let mut initial_values = rustc_hash::FxHashMap::default();
 
@@ -551,23 +481,27 @@ fn run_autopsy(
     let engine = ReplayEngine::record(&mut db, env, &tx, ReplayConfig::default())?;
     eprintln!("[autopsy] Recorded {} steps. Analyzing...", engine.len());
 
-    analyze_and_report(
-        &engine,
-        &AnalysisContext {
-            rpc_url,
-            pre_block,
-            rpc_config,
-            tx_hash,
-            tx_hash_hex,
-            block_num,
-            output_format,
-            output_path,
-        },
-    )?;
+    let ctx = AnalysisContext {
+        rpc_url,
+        pre_block,
+        rpc_config,
+        tx_hash,
+        tx_hash_hex,
+        block_num,
+        output_format,
+        output_path,
+    };
 
     if interactive {
+        // Clone trace for analysis; keep engine intact for the REPL.
+        let trace = engine.trace().clone();
+        analyze_and_report(trace, &ctx)?;
         eprintln!("[autopsy] Entering interactive debugger...");
         repl::start(engine)?;
+    } else {
+        // Consume engine — no clone needed.
+        let trace = engine.into_trace();
+        analyze_and_report(trace, &ctx)?;
     }
 
     Ok(())

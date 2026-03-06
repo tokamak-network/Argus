@@ -6,10 +6,8 @@
 #![cfg(all(feature = "sentinel", feature = "autopsy"))]
 
 use bytes::Bytes;
-use ethrex_common::U256;
 use ethrex_common::types::{
-    Block, BlockBody, BlockHeader, EIP1559Transaction, LegacyTransaction, Log, Receipt,
-    Transaction, TxKind, TxType,
+    Block, BlockBody, BlockHeader, Log, Receipt, Transaction, TxType,
 };
 use ethrex_levm::Environment;
 
@@ -19,11 +17,11 @@ use crate::sentinel::types::SentinelError;
 /// Convert an `RpcBlock` (header + full transactions) into ethrex `Block`.
 pub fn rpc_block_to_ethrex(rpc_block: &RpcBlock) -> Result<Block, SentinelError> {
     let header = rpc_header_to_ethrex(&rpc_block.header);
-    let transactions = rpc_block
+    let transactions: Vec<Transaction> = rpc_block
         .transactions
         .iter()
-        .map(rpc_tx_to_ethrex)
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(crate::autopsy::rpc_types::rpc_tx_to_ethrex)
+        .collect();
     Ok(Block {
         header,
         body: BlockBody {
@@ -46,33 +44,11 @@ pub fn rpc_header_to_ethrex(rpc: &RpcBlockHeader) -> BlockHeader {
 }
 
 /// Convert an `RpcTransaction` into ethrex `Transaction` (Legacy or EIP-1559).
+///
+/// Delegates to [`crate::autopsy::rpc_types::rpc_tx_to_ethrex`].
+/// Kept as `Result` for backward compatibility with callers expecting `Result`.
 pub fn rpc_tx_to_ethrex(rpc: &RpcTransaction) -> Result<Transaction, SentinelError> {
-    let to = rpc.to.map(TxKind::Call).unwrap_or(TxKind::Create);
-    let data = Bytes::from(rpc.input.clone());
-
-    let tx = if let Some(max_fee) = rpc.max_fee_per_gas {
-        Transaction::EIP1559Transaction(EIP1559Transaction {
-            to,
-            data,
-            value: rpc.value,
-            nonce: rpc.nonce,
-            gas_limit: rpc.gas,
-            max_fee_per_gas: max_fee,
-            max_priority_fee_per_gas: rpc.max_priority_fee_per_gas.unwrap_or(0),
-            ..Default::default()
-        })
-    } else {
-        Transaction::LegacyTransaction(LegacyTransaction {
-            to,
-            data,
-            value: rpc.value,
-            nonce: rpc.nonce,
-            gas: rpc.gas,
-            gas_price: U256::from(rpc.gas_price.unwrap_or(0)),
-            ..Default::default()
-        })
-    };
-    Ok(tx)
+    Ok(crate::autopsy::rpc_types::rpc_tx_to_ethrex(rpc))
 }
 
 /// Convert an `RpcReceipt` into ethrex `Receipt`.
@@ -120,30 +96,9 @@ pub fn rpc_log_to_ethrex(rpc: &RpcLog) -> Log {
 
 /// Build an `Environment` from an `RpcTransaction` and the block header it lives in.
 ///
-/// Computes `effective_gas_price` using EIP-1559 priority fee capping when applicable.
+/// Delegates to [`crate::autopsy::rpc_types::build_env_from_rpc`].
 pub fn build_env_from_rpc(rpc_tx: &RpcTransaction, block_header: &RpcBlockHeader) -> Environment {
-    let base_fee = block_header.base_fee_per_gas.unwrap_or(0);
-    let effective_gas_price = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
-        let priority = rpc_tx.max_priority_fee_per_gas.unwrap_or(0);
-        std::cmp::min(max_fee, base_fee + priority)
-    } else {
-        rpc_tx.gas_price.unwrap_or(0)
-    };
-
-    Environment {
-        origin: rpc_tx.from,
-        gas_limit: rpc_tx.gas,
-        block_gas_limit: block_header.gas_limit,
-        block_number: block_header.number.into(),
-        coinbase: block_header.coinbase,
-        timestamp: block_header.timestamp.into(),
-        base_fee_per_gas: U256::from(base_fee),
-        gas_price: U256::from(effective_gas_price),
-        tx_max_fee_per_gas: rpc_tx.max_fee_per_gas.map(U256::from),
-        tx_max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.map(U256::from),
-        tx_nonce: rpc_tx.nonce,
-        ..Default::default()
-    }
+    crate::autopsy::rpc_types::build_env_from_rpc(rpc_tx, block_header)
 }
 
 #[cfg(test)]
@@ -152,6 +107,7 @@ mod tests {
     use crate::autopsy::rpc_client::{
         RpcBlock, RpcBlockHeader, RpcLog, RpcReceipt, RpcTransaction,
     };
+    use ethrex_common::types::TxKind;
     use ethrex_common::{Address, H256, U256};
 
     fn make_block_header() -> RpcBlockHeader {

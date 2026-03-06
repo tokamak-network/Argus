@@ -1,11 +1,15 @@
-//! RPC response types and JSON parsing helpers.
+//! RPC response types, JSON parsing helpers, and ethrex type conversions.
 //!
-//! Defines the data types returned by Ethereum JSON-RPC methods and the
-//! parsing functions that convert raw `serde_json::Value` into typed structs.
+//! Defines the data types returned by Ethereum JSON-RPC methods, the
+//! parsing functions that convert raw `serde_json::Value` into typed structs,
+//! and conversion functions to ethrex-native types (`Transaction`, `Environment`).
 
 use std::time::Duration;
 
+use bytes::Bytes;
+use ethrex_common::types::{EIP1559Transaction, LegacyTransaction, Transaction, TxKind};
 use ethrex_common::{Address, H256, U256};
+use ethrex_levm::Environment;
 use serde_json::Value;
 
 use crate::error::{DebuggerError, RpcError};
@@ -423,6 +427,67 @@ pub(crate) fn parse_rpc_log(val: &Value) -> Result<RpcLog, DebuggerError> {
         topics,
         data,
     })
+}
+
+// ---------------------------------------------------------------------------
+// ethrex type conversions (shared by autopsy CLI and sentinel pipeline)
+// ---------------------------------------------------------------------------
+
+/// Convert an `RpcTransaction` into ethrex `Transaction` (Legacy or EIP-1559).
+pub fn rpc_tx_to_ethrex(rpc: &RpcTransaction) -> Transaction {
+    let to = rpc.to.map(TxKind::Call).unwrap_or(TxKind::Create);
+    let data = Bytes::from(rpc.input.clone());
+
+    if let Some(max_fee) = rpc.max_fee_per_gas {
+        Transaction::EIP1559Transaction(EIP1559Transaction {
+            to,
+            data,
+            value: rpc.value,
+            nonce: rpc.nonce,
+            gas_limit: rpc.gas,
+            max_fee_per_gas: max_fee,
+            max_priority_fee_per_gas: rpc.max_priority_fee_per_gas.unwrap_or(0),
+            ..Default::default()
+        })
+    } else {
+        Transaction::LegacyTransaction(LegacyTransaction {
+            to,
+            data,
+            value: rpc.value,
+            nonce: rpc.nonce,
+            gas: rpc.gas,
+            gas_price: U256::from(rpc.gas_price.unwrap_or(0)),
+            ..Default::default()
+        })
+    }
+}
+
+/// Build an EVM `Environment` from an `RpcTransaction` and block header.
+///
+/// Computes `effective_gas_price` using EIP-1559 priority fee capping when applicable.
+pub fn build_env_from_rpc(rpc_tx: &RpcTransaction, block_header: &RpcBlockHeader) -> Environment {
+    let base_fee = block_header.base_fee_per_gas.unwrap_or(0);
+    let effective_gas_price = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
+        let priority = rpc_tx.max_priority_fee_per_gas.unwrap_or(0);
+        std::cmp::min(max_fee, base_fee + priority)
+    } else {
+        rpc_tx.gas_price.unwrap_or(0)
+    };
+
+    Environment {
+        origin: rpc_tx.from,
+        gas_limit: rpc_tx.gas,
+        block_gas_limit: block_header.gas_limit,
+        block_number: block_header.number.into(),
+        coinbase: block_header.coinbase,
+        timestamp: block_header.timestamp.into(),
+        base_fee_per_gas: U256::from(base_fee),
+        gas_price: U256::from(effective_gas_price),
+        tx_max_fee_per_gas: rpc_tx.max_fee_per_gas.map(U256::from),
+        tx_max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.map(U256::from),
+        tx_nonce: rpc_tx.nonce,
+        ..Default::default()
+    }
 }
 
 #[cfg(test)]
