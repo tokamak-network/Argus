@@ -65,7 +65,7 @@ thiserror = "2.0.9"
 
 # CLI (optional)
 clap = { version = "4.3", features = ["derive", "env"], optional = true }
-rustyline = { version = "15", optional = true }
+rustyline = { version = "17", optional = true }
 hex = { version = "0.4.3", optional = true }
 rustc-hash = { version = "2.1.1", optional = true }
 
