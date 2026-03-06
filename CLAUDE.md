@@ -9,7 +9,7 @@ Built with Rust, powered by ethrex LEVM.
 
 ```bash
 cargo check                                    # Compile check
-cargo test                                     # Run 767 tests (+ 27 ignored)
+cargo test                                     # Run 815 tests (+ 27 ignored)
 cargo clippy --all-features -- -D warnings     # Lint (warnings = errors)
 cargo fmt --check                              # Format check
 

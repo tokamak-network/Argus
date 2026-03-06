@@ -39,7 +39,8 @@ $ cargo run --example sentinel_realtime_demo
    Mempool TXs flagged:  3
 
  Demo 4  Auto-Pause Circuit Breaker
-   Critical alert → block processing HALTED
+   Score below threshold — no pause triggered
+   (Pre-filter-only alerts may not reach confidence threshold)
 ```
 
 > No RPC key needed — demos run against local LEVM. Try it (~5 min first build, instant after):
@@ -51,7 +52,7 @@ $ cargo run --example sentinel_realtime_demo
 
 ## What Argus Does
 
-> Core features (pre-filter, deep analyzer, alerts, forensics, debugger) are implemented and tested (781 tests). Some features (mempool monitoring, auto-pause, ML pipeline) are available in embedded mode only — not yet wired in the RPC-mode CLI. See [sentinel.toml.example](sentinel.toml.example) for details. Argus is currently running on **Ethereum mainnet** via AWS ECS Fargate — see [Deployment Guide](docs/deployment.md) and [Roadmap](docs/ROADMAP.md).
+> Core features (pre-filter, deep analyzer, alerts, forensics, debugger) are implemented and tested (815 tests). Some features (mempool monitoring, auto-pause, ML pipeline) are available in embedded mode only — not yet wired in the RPC-mode CLI. See [sentinel.toml.example](sentinel.toml.example) for details. Argus is currently running on **Ethereum mainnet** via AWS ECS Fargate — see [Deployment Guide](docs/deployment.md) and [Roadmap](docs/ROADMAP.md).
 
 ### Sentinel — Real-Time Attack Detection
 
@@ -120,7 +121,7 @@ Demo 4  Auto-Pause Circuit Breaker
 cargo run --example reentrancy_demo
 ```
 
-Deploys a vulnerable contract, executes a reentrancy attack, and generates a full forensic report:
+Deploys a vulnerable contract, executes a reentrancy attack, and runs full forensic analysis:
 
 ```
 Phase 1  Deploy & Execute
@@ -140,10 +141,12 @@ Phase 3  AttackClassifier
     evidence: State modified at step 69
     evidence: Value transfer during re-entry
 
-Phase 5  SentinelService Pipeline
-  Alert Priority: Critical
-  Score: 0.85
-  Summary: Likely reentrancy attack (confidence: 90%)
+Phase 4  FundFlowTracer
+  ETH drain confirmed (victim -> attacker)
+
+Phase 6  Summary
+  Pre-filter: no receipt-level alert (TX succeeded with normal gas)
+  Reentrancy was detected by the opcode-level classifier (Phase 3).
 ```
 
 ---
@@ -157,7 +160,9 @@ Argus is running on **Ethereum mainnet** via AWS ECS Fargate (since March 2026).
 - **Deep replay**: 100% success (82/82), avg 69,259 opcode steps/TX
 - **Zero downtime**, $7/month on Fargate
 
-> No confirmed exploit interceptions yet — all alerts were MEV/arbitrage or revert patterns. See the full [detection report](docs/detection-report.md) and [operations report](docs/mainnet-report-march-2026.md) for details.
+> No confirmed exploit interceptions yet — all alerts were MEV/arbitrage or revert patterns. Two reports cover different periods and configurations:
+> - [Detection report](docs/detection-report.md) — 11.1h snapshot, `suspicion_threshold=0.3`, 82 alerts (high-sensitivity tuning)
+> - [Operations report](docs/mainnet-report-march-2026.md) — 14-day run, `suspicion_threshold=0.7`, 14 alerts (production tuning)
 
 ## Historical Validation
 
@@ -270,7 +275,7 @@ docker run -d \
   -p 9090:9090 \
   tokamak/argus-demo:latest
 
-# Or build and run locally (runs demos by default)
+# Or build and run locally (runs sentinel in prefilter-only mode)
 docker build -t argus-demo .
 docker run -e ARGUS_RPC_URL="https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY" argus-demo
 ```
@@ -281,7 +286,10 @@ Copy the example config and adjust for your setup:
 
 ```bash
 cp sentinel.toml.example sentinel.toml
-argus sentinel --rpc https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY --config sentinel.toml
+# The argus binary requires the `cli` feature flag
+cargo build --release --features cli
+cargo run --release --features cli -- sentinel \
+  --rpc https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY --config sentinel.toml
 ```
 
 See [`sentinel.toml.example`](sentinel.toml.example) for all available options with inline documentation.
