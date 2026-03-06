@@ -9,6 +9,10 @@ Real-time attack detection, post-hack forensics, and time-travel debugging for E
 
 **Built for:** Protocol security teams, security researchers, and node operators seeking self-hosted Ethereum monitoring.
 
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Argus Sentinel Demo" width="800">
+</p>
+
 > Existing security tools (Slither, Mythril, Echidna) analyze contracts **before** deployment.
 > Argus protects **after** deployment — detecting attacks as they happen and analyzing them when they've already occurred.
 
