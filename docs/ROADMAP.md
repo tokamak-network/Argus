@@ -87,7 +87,7 @@ Goal: **Turn "would have detected" into "did detect."**
 
 ### Success Criteria
 
-- "Argus raised 82 alerts scanning ~20M transactions on Ethereum mainnet" — initial baseline established (11.1h of 336h target); 14-day continuous operation in progress (~Mar 19 completion)
+- "Argus raised 82 alerts scanning ~273K transactions (~3,300 blocks) on Ethereum mainnet" — initial baseline established (11.1h of 336h target); 14-day continuous operation in progress (~Mar 19 completion)
 
 ---
 
@@ -136,8 +136,8 @@ Goal: **Acquire the first external user.**
 
 | # | Item | Description |
 |---|------|-------------|
-| 3-1 | **Publish to crates.io** | Install with `cargo install argus` |
-| 3-2 | **Reth ExEx integration** (depending on Phase 1-3 PoC results) | Reth users can activate Sentinel as a plugin |
+| 3-1 | **EVM trait abstraction + crates.io publish** | Extract `EvmExecutor` trait to decouple from ethrex. Publish `argus-core` (trait-only, no git deps) to crates.io. Keep `argus-ethrex` as a separate crate with git dependency. This unblocks `cargo install argus-core` while maintaining ethrex integration. Aligns with Reth ExEx direction (revm becomes a second `EvmExecutor` impl). Prerequisite: ethrex publishes to crates.io, OR trait abstraction is complete |
+| 3-2 | **Reth ExEx integration** (depending on Phase 1-3 PoC results) | Reth users can activate Sentinel as a plugin. Shares `EvmExecutor` trait with 3-1 |
 | 3-3 | **Focus on Sentinel** | Concentrate resources on Sentinel, the most differentiated of the three modules. Position as "an open-source runtime security tool specialized for Ethereum L1" rather than "all-in-one" |
 | 3-4 | **Community growth** | Launch Discord/Telegram, publish regular security analysis content |
 
