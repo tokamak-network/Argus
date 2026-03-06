@@ -47,6 +47,17 @@ impl EthRpcClient {
         }
     }
 
+    /// Create a client for polling mode (no default block context needed).
+    ///
+    /// Methods like `eth_blockNumber` and `eth_getBlockByNumber` supply their
+    /// own block numbers, so the `block_tag` field is irrelevant. This
+    /// constructor makes that intent explicit by setting `block_tag` to "latest".
+    pub fn for_polling(url: &str, config: RpcConfig) -> Self {
+        let mut client = Self::with_config(url, 0, config);
+        client.block_tag = "latest".to_string();
+        client
+    }
+
     pub fn block_number(&self) -> u64 {
         u64::from_str_radix(self.block_tag.trim_start_matches("0x"), 16).unwrap_or(0)
     }

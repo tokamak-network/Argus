@@ -9,9 +9,9 @@ Argus has strong code quality, but faces structural problems in external competi
 | Problem | Severity | Summary |
 |---------|----------|---------|
 | ethrex dependency | **Critical** | ethrex client market share ~0%. The "L1 node integration" advantage has nowhere to materialize |
-| Zero production detection record | **Critical** | Every case study uses the subjunctive ("would have"). Zero actual detections |
-| Single-developer project | **High** | Zero external contributors, zero issues, no community channels. Bus Factor = 1 |
-| High barrier to entry | **High** | Requires Rust 1.85+ build environment. Cannot see real results within 5 minutes |
+| Limited production detection record | **High** | 82 alerts raised (MEV/arb patterns) but zero confirmed exploit interceptions yet |
+| Single-developer project | **High** | Bus Factor = 1. GitHub Discussions enabled, 5 good-first-issues created (#1–#5), but zero external contributors yet |
+| High barrier to entry | **Medium** | Docker image available; `cargo build` requires Rust 1.85+ (~5 min first build) |
 | All-in-one risk | **Medium** | All three modules are weaker than specialized competitors. Need to focus on Sentinel |
 
 ---
@@ -22,12 +22,12 @@ Goal: **Create a path to "see real results within 5 minutes."**
 
 | # | Item | Status |
 |---|------|--------|
-| 0-1 | Publish Docker Hub image (`docker run tokamak/argus-demo`) | Waiting for GitHub Secrets registration |
+| 0-1 | Publish Docker Hub image (`docker run tokamak/argus-demo`) | Done (v0.1.0) |
 | 0-2 | Write CONTRIBUTING.md | Done |
-| 0-3 | Enable GitHub Discussions | Not started |
-| 0-4 | Add 3–5 real mainnet hack TXs as test fixtures | Not started |
-| 0-5 | Create 5 issues with `good first issue` label for external contributors | Not started |
-| 0-6 | Smoke test: replay 1–2 historical hack TXs — pipeline sanity check level | Not started |
+| 0-3 | Enable GitHub Discussions | Done |
+| 0-4 | Add 3–5 real mainnet hack TXs as test fixtures | Done (Balancer, Bybit, Poly Network) |
+| 0-5 | Create 5 issues with `good first issue` label for external contributors | Done (#1–#5) |
+| 0-6 | Smoke test: replay 1–2 historical hack TXs — pipeline sanity check level | Done (8 offline smoke tests) |
 
 ---
 
@@ -48,11 +48,11 @@ Track B:  Argus → Reth ExEx (plugin)     → Block analysis  ← Parallel PoC
 Keep:     Argus → ethrex LEVM (embedded) → Block analysis  ← Retain as optimal performance path
 ```
 
-| # | Item | Description | Priority |
-|---|------|-------------|----------|
-| 1-1 | **RPC-based Sentinel mode** | Connect to any Ethereum RPC endpoint, poll new blocks, run pre-filter + deep analysis on each TX. No ethrex required | **#1** — Prerequisite for expanding the user base |
-| 1-2 | **Autopsy CLI improvements** | One-line mainnet TX forensic analysis with `argus autopsy --tx 0x... --rpc https://eth.llamarpc.com`. RPC client already exists; only CLI improvements needed | High |
-| 1-3 | **Reth ExEx PoC** | PoC to determine if Sentinel can be integrated via Reth's Execution Extensions. Reth's market share is growing, making this the most promising path to realize the "node-embedded" vision | **#2** — Start after 1-1 is complete, or parallelize if external contributors join |
+| # | Item | Description | Priority | Status |
+|---|------|-------------|----------|--------|
+| 1-1 | **RPC-based Sentinel mode** | Connect to any Ethereum RPC endpoint, poll new blocks, run pre-filter + deep analysis on each TX. No ethrex required | **#1** — Prerequisite for expanding the user base | Done |
+| 1-2 | **Autopsy CLI improvements** | One-line mainnet TX forensic analysis with `argus autopsy --tx 0x... --rpc https://eth.llamarpc.com`. RPC client already exists; only CLI improvements needed | High | Done |
+| 1-3 | **Reth ExEx PoC** | PoC to determine if Sentinel can be integrated via Reth's Execution Extensions. Reth's market share is growing, making this the most promising path to realize the "node-embedded" vision | **#2** — Start after 1-1 is complete, or parallelize if external contributors join | Deferred to Q3 |
 
 ### Why Reth ExEx Was Promoted from "Long-term Consideration"
 
@@ -78,16 +78,16 @@ Keep:     Argus → ethrex LEVM (embedded) → Block analysis  ← Retain as opt
 
 Goal: **Turn "would have detected" into "did detect."**
 
-| # | Item | Description |
-|---|------|-------------|
-| 2-1 | **14-day continuous mainnet operation** | Run RPC-mode Sentinel on Ethereum mainnet via AWS ECS Fargate for 14 days. Record blocks scanned, suspicious TXs flagged, and detection results. See [deployment guide](deployment.md) |
-| 2-2 | **Document detection results** | "In Q2 2026, scanned X blocks on mainnet, flagged Y suspicious TXs, confirmed Z detections" — the first production track record report |
-| 2-3 | **Systematic replay verification of historical hacks** | Run 5+ major hack TXs (Balancer, Bybit, Euler, etc.) through Autopsy, produce a report with quantitative results (detection rate, confidence, latency). Unlike Phase 0-6 smoke tests, this is a systematic benchmark |
-| 2-4 | **Latency benchmark** | Measure and publish Pre-filter μs/tx and Deep Analyzer ms/tx |
+| # | Item | Description | Status |
+|---|------|-------------|--------|
+| 2-1 | **14-day continuous mainnet operation** | Run RPC-mode Sentinel on Ethereum mainnet via AWS ECS Fargate for 14 days. Record blocks scanned, suspicious TXs flagged, and detection results. See [deployment guide](deployment.md) | In progress (~Mar 19 target) |
+| 2-2 | **Document detection results** | "In Q2 2026, scanned X blocks on mainnet, flagged Y suspicious TXs, confirmed Z detections" — the first production track record report | Done — [detection report](detection-report.md) (82 alerts / 11.1h) |
+| 2-3 | **Systematic replay verification of historical hacks** | Run 5+ major hack TXs (Balancer, Bybit, Euler, etc.) through Autopsy, produce a report with quantitative results (detection rate, confidence, latency). Unlike Phase 0-6 smoke tests, this is a systematic benchmark | Done — [replay benchmark](../src/tests/replay_benchmark.rs) |
+| 2-4 | **Latency benchmark** | Measure and publish Pre-filter μs/tx and Deep Analyzer ms/tx | Done — [latency bench](../examples/sentinel_latency_bench.rs) |
 
 ### Success Criteria
 
-- "Argus detected X suspicious transactions on Ethereum mainnet over 14 days" — Phase 2 is complete when this sentence can be written in the README
+- "Argus raised 82 alerts scanning ~20M transactions on Ethereum mainnet" — initial baseline established (11.1h of 336h target); 14-day continuous operation in progress (~Mar 19 completion)
 
 ---
 

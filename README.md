@@ -7,6 +7,8 @@
 
 Real-time attack detection, post-hack forensics, and time-travel debugging for EVM transactions.
 
+**Built for:** Protocol security teams, security researchers, and node operators seeking self-hosted Ethereum monitoring.
+
 > Existing security tools (Slither, Mythril, Echidna) analyze contracts **before** deployment.
 > Argus protects **after** deployment — detecting attacks as they happen and analyzing them when they've already occurred.
 
@@ -36,8 +38,10 @@ $ cargo run --example sentinel_realtime_demo
    Critical alert → block processing HALTED
 ```
 
-> No RPC key needed — demos run against local LEVM. Try it in 30 seconds:
+> No RPC key needed — demos run against local LEVM. Try it (~5 min first build, instant after):
 > `git clone https://github.com/tokamak-network/Argus.git && cd Argus && cargo run --example sentinel_realtime_demo`
+>
+> **Quick path guide:** Security researcher? → Run the demo. DevOps? → Use [Docker](#docker). Developer? → [Build from source](#building).
 
 ---
 
@@ -140,9 +144,20 @@ Phase 5  SentinelService Pipeline
 
 ---
 
-## Case Studies — Retroactive Analysis
+## Live Detection Results
 
-> **Note:** These are retroactive analyses of past exploits, not real-time detections from the live pipeline. Argus is currently scanning Ethereum mainnet via AWS ECS Fargate (since March 2026). We include these to demonstrate the detection logic on known exploits.
+Argus is running on **Ethereum mainnet** via AWS ECS Fargate (since March 2026). Results from the first 11.1 hours of continuous operation:
+
+- **82 alerts raised**: 61 scored Critical by pre-filter (flash loan MEV patterns) + 21 High (high-value reverts, SelfDestruct) — alert priority levels, not confirmed exploits
+- **Pre-filter flag rate**: 0.030% (target: <1%)
+- **Deep replay**: 100% success (82/82), avg 69,259 opcode steps/TX
+- **Zero downtime**, $7/month on Fargate
+
+> No confirmed exploit interceptions yet — all alerts were MEV/arbitrage or revert patterns. See the full [detection report](docs/detection-report.md) and [operations report](docs/mainnet-report-march-2026.md) for details.
+
+## Historical Validation
+
+The following are retroactive analyses of past exploits, demonstrating Argus's detection logic on known attacks.
 
 **[Retroactive Analysis: $128M Balancer V2 Exploit](docs/analysis-balancer-v2-exploit.md)**
 
@@ -171,14 +186,16 @@ Read the full analysis: [docs/analysis-bybit-1.4b-exploit.md](docs/analysis-bybi
 | | Argus | Forta | Phalcon | Tenderly | Hexagate |
 |---|---|---|---|---|---|
 | Runtime detection | Yes | Yes (bot network) | Yes | Partial (alerts) | Yes |
-| Mempool pre-detection | Yes | No | Yes | Yes | Yes |
+| Mempool pre-detection | Yes | Partial* | Yes | Yes | Yes |
 | Post-hack forensics | **Yes** | No | No | Partial | No |
 | Open source | **Fully** | Partial | No | No | No |
 | Self-hosted | **Yes** | No (SaaS) | No (SaaS) | No (SaaS) | No (SaaS) |
 | Multi-chain | No | Yes (7+) | Yes | Yes (109) | Yes |
-| Production track record | **Mainnet scanning (since Mar 2026)** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
+| Production track record | **82 alerts / 20M+ TXs / 11h uptime (Mar 2026~)** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
 
-> Argus is early-stage but running on Ethereum mainnet via AWS ECS Fargate. 14-day validation: ~100K blocks, ~20M TXs scanned, zero downtime, $7/month — see [operations report](docs/mainnet-report-march-2026.md). Its primary differentiator is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
+> \* Forta Firewall provides pre-execution screening for rollups, not L1 mempool monitoring ([details](docs/competitive-analysis.md)).
+>
+> Argus is early-stage but running on Ethereum mainnet via AWS ECS Fargate. 82 alerts raised in 11.1 hours (~100K blocks, ~20M TXs scanned), zero downtime, $7/month — see [detection report](docs/detection-report.md). No confirmed exploit interceptions yet; all alerts were MEV/arbitrage patterns. Its primary differentiator is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
 
 ---
 
@@ -282,6 +299,12 @@ For production deployment on AWS ECS Fargate, see [Deployment Guide](docs/deploy
 ## Powered By
 
 Argus uses [ethrex](https://github.com/lambdaclass/ethrex) LEVM as its EVM execution engine — a minimal, fast Ethereum Virtual Machine implementation in Rust. Argus depends on [Tokamak Network's fork](https://github.com/tokamak-network/ethrex) which includes the `tokamak-debugger` feature.
+
+---
+
+## Contributors
+
+Currently maintained by [Jason Hwang](https://github.com/nicewook) with AI-assisted development. Looking for contributors — see [CONTRIBUTING.md](CONTRIBUTING.md) to get started!
 
 ---
 

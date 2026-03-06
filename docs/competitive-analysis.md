@@ -2,7 +2,7 @@
 
 ## Summary
 
-Argus is differentiated by being open-source + self-hosted + opcode-level analysis. However, it has structural weaknesses: **zero production detection record, ethrex client dependency (market share ~0%), and a single-developer project**. Commercial competitors (Forta, Phalcon, Hexagate) already have hundreds of millions of transactions scanned and real hack prevention track records.
+Argus is differentiated by being open-source + self-hosted + opcode-level analysis. However, it has structural weaknesses: **limited production track record (82 alerts in 11h, no confirmed exploit interceptions), ethrex client dependency (market share ~0%), and a single-developer project**. Commercial competitors (Forta, Phalcon, Hexagate) already have hundreds of millions of transactions scanned and real hack prevention track records.
 
 This document compares the competitive landscape **as it is** and lays out the challenges Argus must address to achieve real competitiveness.
 
@@ -28,13 +28,13 @@ Expanded to 9 comparison dimensions. Includes items unfavorable to Argus.
 | | **Argus** | **Forta** | **Phalcon** | **Tenderly** | **Hexagate** |
 |---|:---:|:---:|:---:|:---:|:---:|
 | Real-time detection | O | O | O | △^1 | O |
-| Pre-execution mempool detection | O | X | O | O | O |
+| Pre-execution mempool detection | O | △^11 | O | O | O |
 | Automated blocking (circuit breaker) | O^2 | X | O | X | O |
 | Post-incident forensic reports | O | X | X | △^3 | X |
 | Open-source + self-hosted | **O** | △^4 | X | X | X |
 | Multi-chain support | **X** | O (7+) | O | O (109) | O |
 | Anomaly detection model | Rule-based + Z-score statistics^5 | Neural net (FORTRESS) | ML-based | X | ML-based |
-| **Production track record** | **Mainnet scanning in operation (2026.03~)**^10 | 270M TXs scanned^6 | 20+ hacks blocked^7 | 1.4M+ simulations^8 | Undisclosed |
+| **Production track record** | **82 alerts / 20M+ TXs / 11h uptime (2026.03~)**^10 | 270M TXs scanned^6 | 20+ hacks blocked^7 | 1.4M+ simulations^8 | Undisclosed |
 | **L1 node-embedded integration** | Potential^9 | X | X | X | X |
 
 > ^1 Tenderly provides alerting, but it is not a dedicated attack detection pipeline.
@@ -42,11 +42,12 @@ Expanded to 9 comparison dimensions. Includes items unfavorable to Argus.
 > ^3 Tenderly provides a transaction debugger, but does not support automated attack pattern classification or forensic report generation.
 > ^4 Forta bot code is open-source, but the platform infrastructure (FORTRESS, etc.) is proprietary.
 > ^5 An initial implementation using hardcoded placeholder mean/standard deviation for Z-score calculation (~100 lines). Not calibrated with real mainnet data. A significant gap compared to competitors' neural net/ML approaches.
-> ^6 [Messari report](https://messari.io/report/forta-firewall-security-and-compliance-infrastructure-for-rollups) — 99% detection rate, <0.0002% false positive rate.
-> ^7 [BlockSec official](https://blocksec.com/phalcon/security) — $20M+ in assets rescued.
-> ^8 [Tenderly 2025 recap](https://blog.tenderly.co/2025-recap-blockchain-adoption-chain-operations/) — 42K+ transactions debugged.
+> ^6 [Messari report](https://messari.io/report/forta-firewall-security-and-compliance-infrastructure-for-rollups) — 99% detection rate, <0.0002% false positive rate (as of Mar 2026).
+> ^7 [BlockSec official](https://blocksec.com/phalcon/security) — $20M+ in assets rescued (as of Mar 2026).
+> ^8 [Tenderly 2025 recap](https://blog.tenderly.co/2025-recap-blockchain-adoption-chain-operations/) — 42K+ transactions debugged (as of Mar 2026).
 > ^9 Only possible on top of ethrex LEVM, and ethrex's mainnet market share is ~0%. Currently an unrealizable potential advantage. Could be materialized through Reth ExEx integration after completing the RPC-independent mode. See [TAM problem section](#1-ethrex-dependency--tam-problem).
-> ^10 Scanning Ethereum mainnet blocks in real-time on AWS ECS Fargate (March 2026~). No actual hack detections yet; 14-day validation period in progress.
+> ^10 All alerts were MEV/arbitrage patterns; no confirmed exploit interceptions. See [detection report](detection-report.md).
+> ^11 Forta Firewall provides pre-execution screening for rollups ([docs](https://docs.forta.network/en/latest/forta-firewall-what-is-forta-firewall/)). Not available for L1 mempool monitoring (as of Mar 2026).
 
 ---
 
@@ -84,14 +85,14 @@ Forta does detection only, Tenderly does debugging/simulation only, Phalcon does
 | Mitigation | Develop RPC-independent mode as a first-class citizen + parallel Reth ExEx PoC. Detailed plan in [ROADMAP Phase 1](ROADMAP.md). |
 | Timeline | **Highest priority** (Q2 2026) |
 
-### 2. Production Validation — Mainnet Scanning Started
+### 2. Production Validation — Baseline Established
 
 | Item | Detail |
 |------|--------|
 | Severity | **High** (downgraded from Critical) |
-| Symptom | Running real-time Ethereum mainnet scanning on AWS ECS Fargate (March 2026~). However, zero actual hack detections so far. |
-| Impact | "Scanning" and "actually caught a hack" are different levels. Trust requires completing the 14-day validation period and publishing a detection quality report. |
-| Mitigation | (1) Publish detection report after 14-day continuous mainnet operation. (2) Compare historical hack TX Autopsy replay results with live scan results. |
+| Symptom | Running real-time Ethereum mainnet scanning on AWS ECS Fargate (March 2026~). 82 alerts raised in 11.1 hours (61 Critical + 21 High), but all were MEV/arbitrage patterns — zero confirmed exploit interceptions. |
+| Impact | "82 alerts raised" and "actually caught a hack" are different levels. Trust requires completing the 14-day validation period and publishing detection quality updates. |
+| Mitigation | (1) Detection report published — see [detection-report.md](detection-report.md). (2) 14-day continuous operation in progress (~Mar 19 target). (3) Replay benchmark completed for 5 historical hacks. |
 | Timeline | In progress (March 2026) |
 
 ### 3. Single-Developer Project = Sustainability Concern
@@ -99,9 +100,9 @@ Forta does detection only, Tenderly does debugging/simulation only, Phalcon does
 | Item | Detail |
 |------|--------|
 | Severity | **High** |
-| Symptom | Entire git history: 6 commits, 1 contributor. Zero external contributors, zero issues, no community channels. |
+| Symptom | Entire git history: 1 contributor. GitHub Discussions enabled, 5 good-first-issues created (#1–#5), but zero external contributors yet. |
 | Impact | Bus Factor = 1. When a new attack vector emerges, detection rules need updating within 48 hours — is that feasible with a single developer? The project halts if the contributor is unavailable. |
-| Mitigation | Open GitHub Discussions, create 5 issues with `good first issue` labels, publish regular security analysis content to attract contributors. |
+| Mitigation | Foundation laid (Discussions + issues). Next: publish regular security analysis content to attract contributors. |
 | Timeline | Start immediately, ongoing |
 
 ### 4. Anomaly Detection Model Maturity Gap
@@ -187,11 +188,11 @@ Avoid unverified claims like "all-in-one," "L1 node integration," or "fastest de
 
 ## Immediate Action Items
 
-| # | Item | Deadline | Notes |
-|---|------|----------|-------|
-| 1 | **Publish historical hack TX replay results** — Run Balancer, Bybit TXs through Autopsy and document results | 2 weeks | First step in transitioning from "would have" to "did (on replay)" |
-| 2 | **Publish Docker Hub image** — Register GitHub Secrets and push `v0.1.0` tag | Immediately | Lower the barrier to entry |
-| 3 | **Start RPC-independent mode development** — First milestone of Phase 1-1 | Q2 2026 | Core of breaking free from ethrex |
-| 4 | **Start Reth ExEx PoC** — Begin after RPC mode (1-1) completion | Q2 2026 | Promoted from "long-term consideration." Parallelize if contributors join |
-| 5 | **Build community foundation** — Enable GitHub Discussions, create 5 `good first issue` items | 1 week | First step toward resolving Bus Factor |
-| 6 | **Measure latency benchmark** — Pre-filter μs/tx, Deep Analyzer ms/tx | Q2 2026 | Evidence to back performance claims |
+| # | Item | Deadline | Status |
+|---|------|----------|--------|
+| 1 | **Publish historical hack TX replay results** — Run Balancer, Bybit TXs through Autopsy and document results | 2 weeks | Done — [replay benchmark](../src/tests/replay_benchmark.rs) |
+| 2 | **Publish Docker Hub image** — Register GitHub Secrets and push `v0.1.0` tag | Immediately | Done (v0.1.0) |
+| 3 | **Start RPC-independent mode development** — First milestone of Phase 1-1 | Q2 2026 | Done — rpc_poller, rpc_service, rpc_replay |
+| 4 | **Start Reth ExEx PoC** — Begin after RPC mode (1-1) completion | Q3 2026 | Deferred — evaluating ethrex L2 adoption first |
+| 5 | **Build community foundation** — Enable GitHub Discussions, create 5 `good first issue` items | 1 week | Done — Discussions + issues #1–#5 |
+| 6 | **Measure latency benchmark** — Pre-filter μs/tx, Deep Analyzer ms/tx | Q2 2026 | Done — [latency bench](../examples/sentinel_latency_bench.rs) |

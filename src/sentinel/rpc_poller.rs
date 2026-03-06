@@ -164,50 +164,108 @@ fn fetch_receipts_individually(
     Ok(receipts)
 }
 
+/// Maximum consecutive tip-fetch errors (any type) before the poller terminates.
+/// Termination only triggers when the error at the threshold is non-retryable;
+/// retryable errors increment the counter but never cause termination on their own.
+const MAX_CONSECUTIVE_ERRORS: u32 = 5;
+
+/// Build the shared blocking HTTP client, returning `None` on failure.
+async fn create_shared_client(
+    url: &str,
+    rpc_config: RpcConfig,
+    running: &Arc<AtomicBool>,
+) -> Option<Arc<EthRpcClient>> {
+    let url = url.to_string();
+    match tokio::task::spawn_blocking(move || EthRpcClient::for_polling(&url, rpc_config)).await {
+        Ok(client) => Some(Arc::new(client)),
+        Err(e) => {
+            eprintln!("[rpc_poller] failed to create RPC client: {e}");
+            running.store(false, Ordering::SeqCst);
+            None
+        }
+    }
+}
+
+/// Fetch the current chain tip to establish the starting point, returning `None` on failure.
+async fn fetch_initial_tip(
+    client: &Arc<EthRpcClient>,
+    running: &Arc<AtomicBool>,
+) -> Option<u64> {
+    let c = Arc::clone(client);
+    match tokio::task::spawn_blocking(move || c.eth_block_number()).await {
+        Ok(Ok(n)) => Some(n),
+        Ok(Err(e)) => {
+            eprintln!("[rpc_poller] initial tip fetch failed: {e}");
+            running.store(false, Ordering::SeqCst);
+            None
+        }
+        Err(e) => {
+            eprintln!("[rpc_poller] initial tip fetch panicked: {e}");
+            running.store(false, Ordering::SeqCst);
+            None
+        }
+    }
+}
+
 /// Core polling loop — runs in a spawned tokio task.
 async fn poll_loop(
     config: RpcPollerConfig,
     tx: mpsc::Sender<(RpcBlock, Vec<RpcReceipt>)>,
     running: Arc<AtomicBool>,
 ) {
-    let url = config.rpc_url.clone();
-    let rpc_config = config.rpc_config.clone();
+    let Some(shared_client) =
+        create_shared_client(&config.rpc_url, config.rpc_config.clone(), &running).await
+    else {
+        return;
+    };
 
-    // Fetch initial chain tip to avoid replaying old history.
-    let last_seen = {
-        let url = url.clone();
-        let rpc_cfg = rpc_config.clone();
-        match tokio::task::spawn_blocking(move || {
-            let client = EthRpcClient::with_config(&url, 0, rpc_cfg);
-            client.eth_block_number()
-        })
-        .await
-        {
-            Ok(Ok(n)) => n,
-            _ => {
-                running.store(false, Ordering::SeqCst);
-                return;
-            }
-        }
+    let Some(last_seen) = fetch_initial_tip(&shared_client, &running).await else {
+        return;
     };
 
     let mut last_seen_block = last_seen;
+    let mut consecutive_tip_errors: u32 = 0;
 
     while running.load(Ordering::SeqCst) {
         // Fetch current chain tip.
         let tip = {
-            let url = url.clone();
-            let rpc_cfg = rpc_config.clone();
-            match tokio::task::spawn_blocking(move || {
-                let client = EthRpcClient::with_config(&url, 0, rpc_cfg);
-                client.eth_block_number()
-            })
-            .await
+            let client = Arc::clone(&shared_client);
+            match tokio::task::spawn_blocking(move || client.eth_block_number())
+                .await
             {
-                Ok(Ok(n)) => n,
-                _ => {
+                Ok(Ok(n)) => {
+                    consecutive_tip_errors = 0;
+                    n
+                }
+                Ok(Err(e)) => {
+                    consecutive_tip_errors += 1;
+                    let retryable = matches!(
+                        &e,
+                        crate::error::DebuggerError::Rpc(rpc_err) if rpc_err.is_retryable()
+                    );
+                    if retryable {
+                        eprintln!(
+                            "[rpc_poller] tip fetch failed (retryable, attempt {consecutive_tip_errors}): {e}"
+                        );
+                    } else {
+                        eprintln!(
+                            "[rpc_poller] tip fetch failed (non-retryable, attempt {consecutive_tip_errors}): {e}"
+                        );
+                    }
+                    if !retryable && consecutive_tip_errors >= MAX_CONSECUTIVE_ERRORS {
+                        eprintln!(
+                            "[rpc_poller] {MAX_CONSECUTIVE_ERRORS} consecutive non-retryable errors; terminating"
+                        );
+                        running.store(false, Ordering::SeqCst);
+                        return;
+                    }
                     tokio::time::sleep(config.poll_interval).await;
                     continue;
+                }
+                Err(e) => {
+                    eprintln!("[rpc_poller] tip fetch panicked: {e}");
+                    running.store(false, Ordering::SeqCst);
+                    return;
                 }
             }
         };
@@ -239,12 +297,11 @@ async fn poll_loop(
                 return;
             }
 
-            // Fetch full block + all receipts in one spawn_blocking to reuse
-            // a single EthRpcClient (and its underlying TCP connection pool).
-            let url2 = url.clone();
-            let rpc_cfg = rpc_config.clone();
+            // Fetch full block + all receipts. The shared_client's underlying
+            // reqwest::blocking::Client maintains a connection pool, so we
+            // avoid TCP handshakes on each block.
+            let client = Arc::clone(&shared_client);
             let result = tokio::task::spawn_blocking(move || {
-                let client = EthRpcClient::with_config(&url2, 0, rpc_cfg);
                 let block = client.eth_get_block_by_number_with_txs(block_num)?;
                 let receipts = fetch_receipts_with_fallback(&client, &block)?;
                 Ok::<_, crate::error::DebuggerError>((block, receipts))
@@ -253,8 +310,14 @@ async fn poll_loop(
 
             let (block, receipts) = match result {
                 Ok(Ok(pair)) => pair,
-                // Any fetch error: stop this cycle and retry block_num next poll.
-                _ => break 'block_loop,
+                Ok(Err(e)) => {
+                    eprintln!("[rpc_poller] block {block_num} fetch failed: {e}");
+                    break 'block_loop;
+                }
+                Err(e) => {
+                    eprintln!("[rpc_poller] block {block_num} fetch panicked: {e}");
+                    break 'block_loop;
+                }
             };
 
             // Send pair; if receiver dropped, stop the loop.
@@ -483,6 +546,49 @@ mod tests {
         );
     }
 
+    // --- Consecutive error termination logic (offline) ---
+
+    /// Simulates the termination logic from poll_loop: the counter increments
+    /// on every tip-fetch error, but termination only triggers when the error
+    /// at the threshold is non-retryable.
+    #[test]
+    fn test_consecutive_tip_error_termination_logic() {
+        let max = MAX_CONSECUTIVE_ERRORS;
+
+        // Scenario 1: mixed errors reaching threshold, last is non-retryable → terminate
+        let mut count: u32 = 0;
+        for _ in 0..4 {
+            count += 1; // retryable errors still increment
+        }
+        count += 1; // 5th error, non-retryable
+        let retryable = false;
+        let should_terminate = !retryable && count >= max;
+        assert!(should_terminate, "non-retryable error at threshold should terminate");
+
+        // Scenario 2: all retryable, at threshold → do NOT terminate
+        let count: u32 = max;
+        let retryable = true;
+        let should_terminate = !retryable && count >= max;
+        assert!(!should_terminate, "retryable errors should never trigger termination");
+
+        // Scenario 3: success resets counter → under threshold
+        let mut count: u32 = max - 1;
+        count = 0; // success resets
+        count += 1; // one more non-retryable
+        let retryable = false;
+        let should_terminate = !retryable && count >= max;
+        assert!(!should_terminate, "counter reset on success prevents termination");
+    }
+
+    // --- for_polling constructor (offline) ---
+
+    #[test]
+    fn test_for_polling_block_tag() {
+        let client = EthRpcClient::for_polling("http://localhost:8545", RpcConfig::default());
+        // "latest" is not a valid hex number, so block_number() returns 0 via unwrap_or
+        assert_eq!(client.block_number(), 0);
+    }
+
     // --- Live tests (require real RPC, marked #[ignore]) ---
 
     #[tokio::test]
@@ -519,7 +625,7 @@ mod tests {
         let url = format!("https://eth-mainnet.g.alchemy.com/v2/{api_key}");
 
         let result = tokio::task::spawn_blocking(move || {
-            let client = EthRpcClient::with_config(&url, 0, RpcConfig::default());
+            let client = EthRpcClient::for_polling(&url, RpcConfig::default());
             let tip = client.eth_block_number()?;
             let block = client.eth_get_block_by_number_with_txs(tip)?;
             let batch = client.eth_get_block_receipts(tip)?;
