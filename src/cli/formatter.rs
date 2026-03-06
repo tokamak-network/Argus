@@ -238,10 +238,11 @@ fn format_number_with_commas(n: u64) -> String {
     result.chars().rev().collect()
 }
 
-/// Format a U256 Wei value as an ETH string (e.g., "150.0 ETH").
+/// Format a U256 Wei value as an ETH string (e.g., "1.50 ETH").
+///
+/// Fractional ETH is truncated to 2 decimal places (no rounding).
 #[cfg(feature = "autopsy")]
 fn format_u256_eth(wei: ethrex_common::U256) -> String {
-    // 1 ETH = 10^18 wei; display as integer ETH for simplicity
     let eth_u256 = wei / ethrex_common::U256::from(10u64.pow(18));
     let remainder = wei % ethrex_common::U256::from(10u64.pow(18));
     if remainder.is_zero() {
@@ -373,6 +374,35 @@ mod tests {
             contract: Address::default(),
         };
         assert_eq!(format_attack_pattern(&acl), "AccessControlBypass");
+    }
+
+    #[test]
+    #[cfg(feature = "autopsy")]
+    fn test_format_u256_eth_exact() {
+        let wei = U256::from(10u64.pow(18)); // exactly 1 ETH
+        assert_eq!(format_u256_eth(wei), "1 ETH");
+    }
+
+    #[test]
+    #[cfg(feature = "autopsy")]
+    fn test_format_u256_eth_fractional() {
+        // 1.5 ETH = 1_500_000_000_000_000_000 wei
+        let wei = U256::from(1_500_000_000_000_000_000u64);
+        assert_eq!(format_u256_eth(wei), "1.50 ETH");
+    }
+
+    #[test]
+    #[cfg(feature = "autopsy")]
+    fn test_format_u256_eth_small_fraction() {
+        // 0.005 ETH = 5_000_000_000_000_000 wei → truncated to "0.00 ETH"
+        let wei = U256::from(5_000_000_000_000_000u64);
+        assert_eq!(format_u256_eth(wei), "0.00 ETH");
+    }
+
+    #[test]
+    #[cfg(feature = "autopsy")]
+    fn test_format_u256_eth_zero() {
+        assert_eq!(format_u256_eth(U256::zero()), "0 ETH");
     }
 
     #[test]

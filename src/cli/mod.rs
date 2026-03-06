@@ -361,6 +361,9 @@ fn setup_replay(
 ///
 /// This is the fallback path used when `sentinel::rpc_types` is unavailable.
 /// Extracted from `setup_replay` to keep the cfg-gated block small.
+///
+/// TODO: When sentinel and autopsy share a unified type-conversion module,
+/// replace this with the shared `build_env_from_rpc` + `rpc_tx_to_ethrex` helpers.
 #[cfg(all(feature = "autopsy", not(feature = "sentinel")))]
 fn build_env_and_tx_fallback(
     rpc_tx: &crate::autopsy::rpc_client::RpcTransaction,

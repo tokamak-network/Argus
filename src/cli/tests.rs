@@ -101,18 +101,21 @@ fn test_sentinel_args_all_options() {
 #[test]
 fn test_parse_tx_hash_with_0x_prefix() {
     let hash = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
-    let result = super::parse_tx_hash(hash);
-    assert!(result.is_ok());
-    let h = result.unwrap();
-    assert_eq!(h.as_bytes()[0], 0xab);
-    assert_eq!(h.as_bytes()[31], 0x90);
+    let h = super::parse_tx_hash(hash).unwrap();
+    let expected: Vec<u8> = (0..32)
+        .map(|i| u8::from_str_radix(&hash[2 + i * 2..2 + i * 2 + 2], 16).unwrap())
+        .collect();
+    assert_eq!(h.as_bytes(), expected.as_slice());
 }
 
 #[test]
 fn test_parse_tx_hash_without_prefix() {
     let hash = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
-    let result = super::parse_tx_hash(hash);
-    assert!(result.is_ok());
+    let h = super::parse_tx_hash(hash).unwrap();
+    let expected: Vec<u8> = (0..32)
+        .map(|i| u8::from_str_radix(&hash[i * 2..i * 2 + 2], 16).unwrap())
+        .collect();
+    assert_eq!(h.as_bytes(), expected.as_slice());
 }
 
 #[test]
