@@ -648,10 +648,12 @@ async fn run_sentinel_async(
     let analysis_config = full_config.to_analysis_config();
     let prefilter_config = full_config.to_sentinel_config();
     eprintln!(
-        "[sentinel] config: suspicion_threshold={:.2}  min_erc20={} prefilter_alert_mode={}",
+        "[sentinel] config: suspicion_threshold={:.2}  min_erc20={} prefilter_alert_mode={} mev_flash={:.2} mev_selfdestruct={:.2}",
         prefilter_config.suspicion_threshold,
         prefilter_config.min_erc20_transfers,
         analysis_config.prefilter_alert_mode,
+        prefilter_config.mev_flash_loan_factor,
+        prefilter_config.mev_selfdestruct_factor,
     );
     if let Some(ref archive_url) = archive_rpc_url {
         let masked = if archive_url.len() > 40 {

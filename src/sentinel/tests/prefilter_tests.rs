@@ -553,3 +553,49 @@ fn test_oracle_only_not_flagged() {
     // H4 fires (known contract: Chainlink) but score = 0.0, independent = 0 → None
     assert!(result.is_none());
 }
+
+// ---------------------------------------------------------------------------
+// TOML config parsing: verify MEV defaults from Fargate-style TOML
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_toml_fargate_mev_defaults() {
+    use crate::sentinel::config::load_config;
+
+    let toml_content = "\
+[sentinel]\n\
+enabled = true\n\
+\n\
+[sentinel.prefilter]\n\
+suspicion_threshold = 0.7\n\
+min_value_eth = 1.0\n\
+min_erc20_transfers = 20\n\
+gas_ratio_threshold = 0.98\n\
+\n\
+[sentinel.analysis]\n\
+max_steps = 500000\n\
+min_alert_confidence = 0.6\n\
+prefilter_alert_mode = false\n\
+\n\
+[sentinel.alert]\n\
+rate_limit_per_minute = 10\n\
+dedup_window_blocks = 5\n\
+";
+
+    let path = std::path::PathBuf::from("/tmp/test_fargate_mev.toml");
+    std::fs::write(&path, toml_content).unwrap();
+
+    let config = load_config(Some(&path)).expect("should parse TOML");
+    let sc = config.to_sentinel_config();
+
+    assert!(
+        (sc.mev_flash_loan_factor - 0.15).abs() < f64::EPSILON,
+        "mev_flash_loan_factor should default to 0.15, got {}",
+        sc.mev_flash_loan_factor
+    );
+    assert!(
+        (sc.mev_selfdestruct_factor - 0.25).abs() < f64::EPSILON,
+        "mev_selfdestruct_factor should default to 0.25, got {}",
+        sc.mev_selfdestruct_factor
+    );
+}
