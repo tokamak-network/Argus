@@ -51,16 +51,16 @@ $ cargo run --example sentinel_realtime_demo
 
 ## What Argus Does
 
-> All features below have been implemented and tested. Argus is currently running on **Ethereum mainnet** via AWS ECS Fargate — see [Deployment Guide](docs/deployment.md) and [Roadmap](docs/ROADMAP.md).
+> Core features (pre-filter, deep analyzer, alerts, forensics, debugger) are implemented and tested (781 tests). Some features (mempool monitoring, auto-pause, ML pipeline) are available in embedded mode only — not yet wired in the RPC-mode CLI. See [sentinel.toml.example](sentinel.toml.example) for details. Argus is currently running on **Ethereum mainnet** via AWS ECS Fargate — see [Deployment Guide](docs/deployment.md) and [Roadmap](docs/ROADMAP.md).
 
 ### Sentinel — Real-Time Attack Detection
 
 A 2-stage detection pipeline integrated at the block processing level:
 
-- **Pre-filter**: Receipt-based heuristics (~10-50μs/tx) eliminate 99% of benign transactions
+- **Pre-filter**: Receipt-based heuristics (~10-50μs/tx — see [latency bench](examples/sentinel_latency_bench.rs)) eliminate 99% of benign transactions
 - **Deep analyzer**: Full opcode-level replay on suspicious transactions only
-- **Mempool monitoring**: Detect attacks *before* they're included in a block
-- **Auto-pause circuit breaker**: Automatically halt processing on critical alerts
+- **Mempool monitoring**: Detect attacks *before* they're included in a block *(embedded mode only; not yet in RPC-mode CLI)*
+- **Auto-pause circuit breaker**: Optionally halt processing on critical alerts *(embedded mode only; disabled by default due to [slashing risk](docs/competitive-analysis.md#auto-pause-risk))*
 - **Multi-channel alerts**: JSONL, Webhook (Slack/Discord/PagerDuty), WebSocket, Prometheus
 
 ### Autopsy Lab — Post-Hack Forensics
@@ -76,9 +76,9 @@ Replay any mainnet transaction and generate a forensic report:
 GDB-style interactive replay at opcode granularity:
 
 - Forward/backward stepping through execution
-- Breakpoints on opcode, address, or storage slot
+- Breakpoints on program counter (PC)
 - Full state inspection at any point in execution
-- Sub-50ms step navigation
+- Fast step navigation
 
 ---
 
@@ -161,27 +161,15 @@ Argus is running on **Ethereum mainnet** via AWS ECS Fargate (since March 2026).
 
 ## Historical Validation
 
-The following are retroactive analyses of past exploits, demonstrating Argus's detection logic on known attacks.
+The following are **retroactive, hypothetical** analyses of past exploits. Argus was not running at the time of these attacks. These demonstrate what the detection pipeline *would likely* produce on similar patterns. Some signals shown are planned but not yet implemented — see each analysis for details.
 
 **[Retroactive Analysis: $128M Balancer V2 Exploit](docs/analysis-balancer-v2-exploit.md)**
 
-On November 3, 2025, an attacker exploited a rounding error in Balancer V2's `batchSwap` to drain $128M across 6 chains in under 30 minutes. We analyzed this transaction through Argus's detection pipeline:
+$128M drained via rounding error in Balancer V2's `batchSwap` (Nov 2025). Argus's pre-filter would likely flag the unusual gas + ERC-20 transfer count; deep analyzer classifies as price manipulation (82% confidence).
 
-1. **Pre-filter**: Flags the transaction pattern (3M gas + 4.2KB calldata + Balancer Vault interaction)
-2. **Deep Analyzer**: Classifies as price manipulation (82% confidence) after opcode replay
-3. **Autopsy**: Generates a forensic report with fund flow tracing
+**[Retroactive Analysis: $1.4B Bybit Exploit](docs/analysis-bybit-1.4b-exploit.md)**
 
-Read the full analysis: [docs/analysis-balancer-v2-exploit.md](docs/analysis-balancer-v2-exploit.md)
-
-**[Retroactive Analysis: $1.5B Bybit Exploit](docs/analysis-bybit-1.4b-exploit.md)**
-
-On February 21, 2025, North Korea's Lazarus Group executed the largest crypto theft in history — $1.5B drained from Bybit's cold wallet via a supply chain attack on Safe{Wallet}'s front-end.
-
-1. **Pre-filter**: Flags the transaction for unusual DELEGATECALL to an unverified contract
-2. **Deep Analyzer**: Classifies as access control bypass (95% confidence) — proxy implementation overwritten
-3. **Autopsy**: Traces fund flow across 40+ intermediary wallets
-
-Read the full analysis: [docs/analysis-bybit-1.4b-exploit.md](docs/analysis-bybit-1.4b-exploit.md)
+$1.4B drained from Bybit's cold wallet via supply chain attack on Safe{Wallet} (Feb 2025). Argus's pre-filter would likely flag unusual gas pattern from the multisig; deep analyzer identifies proxy implementation overwrite. Full detection of proxy upgrade anomalies requires planned signal additions.
 
 ---
 
@@ -190,14 +178,16 @@ Read the full analysis: [docs/analysis-bybit-1.4b-exploit.md](docs/analysis-bybi
 | | Argus | Forta | Phalcon | Tenderly | Hexagate |
 |---|---|---|---|---|---|
 | Runtime detection | Yes | Yes (bot network) | Yes | Partial (alerts) | Yes |
-| Mempool pre-detection | Yes | Partial* | Yes | Yes | Yes |
+| Mempool pre-detection | Yes* | Partial** | Yes | Yes | Yes |
 | Post-hack forensics | **Yes** | No | No | Partial | No |
 | Open source | **Fully** | Partial | No | No | No |
 | Self-hosted | **Yes** | No (SaaS) | No (SaaS) | No (SaaS) | No (SaaS) |
 | Multi-chain | No | Yes (7+) | Yes | Yes (109) | Yes |
 | Production track record | **82 alerts / ~273K TXs / 11h uptime (Mar 2026~)** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
 
-> \* Forta Firewall provides pre-execution screening for rollups, not L1 mempool monitoring ([details](docs/competitive-analysis.md)).
+> \* Argus mempool monitoring is available in embedded mode only; not yet wired in RPC-mode CLI.
+>
+> \*\* Forta Firewall provides pre-execution screening for rollups, not L1 mempool monitoring ([details](docs/competitive-analysis.md)).
 >
 > Argus is early-stage but running on Ethereum mainnet via AWS ECS Fargate. 82 alerts raised in 11.1 hours (~3,300 blocks, ~273K TXs scanned), zero downtime, $7/month — see [detection report](docs/detection-report.md). No confirmed exploit interceptions yet; all alerts were MEV/arbitrage patterns. Its primary differentiator is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
 
@@ -280,9 +270,9 @@ docker run -d \
   -p 9090:9090 \
   tokamak/argus-demo:latest
 
-# Or build locally
+# Or build and run locally (runs demos by default)
 docker build -t argus-demo .
-docker run argus-demo
+docker run -e ARGUS_RPC_URL="https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY" argus-demo
 ```
 
 ### Configuration
