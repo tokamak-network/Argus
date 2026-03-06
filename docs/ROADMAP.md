@@ -95,7 +95,7 @@ Goal: **Turn "would have detected" into "did detect."**
 
 Goal: **Validate whether an LLM can analyze EVM opcode traces to detect attacks.**
 
-Detailed design: [`PRD/`](../PRD/README.md) (5 documents). PoC results: [`docs/ai-agent-poc-report.md`](ai-agent-poc-report.md)
+Detailed design: see [AI Agent PoC Report](ai-agent-poc-report.md). PoC results: [`docs/ai-agent-poc-report.md`](ai-agent-poc-report.md)
 
 | # | Item | Description | Status |
 |---|------|-------------|--------|

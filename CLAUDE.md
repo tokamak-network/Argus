@@ -100,7 +100,7 @@ docs/                   # Case studies
 | `sentinel` | Yes | Real-time detection pipeline, axum, tokio |
 | `autopsy` | Yes | Forensic analysis, reqwest, sha3 |
 | `cli` | No | Interactive debugger shell, clap, rustyline |
-| `ai_agent` | No | LLM-assisted detection — Phase 1 MVP complete. 2-tier judge, hallucination guard, cost tracker, circuit breaker. See PRD/ and docs/ai-agent-poc-report.md |
+| `ai_agent` | No | LLM-assisted detection — Phase 1 MVP complete. 2-tier judge, hallucination guard, cost tracker, circuit breaker. See [docs/ai-agent-poc-report.md](docs/ai-agent-poc-report.md) |
 
 ## Key Dependencies
 

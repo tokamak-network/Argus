@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `flash_loan_ranges_overlap` tests for improved pre-filter scoring coverage
 - Phase 2 deliverables: replay benchmark, latency bench, mainnet detection report
 - AI Agent Phase 1 MVP: 2-tier LLM pipeline for EVM attack detection (feature: `ai_agent`)
+- MEV bot pattern filtering (`mev_flash_loan_factor`, `mev_selfdestruct_factor`) for false-positive suppression
 - DeFi whitelist engine for false-positive reduction
 - Sentinel dashboard full redesign (Astro + React + Recharts)
 
