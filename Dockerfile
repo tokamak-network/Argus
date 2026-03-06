@@ -1,4 +1,4 @@
-FROM rust:1.85-bookworm AS builder
+FROM rust:1.88-bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config libssl-dev git \
@@ -10,7 +10,7 @@ COPY src/ src/
 COPY examples/ examples/
 
 RUN cargo build --release --examples && \
-    cargo build --release --features cli --bin argus
+    cargo build --release --features "cli,ai_agent" --bin argus
 
 FROM debian:bookworm-slim
 
