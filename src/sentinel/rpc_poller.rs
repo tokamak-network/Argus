@@ -187,10 +187,7 @@ async fn create_shared_client(
 }
 
 /// Fetch the current chain tip to establish the starting point, returning `None` on failure.
-async fn fetch_initial_tip(
-    client: &Arc<EthRpcClient>,
-    running: &Arc<AtomicBool>,
-) -> Option<u64> {
+async fn fetch_initial_tip(client: &Arc<EthRpcClient>, running: &Arc<AtomicBool>) -> Option<u64> {
     let c = Arc::clone(client);
     match tokio::task::spawn_blocking(move || c.eth_block_number()).await {
         Ok(Ok(n)) => Some(n),
@@ -230,9 +227,7 @@ async fn poll_loop(
         // Fetch current chain tip.
         let tip = {
             let client = Arc::clone(&shared_client);
-            match tokio::task::spawn_blocking(move || client.eth_block_number())
-                .await
-            {
+            match tokio::task::spawn_blocking(move || client.eth_block_number()).await {
                 Ok(Ok(n)) => {
                     consecutive_tip_errors = 0;
                     n
@@ -563,21 +558,29 @@ mod tests {
         count += 1; // 5th error, non-retryable
         let retryable = false;
         let should_terminate = !retryable && count >= max;
-        assert!(should_terminate, "non-retryable error at threshold should terminate");
+        assert!(
+            should_terminate,
+            "non-retryable error at threshold should terminate"
+        );
 
         // Scenario 2: all retryable, at threshold → do NOT terminate
         let count: u32 = max;
         let retryable = true;
         let should_terminate = !retryable && count >= max;
-        assert!(!should_terminate, "retryable errors should never trigger termination");
+        assert!(
+            !should_terminate,
+            "retryable errors should never trigger termination"
+        );
 
         // Scenario 3: success resets counter → under threshold
-        let mut count: u32 = max - 1;
-        count = 0; // success resets
-        count += 1; // one more non-retryable
+        // Simulate: had (max-1) errors, then a success resets to 0, then 1 more error
+        let count: u32 = 0_u32.wrapping_add(1); // reset + one more error = 1
         let retryable = false;
         let should_terminate = !retryable && count >= max;
-        assert!(!should_terminate, "counter reset on success prevents termination");
+        assert!(
+            !should_terminate,
+            "counter reset on success prevents termination"
+        );
     }
 
     // --- for_polling constructor (offline) ---
