@@ -62,6 +62,8 @@ dedup_window_blocks = 10
 
 # ---------------------------------------------------------------------------
 # Mempool monitoring (pre-execution scanning)
+# NOTE: Only used in Store mode (ethrex-embedded). Not wired in RPC-mode
+# CLI sentinel. Included for reference; ignored when using `argus sentinel`.
 # ---------------------------------------------------------------------------
 [sentinel.mempool]
 enabled = false
@@ -70,16 +72,19 @@ min_gas = 500000
 
 # ---------------------------------------------------------------------------
 # Auto-pause circuit breaker
-# ---------------------------------------------------------------------------
-[sentinel.auto_pause]
+# NOTE: Only used in Store mode (ethrex-embedded). Not wired in RPC-mode
+# CLI sentinel. Included for reference; ignored when using `argus sentinel`.
 # WARNING: Enabling auto-pause on a validator node risks slashing penalties.
 # Only enable if you understand the implications for your infrastructure.
+# ---------------------------------------------------------------------------
+[sentinel.auto_pause]
 enabled = false
 confidence_threshold = 0.9
 priority_threshold = "Critical"
 
 # ---------------------------------------------------------------------------
 # Adaptive ML pipeline (experimental)
+# NOTE: Not wired in current CLI sentinel path. Placeholder for future use.
 # ---------------------------------------------------------------------------
 [sentinel.pipeline]
 enabled = false

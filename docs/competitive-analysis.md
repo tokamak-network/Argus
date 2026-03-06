@@ -34,7 +34,7 @@ Expanded to 9 comparison dimensions. Includes items unfavorable to Argus.
 | Open-source + self-hosted | **O** | △^4 | X | X | X |
 | Multi-chain support | **X** | O (7+) | O | O (109) | O |
 | Anomaly detection model | Rule-based + Z-score statistics^5 | Neural net (FORTRESS) | ML-based | X | ML-based |
-| **Production track record** | **82 alerts / 20M+ TXs / 11h uptime (2026.03~)**^10 | 270M TXs scanned^6 | 20+ hacks blocked^7 | 1.4M+ simulations^8 | Undisclosed |
+| **Production track record** | **82 alerts / ~273K TXs / 11h uptime (2026.03~)**^10 | 270M TXs scanned^6 | 20+ hacks blocked^7 | 1.4M+ simulations^8 | Undisclosed |
 | **L1 node-embedded integration** | Potential^9 | X | X | X | X |
 
 > ^1 Tenderly provides alerting, but it is not a dedicated attack detection pipeline.

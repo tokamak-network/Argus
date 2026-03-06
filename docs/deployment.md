@@ -165,9 +165,13 @@ aws ec2 create-security-group \
   --group-name argus-sentinel-sg \
   --description "Argus Sentinel ECS"
 
-# Inbound: metrics/health
+# Inbound: metrics/health (restrict to your VPC CIDR or monitoring IP)
 aws ec2 authorize-security-group-ingress \
-  --group-id <SG_ID> --protocol tcp --port 9090 --cidr 0.0.0.0/0
+  --group-id <SG_ID> --protocol tcp --port 9090 --cidr 10.0.0.0/16
+
+# WARNING: Do NOT use 0.0.0.0/0 — the metrics endpoint exposes operational
+# data and has no authentication. Restrict to your VPC CIDR, monitoring
+# subnet, or specific IPs. See SECURITY.md for guidance.
 
 # Outbound: all (RPC calls — default allows all)
 ```

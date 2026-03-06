@@ -5,12 +5,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock ./
 COPY src/ src/
 COPY examples/ examples/
 
-RUN cargo build --release --examples && \
-    cargo build --release --features "cli,ai_agent" --bin argus
+RUN cargo build --release --locked --examples && \
+    cargo build --release --locked --features "cli,ai_agent" --bin argus
 
 FROM debian:bookworm-slim
 

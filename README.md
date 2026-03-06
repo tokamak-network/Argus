@@ -191,11 +191,11 @@ Read the full analysis: [docs/analysis-bybit-1.4b-exploit.md](docs/analysis-bybi
 | Open source | **Fully** | Partial | No | No | No |
 | Self-hosted | **Yes** | No (SaaS) | No (SaaS) | No (SaaS) | No (SaaS) |
 | Multi-chain | No | Yes (7+) | Yes | Yes (109) | Yes |
-| Production track record | **82 alerts / 20M+ TXs / 11h uptime (Mar 2026~)** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
+| Production track record | **82 alerts / ~273K TXs / 11h uptime (Mar 2026~)** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
 
 > \* Forta Firewall provides pre-execution screening for rollups, not L1 mempool monitoring ([details](docs/competitive-analysis.md)).
 >
-> Argus is early-stage but running on Ethereum mainnet via AWS ECS Fargate. 82 alerts raised in 11.1 hours (~100K blocks, ~20M TXs scanned), zero downtime, $7/month — see [detection report](docs/detection-report.md). No confirmed exploit interceptions yet; all alerts were MEV/arbitrage patterns. Its primary differentiator is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
+> Argus is early-stage but running on Ethereum mainnet via AWS ECS Fargate. 82 alerts raised in 11.1 hours (~3,300 blocks, ~273K TXs scanned), zero downtime, $7/month — see [detection report](docs/detection-report.md). No confirmed exploit interceptions yet; all alerts were MEV/arbitrage patterns. Its primary differentiator is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
 
 ---
 
