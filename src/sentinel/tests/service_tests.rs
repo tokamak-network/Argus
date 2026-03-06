@@ -331,7 +331,10 @@ mod reentrancy_sentinel_e2e_tests {
         };
 
         let store = Store::new("", EngineType::InMemory).expect("in-memory store");
-        let config = SentinelConfig::default(); // threshold 0.5
+        let config = SentinelConfig {
+            mev_selfdestruct_factor: 1.0, // disable MEV suppression for e2e heuristic test
+            ..Default::default()
+        };
 
         // Enable prefilter_alert_mode so alerts emit even without deep analysis
         let analysis_config = AnalysisConfig {

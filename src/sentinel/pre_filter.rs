@@ -20,6 +20,16 @@ enum CashFlowResult {
     NotApplicable,
 }
 
+/// Classified MEV bot pattern detected from the reason set.
+enum MevPattern {
+    /// Flash loan arbitrage: KnownProvider + KnownContract + large ERC20 routing.
+    FlashLoanArbitrage,
+    /// MEV bot cleanup: SelfDestruct + HighValueRevert with no flash loan signal.
+    SelfDestructCleanup,
+    /// No recognized MEV pattern.
+    None,
+}
+
 /// Count the number of independent signal categories in the reasons list.
 /// KnownContractInteraction is excluded (it acts as a relevance modifier, not an independent signal).
 fn count_independent_signals(reasons: &[SuspicionReason]) -> usize {
@@ -329,8 +339,16 @@ impl PreFilter {
         let (wl_matches, wl_modifier) = self.whitelist.check_addresses(&involved_addresses);
         let whitelist_match_count = wl_matches.len() as u32;
 
-        // Final score: multiplicative factors + whitelist additive modifier
-        let score = (base_score * relevance_factor * symmetry_factor + wl_modifier).clamp(0.0, 1.0);
+        // Final score: multiplicative factors + whitelist additive modifier + MEV discount
+        let raw_score = base_score * relevance_factor * symmetry_factor + wl_modifier;
+
+        let mev_factor = match Self::detect_mev_pattern(&reasons) {
+            MevPattern::FlashLoanArbitrage => self.config.mev_flash_loan_factor,
+            MevPattern::SelfDestructCleanup => self.config.mev_selfdestruct_factor,
+            MevPattern::None => 1.0,
+        };
+
+        let score = (raw_score * mev_factor).clamp(0.0, 1.0);
 
         // Minimum 2 independent signals gate (generalizes old flash-loan-alone guard)
         if independent_count < self.config.min_independent_signals {
@@ -350,6 +368,47 @@ impl PreFilter {
             priority,
             whitelist_matches: whitelist_match_count,
         })
+    }
+
+    // -----------------------------------------------------------------------
+    // MEV pattern detection
+    // -----------------------------------------------------------------------
+
+    /// Classify known MEV bot patterns from the reason set.
+    ///
+    /// Like a customs officer recognizing frequent-flyer traders vs smugglers:
+    /// MEV bots have distinctive fingerprints (known protocols + many token swaps)
+    /// that distinguish them from actual attacks.
+    fn detect_mev_pattern(reasons: &[SuspicionReason]) -> MevPattern {
+        let has_flash_loan = reasons
+            .iter()
+            .any(|r| matches!(r, SuspicionReason::FlashLoanSignature { .. }));
+        let has_known_contract = reasons
+            .iter()
+            .any(|r| matches!(r, SuspicionReason::KnownContractInteraction { .. }));
+        let has_large_erc20 = reasons
+            .iter()
+            .any(|r| matches!(r, SuspicionReason::MultipleErc20Transfers { .. }));
+        let has_selfdestruct = reasons
+            .iter()
+            .any(|r| matches!(r, SuspicionReason::SelfDestructDetected));
+        let has_high_value_revert = reasons
+            .iter()
+            .any(|r| matches!(r, SuspicionReason::HighValueWithRevert { .. }));
+
+        // MEV flash loan arbitrage: flash loan through known protocol + many token swaps.
+        // Genuine attacks from unknown providers won't have KnownContractInteraction.
+        if has_flash_loan && has_known_contract && has_large_erc20 {
+            return MevPattern::FlashLoanArbitrage;
+        }
+
+        // MEV self-destruct cleanup: contract factory cleanup, no flash loan.
+        // Flash loan + selfdestruct combos are kept (real attack vector).
+        if has_selfdestruct && has_high_value_revert && !has_flash_loan {
+            return MevPattern::SelfDestructCleanup;
+        }
+
+        MevPattern::None
     }
 
     // -----------------------------------------------------------------------

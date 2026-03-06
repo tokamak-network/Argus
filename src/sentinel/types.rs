@@ -26,6 +26,14 @@ pub struct SentinelConfig {
     pub relevance_factor: f64,
     /// Multiplicative discount for symmetric flash loan cash flow (default: 0.5).
     pub symmetry_discount: f64,
+    /// Multiplicative discount for known-protocol flash loan MEV patterns (default: 0.15).
+    /// Applied when FlashLoan + KnownContract + large ERC20 are all present.
+    /// Set to 1.0 to disable.
+    pub mev_flash_loan_factor: f64,
+    /// Multiplicative discount for SelfDestruct + HighValueRevert MEV patterns (default: 0.25).
+    /// Applied when SelfDestruct + HighValueRevert are present without FlashLoan.
+    /// Set to 1.0 to disable.
+    pub mev_selfdestruct_factor: f64,
 }
 
 impl Default for SentinelConfig {
@@ -40,6 +48,8 @@ impl Default for SentinelConfig {
             min_independent_signals: 2,
             relevance_factor: 0.3,
             symmetry_discount: 0.5,
+            mev_flash_loan_factor: 0.15,
+            mev_selfdestruct_factor: 0.25,
         }
     }
 }

@@ -30,6 +30,15 @@ min_erc20_transfers = 5
 # Gas used/limit ratio above which a TX is flagged as unusual [0.0 - 1.0].
 gas_ratio_threshold = 0.95
 
+# MEV bot suppression: multiplicative discount for known MEV patterns.
+# FlashLoan arbitrage: flash loan + known protocol + large ERC20 routing.
+# Set to 1.0 to disable. Lower = more aggressive suppression.
+mev_flash_loan_factor = 0.15
+
+# SelfDestruct cleanup: SelfDestruct + HighValueRevert without flash loan.
+# Set to 1.0 to disable.
+mev_selfdestruct_factor = 0.25
+
 # ---------------------------------------------------------------------------
 # Deep analysis engine (opcode-level replay on flagged TXs)
 # ---------------------------------------------------------------------------

@@ -756,6 +756,8 @@ fn prefilter_benchmark_production_config() {
         min_independent_signals: 2,
         relevance_factor: 0.3,
         symmetry_discount: 0.5,
+        mev_flash_loan_factor: 1.0,
+        mev_selfdestruct_factor: 1.0,
     };
     let filter = PreFilter::new(config);
     let cases = all_cases();
@@ -817,6 +819,8 @@ fn prefilter_benchmark_with_whitelist() {
         min_independent_signals: 2,
         relevance_factor: 0.3,
         symmetry_discount: 0.5,
+        mev_flash_loan_factor: 1.0,
+        mev_selfdestruct_factor: 1.0,
     };
     let wl = WhitelistEngine::new(WhitelistConfig {
         entries: vec![
@@ -883,6 +887,8 @@ fn prefilter_benchmark_diagnostic() {
         min_independent_signals: 2,
         relevance_factor: 0.3,
         symmetry_discount: 0.5,
+        mev_flash_loan_factor: 1.0,
+        mev_selfdestruct_factor: 1.0,
     };
     let filter = PreFilter::new(config);
     let header = make_header(20_000_000);

@@ -475,6 +475,7 @@ fn test_self_destruct_indicators() {
     // H2 (high value revert) + H6 (self-destruct): 2 independent signals → passes gate
     let filter = PreFilter::new(SentinelConfig {
         suspicion_threshold: 0.2,
+        mev_selfdestruct_factor: 1.0, // disable MEV suppression for heuristic test
         ..Default::default()
     });
     // Reverted, high gas (>1M), empty logs, high value

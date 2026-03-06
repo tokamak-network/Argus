@@ -85,6 +85,8 @@ impl SentinelFullConfig {
             min_independent_signals: self.prefilter.min_independent_signals,
             relevance_factor: self.prefilter.relevance_factor,
             symmetry_discount: self.prefilter.symmetry_discount,
+            mev_flash_loan_factor: self.prefilter.mev_flash_loan_factor,
+            mev_selfdestruct_factor: self.prefilter.mev_selfdestruct_factor,
         }
     }
 
@@ -115,6 +117,21 @@ impl SentinelFullConfig {
             return Err(format!(
                 "prefilter.min_value_eth must be non-negative, got {}",
                 self.prefilter.min_value_eth
+            ));
+        }
+        if self.prefilter.mev_flash_loan_factor < 0.0 || self.prefilter.mev_flash_loan_factor > 1.0
+        {
+            return Err(format!(
+                "prefilter.mev_flash_loan_factor must be in [0.0, 1.0], got {}",
+                self.prefilter.mev_flash_loan_factor
+            ));
+        }
+        if self.prefilter.mev_selfdestruct_factor < 0.0
+            || self.prefilter.mev_selfdestruct_factor > 1.0
+        {
+            return Err(format!(
+                "prefilter.mev_selfdestruct_factor must be in [0.0, 1.0], got {}",
+                self.prefilter.mev_selfdestruct_factor
             ));
         }
         if self.analysis.min_alert_confidence < 0.0 || self.analysis.min_alert_confidence > 1.0 {
@@ -193,6 +210,12 @@ pub struct PrefilterConfig {
     pub relevance_factor: f64,
     /// Multiplicative discount for symmetric flash loan cash flow (default: 0.5).
     pub symmetry_discount: f64,
+    /// MEV flash loan pattern discount factor (default: 0.15).
+    /// Applied when FlashLoan + KnownContract + large ERC20 are all present.
+    pub mev_flash_loan_factor: f64,
+    /// MEV self-destruct pattern discount factor (default: 0.25).
+    /// Applied when SelfDestruct + HighValueRevert without FlashLoan.
+    pub mev_selfdestruct_factor: f64,
 }
 
 impl Default for PrefilterConfig {
@@ -206,6 +229,8 @@ impl Default for PrefilterConfig {
             min_independent_signals: 2,
             relevance_factor: 0.3,
             symmetry_discount: 0.5,
+            mev_flash_loan_factor: 0.15,
+            mev_selfdestruct_factor: 0.25,
         }
     }
 }

@@ -108,6 +108,11 @@ pub(super) fn one_eth() -> U256 {
     U256::from(1_000_000_000_000_000_000_u64)
 }
 
+pub(super) fn balancer_vault() -> Address {
+    let bytes = hex::decode("BA12222222228d8Ba445958a75a0704d566BF2C8").unwrap();
+    Address::from_slice(&bytes)
+}
+
 mod alert_tests;
 mod pipeline_tests;
 mod prefilter_benchmark;

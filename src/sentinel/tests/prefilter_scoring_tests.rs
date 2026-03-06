@@ -55,6 +55,7 @@ fn test_combined_flash_loan_plus_transfers() {
     // Need low threshold to verify detection.
     let filter = PreFilter::new(SentinelConfig {
         suspicion_threshold: 0.1,
+        mev_flash_loan_factor: 1.0, // disable MEV suppression for heuristic test
         ..Default::default()
     });
     let header = make_header(19_500_000);
@@ -291,6 +292,7 @@ fn test_two_signals_revert_plus_selfdestruct_passes_gate() {
     // High-value revert (H2) + self-destruct (H6) = 2 independent signals → passes gate
     let filter = PreFilter::new(SentinelConfig {
         suspicion_threshold: 0.2,
+        mev_selfdestruct_factor: 1.0, // disable MEV suppression for heuristic test
         ..Default::default()
     });
     let header = make_header(19_500_000);
@@ -506,7 +508,10 @@ mod reentrancy_prefilter_tests {
 
     #[test]
     fn reentrancy_prefilter_flags_suspicious_receipt() {
-        let filter = PreFilter::default(); // threshold = 0.5
+        let filter = PreFilter::new(SentinelConfig {
+            mev_selfdestruct_factor: 1.0, // disable MEV suppression for heuristic test
+            ..Default::default()
+        });
 
         // Construct a reverted TX with 5 ETH value + 2M gas + no logs.
         // H2 (high value revert): 5 ETH > 1 ETH threshold, reverted, gas=2M > 100k → score 0.3
@@ -551,5 +556,188 @@ mod reentrancy_prefilter_tests {
             "Should have HighValueWithRevert reason"
         );
         assert!(has_self_destruct, "Should have SelfDestructDetected reason");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MEV pattern suppression tests
+// ---------------------------------------------------------------------------
+
+mod mev_pattern_tests {
+    use super::*;
+
+    #[test]
+    fn mev_flash_loan_arbitrage_suppressed() {
+        // Exact fingerprint of Fargate false positives:
+        // FlashLoan(Balancer) + ERC20(22 transfers) + KnownContract + UnusualGas
+        // Base: 0.40 + 0.40 + 0.15 = 0.95
+        // After MEV factor 0.15: 0.95 * 0.15 = 0.1425 → below 0.70
+        let filter = PreFilter::new(SentinelConfig {
+            suspicion_threshold: 0.70,
+            min_erc20_transfers: 20,
+            relevance_factor: 1.0, // worst-case: no relevance dampening
+            mev_flash_loan_factor: 0.15,
+            ..Default::default()
+        });
+        let header = make_header(21_000_000);
+
+        // Balancer Vault flash loan log
+        let balancer_addr = balancer_vault();
+        let flash_topic = H256::from_slice(&{
+            let mut bytes = [0u8; 32];
+            bytes[..4].copy_from_slice(&[0x0d, 0x7d, 0x75, 0xe0]);
+            bytes
+        });
+        let flash_log = make_log(balancer_addr, vec![flash_topic], Bytes::new());
+
+        // 22 ERC-20 transfers
+        let mut logs: Vec<Log> = (0u8..22)
+            .map(|i| make_erc20_transfer_log(random_address(i), random_address(i + 100)))
+            .collect();
+        logs.insert(0, flash_log);
+
+        // Unusual gas: 980k/1M = 0.98 > 0.95
+        let receipt = make_receipt(true, 980_000, logs);
+        let tx = make_tx_call(balancer_addr, U256::zero(), 1_000_000);
+
+        let result = filter.scan_tx(&tx, &receipt, 0, &header);
+        assert!(
+            result.is_none(),
+            "Balancer flash loan MEV must be suppressed below 0.70 threshold"
+        );
+    }
+
+    #[test]
+    fn mev_selfdestruct_cleanup_suppressed() {
+        // Exact fingerprint of SelfDestruct false positives:
+        // HighValueRevert(0.30) + SelfDestruct(0.30) + UnusualGas(0.15) = 0.75
+        // After MEV factor 0.25: 0.75 * 0.25 = 0.1875 → below 0.70
+        let filter = PreFilter::new(SentinelConfig {
+            suspicion_threshold: 0.70,
+            mev_selfdestruct_factor: 0.25,
+            ..Default::default()
+        });
+        let header = make_header(21_000_000);
+
+        // Reverted, high ETH, high gas > 1M, empty logs (self-destruct pattern)
+        let receipt = make_receipt(false, 2_000_000, vec![]);
+        let tx = make_tx_call(random_address(0xCC), one_eth() * 5, 3_000_000);
+
+        let result = filter.scan_tx(&tx, &receipt, 0, &header);
+        assert!(
+            result.is_none(),
+            "SelfDestruct + HighValueRevert without flash loan must be suppressed"
+        );
+    }
+
+    #[test]
+    fn genuine_flash_loan_from_unknown_provider_not_suppressed() {
+        // Flash loan from UNKNOWN provider (not in known_address_db).
+        // No KnownContractInteraction → MEV flash loan filter does NOT fire.
+        let filter = PreFilter::new(SentinelConfig {
+            suspicion_threshold: 0.50,
+            min_erc20_transfers: 5,
+            mev_flash_loan_factor: 0.15,
+            relevance_factor: 1.0, // no relevance dampening
+            ..Default::default()
+        });
+        let header = make_header(21_000_000);
+
+        // Flash loan from unknown provider
+        let unknown_provider = random_address(0xDE);
+        let flash_topic = H256::from_slice(&{
+            let mut bytes = [0u8; 32];
+            bytes[..4].copy_from_slice(&[0x0d, 0x7d, 0x75, 0xe0]); // Balancer-style topic
+            bytes
+        });
+        let flash_log = make_log(unknown_provider, vec![flash_topic], Bytes::new());
+
+        // 8 ERC-20 transfers (above min_erc20_transfers=5)
+        let mut logs = vec![flash_log];
+        for i in 0u8..8 {
+            logs.push(make_erc20_transfer_log(
+                random_address(i),
+                random_address(i + 50),
+            ));
+        }
+
+        let receipt = make_receipt(true, 900_000, logs);
+        let tx = make_tx_call(unknown_provider, U256::zero(), 1_000_000);
+
+        let result = filter.scan_tx(&tx, &receipt, 0, &header);
+        assert!(
+            result.is_some(),
+            "Flash loan from unknown provider must NOT be suppressed by MEV filter"
+        );
+    }
+
+    #[test]
+    fn flash_loan_plus_selfdestruct_not_suppressed() {
+        // Flash loan + SelfDestruct combo = real attack vector.
+        // SelfDestructCleanup requires !has_flash_loan, so this is NOT suppressed.
+        let filter = PreFilter::new(SentinelConfig {
+            suspicion_threshold: 0.50,
+            min_independent_signals: 2,
+            mev_selfdestruct_factor: 0.25,
+            mev_flash_loan_factor: 0.15,
+            relevance_factor: 1.0,
+            ..Default::default()
+        });
+        let header = make_header(21_000_000);
+
+        // Flash loan log from unknown provider
+        let unknown_provider = random_address(0xDE);
+        let flash_topic = H256::from_slice(&{
+            let mut bytes = [0u8; 32];
+            bytes[..4].copy_from_slice(&[0x0d, 0x7d, 0x75, 0xe0]);
+            bytes
+        });
+        let flash_log = make_log(unknown_provider, vec![flash_topic], Bytes::new());
+
+        // Reverted + high value + high gas (triggers H2 + H6) + flash loan (H1)
+        let receipt = make_receipt(false, 2_000_000, vec![flash_log]);
+        let tx = make_tx_call(random_address(0xBB), one_eth() * 3, 3_000_000);
+
+        let result = filter.scan_tx(&tx, &receipt, 0, &header);
+        assert!(
+            result.is_some(),
+            "Flash loan + SelfDestruct combo must NOT be suppressed"
+        );
+    }
+
+    #[test]
+    fn mev_factors_disabled_at_1_0_pass_through() {
+        // With mev_*_factor = 1.0, Balancer MEV passes unchanged
+        let filter = PreFilter::new(SentinelConfig {
+            suspicion_threshold: 0.70,
+            min_erc20_transfers: 20,
+            relevance_factor: 1.0,
+            mev_flash_loan_factor: 1.0,   // disabled
+            mev_selfdestruct_factor: 1.0, // disabled
+            ..Default::default()
+        });
+        let header = make_header(21_000_000);
+
+        let balancer_addr = balancer_vault();
+        let flash_topic = H256::from_slice(&{
+            let mut bytes = [0u8; 32];
+            bytes[..4].copy_from_slice(&[0x0d, 0x7d, 0x75, 0xe0]);
+            bytes
+        });
+        let flash_log = make_log(balancer_addr, vec![flash_topic], Bytes::new());
+
+        let mut logs: Vec<Log> = (0u8..22)
+            .map(|i| make_erc20_transfer_log(random_address(i), random_address(i + 100)))
+            .collect();
+        logs.insert(0, flash_log);
+
+        let receipt = make_receipt(true, 980_000, logs);
+        let tx = make_tx_call(balancer_addr, U256::zero(), 1_000_000);
+
+        let result = filter.scan_tx(&tx, &receipt, 0, &header);
+        assert!(
+            result.is_some(),
+            "With MEV factors disabled (1.0), Balancer flash loan must still be flagged"
+        );
     }
 }

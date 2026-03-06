@@ -201,6 +201,8 @@ fn suspicion_threshold_0_85_boundary_below() {
         min_independent_signals: 2,
         relevance_factor: 0.3,
         symmetry_discount: 0.5,
+        mev_flash_loan_factor: 1.0,
+        mev_selfdestruct_factor: 1.0,
     };
     // revert(0.3) + erc20_3x(0.2) + unusual_gas(0.15) = 0.65, modifier=-0.11 → 0.54 < 0.85
     let wl = WhitelistEngine::new(WhitelistConfig {
@@ -235,6 +237,8 @@ fn suspicion_threshold_0_85_boundary_at_threshold() {
         min_independent_signals: 2,
         relevance_factor: 0.3,
         symmetry_discount: 0.5,
+        mev_flash_loan_factor: 1.0,
+        mev_selfdestruct_factor: 1.0,
     };
     let filter = PreFilter::with_whitelist(config, WhitelistEngine::empty());
 
@@ -362,6 +366,8 @@ fn score_after_modifier_clamped_to_zero() {
         min_independent_signals: 2,
         relevance_factor: 0.3,
         symmetry_discount: 0.5,
+        mev_flash_loan_factor: 1.0,
+        mev_selfdestruct_factor: 1.0,
     };
     let wl = WhitelistEngine::new(WhitelistConfig {
         entries: vec![WhitelistEntry {
@@ -401,6 +407,8 @@ fn score_does_not_exceed_1_0() {
         min_independent_signals: 2,
         relevance_factor: 0.3,
         symmetry_discount: 0.5,
+        mev_flash_loan_factor: 1.0,
+        mev_selfdestruct_factor: 1.0,
     };
     let filter = PreFilter::with_whitelist(config, WhitelistEngine::empty());
 
