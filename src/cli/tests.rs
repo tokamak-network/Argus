@@ -93,3 +93,51 @@ fn test_sentinel_args_all_options() {
     );
     assert_eq!(poll_interval, 5);
 }
+
+// ---------------------------------------------------------------------------
+// parse_tx_hash tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_parse_tx_hash_with_0x_prefix() {
+    let hash = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+    let result = super::parse_tx_hash(hash);
+    assert!(result.is_ok());
+    let h = result.unwrap();
+    assert_eq!(h.as_bytes()[0], 0xab);
+    assert_eq!(h.as_bytes()[31], 0x90);
+}
+
+#[test]
+fn test_parse_tx_hash_without_prefix() {
+    let hash = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+    let result = super::parse_tx_hash(hash);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_parse_tx_hash_odd_length() {
+    let hash = "0xabc"; // 3 hex chars (odd)
+    let result = super::parse_tx_hash(hash);
+    assert!(result.is_err());
+    let err = format!("{}", result.unwrap_err());
+    assert!(err.contains("even length"), "error: {err}");
+}
+
+#[test]
+fn test_parse_tx_hash_invalid_hex() {
+    let hash = "0xGGGGGG1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+    let result = super::parse_tx_hash(hash);
+    assert!(result.is_err());
+    let err = format!("{}", result.unwrap_err());
+    assert!(err.contains("invalid tx hash"), "error: {err}");
+}
+
+#[test]
+fn test_parse_tx_hash_wrong_length() {
+    let hash = "0xabcdef"; // only 3 bytes, not 32
+    let result = super::parse_tx_hash(hash);
+    assert!(result.is_err());
+    let err = format!("{}", result.unwrap_err());
+    assert!(err.contains("32 bytes"), "error: {err}");
+}

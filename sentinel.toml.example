@@ -128,3 +128,25 @@ protocol = "Balancer Vault"
 address = "0xBA12222222228d8Ba445958a75a0704d566BF2C8"
 category = "FlashLoan"
 score_modifier = -0.25
+
+# ---------------------------------------------------------------------------
+# AI Agent (requires `ai_agent` feature flag)
+#
+# 2-tier LLM pipeline: screening model (cheap/fast) escalates to deep model
+# (accurate) when confidence exceeds threshold. Budget controls prevent
+# runaway costs. Enable with `argus sentinel --ai`.
+# ---------------------------------------------------------------------------
+[sentinel.ai]
+enabled = false
+backend = "litellm"
+screening_model = "gemini-3-flash"
+deep_model = "gemini-3-pro"
+is_suspicious_confidence_threshold = 0.6
+monthly_budget_usd = 150.0
+daily_limit_usd = 10.0
+hourly_rate_limit = 100
+max_concurrent_per_block = 3
+request_timeout_secs = 30
+max_retries = 3
+# litellm_api_base = "https://your-litellm-proxy.example.com"
+# litellm_api_key_env = "LITELLM_API_KEY"

@@ -266,7 +266,7 @@ fn make_cli_db(
 
 /// Parse a hex-encoded transaction hash string into an H256.
 #[cfg(feature = "autopsy")]
-fn parse_tx_hash(tx_hash_hex: &str) -> Result<ethrex_common::H256, DebuggerError> {
+pub fn parse_tx_hash(tx_hash_hex: &str) -> Result<ethrex_common::H256, DebuggerError> {
     let hash_hex = tx_hash_hex.strip_prefix("0x").unwrap_or(tx_hash_hex);
     if !hash_hex.len().is_multiple_of(2) {
         return Err(crate::error::RpcError::simple("tx hash hex must have even length").into());
@@ -351,57 +351,67 @@ fn setup_replay(
     };
 
     #[cfg(not(feature = "sentinel"))]
-    let (env, tx) = {
-        let base_fee = block_header.base_fee_per_gas.unwrap_or(0);
-        let effective_gas_price = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
-            let priority = rpc_tx.max_priority_fee_per_gas.unwrap_or(0);
-            std::cmp::min(max_fee, base_fee + priority)
-        } else {
-            rpc_tx.gas_price.unwrap_or(0)
-        };
-        let env = Environment {
-            origin: rpc_tx.from,
-            gas_limit: rpc_tx.gas,
-            block_gas_limit: block_header.gas_limit,
-            block_number: block_header.number.into(),
-            coinbase: block_header.coinbase,
-            timestamp: block_header.timestamp.into(),
-            base_fee_per_gas: U256::from(base_fee),
-            gas_price: U256::from(effective_gas_price),
-            tx_max_fee_per_gas: rpc_tx.max_fee_per_gas.map(U256::from),
-            tx_max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.map(U256::from),
-            tx_nonce: rpc_tx.nonce,
-            ..Default::default()
-        };
-        let tx_to = rpc_tx.to.map(TxKind::Call).unwrap_or(TxKind::Create);
-        let tx_data = Bytes::from(rpc_tx.input.clone());
-        let tx = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
-            Transaction::EIP1559Transaction(EIP1559Transaction {
-                to: tx_to,
-                data: tx_data,
-                value: rpc_tx.value,
-                nonce: rpc_tx.nonce,
-                gas_limit: rpc_tx.gas,
-                max_fee_per_gas: max_fee,
-                max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.unwrap_or(0),
-                ..Default::default()
-            })
-        } else {
-            Transaction::LegacyTransaction(LegacyTransaction {
-                to: tx_to,
-                data: tx_data,
-                value: rpc_tx.value,
-                nonce: rpc_tx.nonce,
-                gas: rpc_tx.gas,
-                gas_price: U256::from(rpc_tx.gas_price.unwrap_or(0)),
-                ..Default::default()
-            })
-        };
-        (env, tx)
-    };
+    let (env, tx) = build_env_and_tx_fallback(rpc_tx, &block_header)?;
 
     let db = GeneralizedDatabase::new(Arc::new(remote_db));
     Ok((db, env, tx, pre_block))
+}
+
+/// Build EVM `Environment` and `Transaction` from RPC types without the sentinel feature.
+///
+/// This is the fallback path used when `sentinel::rpc_types` is unavailable.
+/// Extracted from `setup_replay` to keep the cfg-gated block small.
+#[cfg(all(feature = "autopsy", not(feature = "sentinel")))]
+fn build_env_and_tx_fallback(
+    rpc_tx: &crate::autopsy::rpc_client::RpcTransaction,
+    block_header: &crate::autopsy::rpc_client::RpcBlockHeader,
+) -> Result<(Environment, Transaction), DebuggerError> {
+    let base_fee = block_header.base_fee_per_gas.unwrap_or(0);
+    let effective_gas_price = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
+        let priority = rpc_tx.max_priority_fee_per_gas.unwrap_or(0);
+        std::cmp::min(max_fee, base_fee + priority)
+    } else {
+        rpc_tx.gas_price.unwrap_or(0)
+    };
+    let env = Environment {
+        origin: rpc_tx.from,
+        gas_limit: rpc_tx.gas,
+        block_gas_limit: block_header.gas_limit,
+        block_number: block_header.number.into(),
+        coinbase: block_header.coinbase,
+        timestamp: block_header.timestamp.into(),
+        base_fee_per_gas: U256::from(base_fee),
+        gas_price: U256::from(effective_gas_price),
+        tx_max_fee_per_gas: rpc_tx.max_fee_per_gas.map(U256::from),
+        tx_max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.map(U256::from),
+        tx_nonce: rpc_tx.nonce,
+        ..Default::default()
+    };
+    let tx_to = rpc_tx.to.map(TxKind::Call).unwrap_or(TxKind::Create);
+    let tx_data = Bytes::from(rpc_tx.input.clone());
+    let tx = if let Some(max_fee) = rpc_tx.max_fee_per_gas {
+        Transaction::EIP1559Transaction(EIP1559Transaction {
+            to: tx_to,
+            data: tx_data,
+            value: rpc_tx.value,
+            nonce: rpc_tx.nonce,
+            gas_limit: rpc_tx.gas,
+            max_fee_per_gas: max_fee,
+            max_priority_fee_per_gas: rpc_tx.max_priority_fee_per_gas.unwrap_or(0),
+            ..Default::default()
+        })
+    } else {
+        Transaction::LegacyTransaction(LegacyTransaction {
+            to: tx_to,
+            data: tx_data,
+            value: rpc_tx.value,
+            nonce: rpc_tx.nonce,
+            gas: rpc_tx.gas,
+            gas_price: U256::from(rpc_tx.gas_price.unwrap_or(0)),
+            ..Default::default()
+        })
+    };
+    Ok((env, tx))
 }
 
 /// Parameters for post-replay analysis and report generation.

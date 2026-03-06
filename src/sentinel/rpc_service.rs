@@ -18,7 +18,7 @@ use super::metrics::SentinelMetrics;
 use super::pre_filter::PreFilter;
 use super::rpc_poller::{RpcBlockPoller, RpcPollerConfig};
 use super::rpc_replay::replay_tx_from_rpc;
-use super::rpc_types::{rpc_block_to_ethrex, rpc_receipt_to_ethrex};
+use super::rpc_types::{rpc_block_to_ethrex, rpc_receipt_to_ethrex, rpc_receipt_to_ethrex_typed};
 use super::types::{
     AlertPriority, AnalysisConfig, SentinelAlert, SentinelConfig, SuspicionReason, SuspiciousTx,
 };
@@ -225,7 +225,17 @@ async fn process_rpc_block(
             return;
         }
     };
-    let ethrex_receipts: Vec<_> = rpc_receipts.iter().map(rpc_receipt_to_ethrex).collect();
+    let ethrex_receipts: Vec<_> = rpc_receipts
+        .iter()
+        .enumerate()
+        .map(|(i, receipt)| {
+            rpc_block
+                .transactions
+                .get(i)
+                .map(|tx| rpc_receipt_to_ethrex_typed(receipt, tx))
+                .unwrap_or_else(|| rpc_receipt_to_ethrex(receipt))
+        })
+        .collect();
 
     metrics.increment_blocks_scanned();
     metrics.increment_txs_scanned(ethrex_block.body.transactions.len() as u64);

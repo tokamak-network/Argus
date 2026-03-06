@@ -247,7 +247,8 @@ fn format_u256_eth(wei: ethrex_common::U256) -> String {
     if remainder.is_zero() {
         format!("{eth_u256} ETH")
     } else {
-        format!("{eth_u256}.x ETH")
+        let fraction = (remainder * U256::from(100) / U256::from(10u64.pow(18))).as_u64();
+        format!("{eth_u256}.{fraction:02} ETH")
     }
 }
 

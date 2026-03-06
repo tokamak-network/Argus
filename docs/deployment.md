@@ -198,7 +198,7 @@ Task definition (`task-def.json`):
       "image": "<ACCOUNT_ID>.dkr.ecr.ap-northeast-2.amazonaws.com/argus:v0.1.3",
       "essential": true,
       "command": [
-        "printf '[sentinel]\\nenabled = true\\n\\n[sentinel.prefilter]\\nsuspicion_threshold = 0.7\\nmin_value_eth = 1.0\\nmin_erc20_transfers = 20\\ngas_ratio_threshold = 0.98\\n\\n[sentinel.analysis]\\nmax_steps = 500000\\nmin_alert_confidence = 0.6\\nprefilter_alert_mode = false\\n\\n[sentinel.alert]\\nrate_limit_per_minute = 10\\ndedup_window_blocks = 5\\n' > /tmp/sentinel.toml && exec argus sentinel --rpc \"$ARGUS_RPC_URL\" --metrics-port \"$ARGUS_METRICS_PORT\" --config /tmp/sentinel.toml"
+        "printf '[sentinel]\\nenabled = true\\n\\n[sentinel.prefilter]\\nsuspicion_threshold = 0.7\\nmin_value_eth = 1.0\\nmin_erc20_transfers = 20\\ngas_ratio_threshold = 0.98\\n\\n[sentinel.analysis]\\nmax_steps = 500000\\nmin_alert_confidence = 0.6\\nprefilter_alert_mode = false\\n\\n[sentinel.alert]\\nrate_limit_per_minute = 10\\ndedup_window_blocks = 5\\n\\n[sentinel.ai]\\nenabled = false\\n' > /tmp/sentinel.toml && exec argus sentinel --rpc \"$ARGUS_RPC_URL\" --metrics-port \"$ARGUS_METRICS_PORT\" --config /tmp/sentinel.toml"
       ],
       "portMappings": [{ "containerPort": 9090, "protocol": "tcp" }],
       "secrets": [
