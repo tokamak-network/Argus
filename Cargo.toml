@@ -7,6 +7,9 @@ description = "Real-time Ethereum attack detection and post-hack forensics toolk
 repository = "https://github.com/tokamak-network/Argus"
 keywords = ["ethereum", "security", "attack-detection", "forensics", "evm"]
 categories = ["cryptography::cryptocurrencies", "command-line-utilities"]
+readme = "README.md"
+homepage = "https://github.com/tokamak-network/Argus"
+documentation = "https://docs.rs/argus"
 
 [features]
 default = ["sentinel", "autopsy"]

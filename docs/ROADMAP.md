@@ -1,158 +1,158 @@
 # Argus Roadmap
 
-**[Architecture Diagram](argus-architecture.html)** — 모듈별 파일 매핑이 포함된 인터랙티브 아키텍처 맵
+**[Architecture Diagram](argus-architecture.html)** — Interactive architecture map with per-module file mapping
 
-## 현실 진단
+## Honest Assessment
 
-Argus의 코드 품질은 높지만, 외부 경쟁력에는 구조적 문제가 있다.
+Argus has strong code quality, but faces structural problems in external competitiveness.
 
-| 문제 | 심각도 | 요약 |
-|------|--------|------|
-| ethrex 의존성 | **치명적** | ethrex 클라이언트 시장 점유율 ~0%. "L1 노드 통합" 강점이 발현될 곳이 없음 |
-| 프로덕션 검증 0건 | **치명적** | 모든 케이스 스터디가 가정법("would have"). 실제 탐지 실적 0건 |
-| 1인 개발 체제 | **높음** | 외부 기여자 0, 이슈 0, 커뮤니티 채널 없음. 버스 팩터(Bus Factor) = 1 |
-| 진입 장벽 | **높음** | Rust 1.85+ 빌드 필수. 5분 안에 실제 결과를 볼 수 없음 |
-| 올인원 리스크 | **중간** | 3개 모듈 모두 전문 경쟁자 대비 열위. Sentinel에 집중 필요 |
-
----
-
-## Phase 0: 기반 정비 (즉시 ~ 2주)
-
-목표: **"5분 안에 실제 결과를 볼 수 있는 경로"를 만든다.**
-
-| # | 항목 | 상태 |
-|---|------|------|
-| 0-1 | Docker Hub 이미지 퍼블리시 (`docker run tokamak/argus-demo`) | GitHub Secrets 등록 대기 |
-| 0-2 | CONTRIBUTING.md 작성 | 완료 |
-| 0-3 | GitHub Discussions 활성화 | 미착수 |
-| 0-4 | 실제 메인넷 해킹 TX 3-5건을 test fixtures로 추가 | 미착수 |
-| 0-5 | `good first issue` 라벨로 외부 기여 가능 이슈 5개 생성 | 미착수 |
-| 0-6 | 과거 해킹 TX 1-2건 리플레이 스모크 테스트 — 파이프라인 작동 확인 수준 | 미착수 |
+| Problem | Severity | Summary |
+|---------|----------|---------|
+| ethrex dependency | **Critical** | ethrex client market share ~0%. The "L1 node integration" advantage has nowhere to materialize |
+| Zero production detection record | **Critical** | Every case study uses the subjunctive ("would have"). Zero actual detections |
+| Single-developer project | **High** | Zero external contributors, zero issues, no community channels. Bus Factor = 1 |
+| High barrier to entry | **High** | Requires Rust 1.85+ build environment. Cannot see real results within 5 minutes |
+| All-in-one risk | **Medium** | All three modules are weaker than specialized competitors. Need to focus on Sentinel |
 
 ---
 
-## Phase 1: ethrex 탈피 — RPC 독립 + Reth ExEx (Q2 2026)
+## Phase 0: Foundation (Immediate — 2 weeks)
 
-목표: **ethrex 없이도 Argus를 사용할 수 있게 하고, Reth 생태계 진입을 준비한다.**
+Goal: **Create a path to "see real results within 5 minutes."**
 
-현재 Argus는 ethrex LEVM 위에서만 동작한다. ethrex의 시장 점유율이 ~0%인 상황에서 이것은 치명적 제약이다.
+| # | Item | Status |
+|---|------|--------|
+| 0-1 | Publish Docker Hub image (`docker run tokamak/argus-demo`) | Waiting for GitHub Secrets registration |
+| 0-2 | Write CONTRIBUTING.md | Done |
+| 0-3 | Enable GitHub Discussions | Not started |
+| 0-4 | Add 3–5 real mainnet hack TXs as test fixtures | Not started |
+| 0-5 | Create 5 issues with `good first issue` label for external contributors | Not started |
+| 0-6 | Smoke test: replay 1–2 historical hack TXs — pipeline sanity check level | Not started |
 
-### 해결 방안 — 두 트랙 순차 진행 (기여자 합류 시 병렬 전환)
+---
+
+## Phase 1: Breaking Free from ethrex — RPC Independence + Reth ExEx (Q2 2026)
+
+Goal: **Make Argus usable without ethrex and prepare to enter the Reth ecosystem.**
+
+Argus currently runs only on top of ethrex LEVM. With ethrex's market share at ~0%, this is a critical constraint.
+
+### Solution — Two Sequential Tracks (Parallelize if Contributors Join)
 
 ```
-현재: Argus → ethrex LEVM (내장) → 블록 분석
+Current:  Argus → ethrex LEVM (embedded) → Block analysis
 
-트랙 A: Argus → RPC 엔드포인트 (외부) → 블록 분석  ← 1급 시민으로 승격
-트랙 B: Argus → Reth ExEx (플러그인) → 블록 분석    ← PoC 병렬 진행
+Track A:  Argus → RPC endpoint (external) → Block analysis  ← Promote to first-class citizen
+Track B:  Argus → Reth ExEx (plugin)     → Block analysis  ← Parallel PoC
 
-유지:  Argus → ethrex LEVM (내장) → 블록 분석       ← 최적 성능 경로로 유지
+Keep:     Argus → ethrex LEVM (embedded) → Block analysis  ← Retain as optimal performance path
 ```
 
-| # | 항목 | 설명 | 우선순위 |
-|---|------|------|----------|
-| 1-1 | **RPC 기반 Sentinel 모드** | 임의의 Ethereum RPC 엔드포인트에 연결하여 새 블록을 폴링, 각 TX를 pre-filter + deep analysis. ethrex 불필요 | **1순위** — 사용자 기반 확대의 전제 조건 |
-| 1-2 | **Autopsy CLI 개선** | `argus autopsy --tx 0x... --rpc https://eth.llamarpc.com` 한 줄로 메인넷 TX 포렌식 분석. 이미 RPC 클라이언트 존재하므로 CLI 개선만 필요 | 높음 |
-| 1-3 | **Reth ExEx PoC** | Reth의 Execution Extensions으로 Sentinel을 통합할 수 있는지 PoC. Reth 시장 점유율 성장 중이며, "노드 내장" 비전을 현실화할 가장 유망한 경로 | **2순위** — 1-1 완료 후 착수, 또는 외부 기여자 합류 시 병렬 가능 |
+| # | Item | Description | Priority |
+|---|------|-------------|----------|
+| 1-1 | **RPC-based Sentinel mode** | Connect to any Ethereum RPC endpoint, poll new blocks, run pre-filter + deep analysis on each TX. No ethrex required | **#1** — Prerequisite for expanding the user base |
+| 1-2 | **Autopsy CLI improvements** | One-line mainnet TX forensic analysis with `argus autopsy --tx 0x... --rpc https://eth.llamarpc.com`. RPC client already exists; only CLI improvements needed | High |
+| 1-3 | **Reth ExEx PoC** | PoC to determine if Sentinel can be integrated via Reth's Execution Extensions. Reth's market share is growing, making this the most promising path to realize the "node-embedded" vision | **#2** — Start after 1-1 is complete, or parallelize if external contributors join |
 
-### 왜 Reth ExEx를 "장기 검토"에서 승격했는가
+### Why Reth ExEx Was Promoted from "Long-term Consideration"
 
-- ethrex에 계속 종속되면 TAM(Total Addressable Market)이 0에 수렴한다
-- Reth는 Rust 기반 Ethereum 클라이언트 중 가장 빠르게 성장 중이다
-- ExEx를 통한 보안 플러그인은 Argus의 "노드 내장" 비전을 실현할 수 있는 가장 현실적인 경로다
-- PoC 수준이라면 리소스 부담이 크지 않다
+- Staying locked to ethrex means TAM (Total Addressable Market) converges to 0
+- Reth is the fastest-growing Rust-based Ethereum client
+- Security plugins via ExEx are the most realistic path to realize Argus's "node-embedded" vision
+- At PoC level, the resource burden is manageable
 
-### 완료 기준
+### Completion Criteria
 
-**트랙 A (RPC 모드)** — Phase 1의 핵심 마일스톤:
-- **모든 Ethereum 노드 운영자**가 Argus를 사용할 수 있다 (ethrex 한정 → 전체 생태계)
-- Alchemy/Infura 같은 RPC 프로바이더 사용자도 대상이 된다
-- `docker run tokamak/argus --rpc https://...` 한 줄로 시작 가능
+**Track A (RPC mode)** — Core milestone of Phase 1:
+- **All Ethereum node operators** can use Argus (from ethrex-only → entire ecosystem)
+- Users of RPC providers like Alchemy/Infura also become target users
+- Start with a single line: `docker run tokamak/argus-demo --rpc https://...`
 
-**트랙 B (Reth ExEx PoC)** — 트랙 A 완료 후 또는 기여자 합류 시:
-- Reth ExEx로 Sentinel pre-filter가 작동하는 최소 데모 완성
-- "Reth 노드에서 Argus 보안 레이어를 활성화할 수 있다"를 한 문장으로 증명
-
----
-
-## Phase 2: 프로덕션 실적 축적 (Q2-Q3 2026)
-
-목표: **"would have detected"를 "did detect"로 바꾼다.**
-
-| # | 항목 | 설명 |
-|---|------|------|
-| 2-1 | **메인넷 14일 연속 운영** | AWS ECS Fargate에서 RPC 모드 Sentinel을 메인넷에 연결, 14일간 구동. 스캔 블록 수, 의심 TX 수, 탐지 결과 기록. [배포 가이드](deployment.md) 참조 |
-| 2-2 | **탐지 실적 문서화** | "2026년 Q2, 메인넷에서 X개 블록 스캔, Y건 의심 TX 탐지, Z건 확인" — 첫 실적 보고서 |
-| 2-3 | **과거 해킹 TX 체계적 리플레이 검증** | Balancer, Bybit, Euler 등 5건 이상의 유명 해킹 TX를 Autopsy에서 실행, 정량 결과(탐지율, 신뢰도, 지연 시간)를 보고서로 작성. Phase 0-6 스모크 테스트와 달리 체계적 벤치마크 |
-| 2-4 | **지연 벤치마크(Latency Benchmark)** | Pre-filter μs/tx, Deep Analyzer ms/tx 수치 측정 및 공개 |
-
-### 성공 기준
-
-- "Argus detected X suspicious transactions on Ethereum mainnet over 14 days" — 이 한 문장을 README에 쓸 수 있으면 Phase 2 완료
+**Track B (Reth ExEx PoC)** — After Track A completion, or when contributors join:
+- Minimal demo showing Sentinel pre-filter running via Reth ExEx
+- Prove in one sentence: "You can enable the Argus security layer on a Reth node"
 
 ---
 
-## Phase AI-0: LLM 통합 PoC 검증 — PASS (2026-03-05 완료)
+## Phase 2: Building Production Track Record (Q2–Q3 2026)
 
-목표: **LLM이 EVM opcode trace를 분석하여 공격을 탐지할 수 있는지 검증한다.**
+Goal: **Turn "would have detected" into "did detect."**
 
-상세 설계: [`PRD/`](../PRD/README.md) 참조 (5개 문서). PoC 결과: [`docs/ai-agent-poc-report.md`](ai-agent-poc-report.md)
+| # | Item | Description |
+|---|------|-------------|
+| 2-1 | **14-day continuous mainnet operation** | Run RPC-mode Sentinel on Ethereum mainnet via AWS ECS Fargate for 14 days. Record blocks scanned, suspicious TXs flagged, and detection results. See [deployment guide](deployment.md) |
+| 2-2 | **Document detection results** | "In Q2 2026, scanned X blocks on mainnet, flagged Y suspicious TXs, confirmed Z detections" — the first production track record report |
+| 2-3 | **Systematic replay verification of historical hacks** | Run 5+ major hack TXs (Balancer, Bybit, Euler, etc.) through Autopsy, produce a report with quantitative results (detection rate, confidence, latency). Unlike Phase 0-6 smoke tests, this is a systematic benchmark |
+| 2-4 | **Latency benchmark** | Measure and publish Pre-filter μs/tx and Deep Analyzer ms/tx |
 
-| # | 항목 | 설명 | 상태 |
-|---|------|------|------|
-| AI-0-1 | **StepRecord→AgentContext 매핑 분석** | ethrex LEVM StepRecord가 call_graph, storage_mutations 등을 제공하는지 검증 | ✅ 완료 |
-| AI-0-2 | **Fixture 변환** | 공격 TX 3개 + 정상 TX 10개 → AgentContext JSON (13개) | ✅ 완료 |
-| AI-0-3 | **LiteLLM (Gemini) 정확도 측정** | 13개 fixture로 gemini-3-flash/pro 판별 정확도 **100%** 달성 (목표 80%) | ✅ 완료 |
-| AI-0-4 | **SDK 호환성 검증** | anthropic-sdk-rust 부적합 → LiteLLM proxy (OpenAI-compatible) 채택 | ✅ 완료 |
-| AI-0-5 | **비용 시뮬레이션** | $0.009-0.016/req, 월 $67-250 (캐시율 의존). $150 예산 내 운영 가능 | ✅ 완료 |
+### Success Criteria
 
-**전제 조건:** `rpc_service.rs` detected_patterns 버그 ✅ 수정 완료
-
-**결과:** 정확도 100% (13/13) — Phase AI-1 MVP 착수 승인
-
-Phase AI-1 ✅ 완료 (2026-03-05) → AI-2 (최적화, 2-3주) → AI-3 (고도화, 3-4주)
+- "Argus detected X suspicious transactions on Ethereum mainnet over 14 days" — Phase 2 is complete when this sentence can be written in the README
 
 ---
 
-## Phase AI-1: MVP 구현 — 완료 (2026-03-05)
+## Phase AI-0: LLM Integration PoC Validation — PASS (Completed 2026-03-05)
 
-목표: **ContextExtractor + 2-tier AI Judge + Hallucination Guard + 비용 제어 + Sentinel 통합**
+Goal: **Validate whether an LLM can analyze EVM opcode traces to detect attacks.**
 
-| # | 항목 | 설명 | 상태 |
-|---|------|------|------|
-| AI-1-1 | **CostTracker + CircuitBreaker + Config** | JSON 영속화, 일/월 리셋, 회로차단기, TOML 설정 | ✅ 완료 |
-| AI-1-2 | **ContextExtractor** | StepRecord[] → AgentContext (call_graph, storage_mutations, logs, transfers) | ✅ 완료 |
-| AI-1-3 | **AiJudge 2-tier + HallucinationGuard** | screening(gemini-3-flash) → escalation → deep(gemini-3-pro) + 증거 검증 | ✅ 완료 |
-| AI-1-4 | **Sentinel Pipeline 통합** | rpc_service.rs에 AI judge 비동기 통합, SentinelAlert.agent_verdict 필드 | ✅ 완료 |
+Detailed design: [`PRD/`](../PRD/README.md) (5 documents). PoC results: [`docs/ai-agent-poc-report.md`](ai-agent-poc-report.md)
 
-**산출물:** 18개 신규 파일, ~6,500 LoC, 145 신규 테스트 (총 767 pass + 27 ignored)
+| # | Item | Description | Status |
+|---|------|-------------|--------|
+| AI-0-1 | **StepRecord→AgentContext mapping analysis** | Verify that ethrex LEVM StepRecord provides call_graph, storage_mutations, etc. | Completed |
+| AI-0-2 | **Fixture conversion** | 3 attack TXs + 10 benign TXs → AgentContext JSON (13 total) | Completed |
+| AI-0-3 | **LiteLLM (Gemini) accuracy measurement** | Achieved **100%** classification accuracy on 13 fixtures with gemini-3-flash/pro (target was 80%) | Completed |
+| AI-0-4 | **SDK compatibility verification** | anthropic-sdk-rust found unsuitable → Adopted LiteLLM proxy (OpenAI-compatible) | Completed |
+| AI-0-5 | **Cost simulation** | $0.009–0.016/req, $67–250/month (cache-rate dependent). Operable within $150 budget | Completed |
 
-**알려진 제한:** input_selector = None (Phase 2에서 recorder.rs calldata 캡처 추가 예정), CREATE deployed = Address::zero()
+**Prerequisite:** `rpc_service.rs` detected_patterns bug — Fixed
 
----
+**Result:** 100% accuracy (13/13) — Phase AI-1 MVP approved
 
-## Phase 3: 채택 확대 (Q3-Q4 2026)
-
-목표: **첫 번째 외부 사용자를 확보한다.**
-
-| # | 항목 | 설명 |
-|---|------|------|
-| 3-1 | **crates.io 퍼블리시** | `cargo install argus`로 설치 가능 |
-| 3-2 | **Reth ExEx 통합** (Phase 1-3 PoC 결과에 따라) | Reth 사용자가 플러그인으로 Sentinel 활성화 |
-| 3-3 | **Sentinel에 집중** | 3개 모듈 중 가장 차별화된 Sentinel에 리소스 집중. "올인원"보다 "Ethereum L1에 특화된 오픈소스 런타임 보안 도구" 포지셔닝 |
-| 3-4 | **커뮤니티 성장** | Discord/Telegram 개설, 정기 보안 분석 콘텐츠 발행 |
+Phase AI-1 completed (2026-03-05) → AI-2 (optimization, 2–3 weeks) → AI-3 (advanced features, 3–4 weeks)
 
 ---
 
-## 전략 전환 요약
+## Phase AI-1: MVP Implementation — Completed (2026-03-05)
 
-| 기존 방향 | 전환 방향 |
-|-----------|----------|
-| GitHub 스타 최적화 (마케팅) | 프로덕션 실적 최적화 (제품) |
-| ethrex 전용 | RPC 독립 모드 1급 시민 + Reth ExEx 병렬 |
-| 올인원 (3모듈 동시) | Sentinel 집중, 나머지는 보조 |
-| 합성 데모 | 실제 메인넷/테스트넷 데이터 |
-| 케이스 스터디 (가정법) | 탐지 실적 보고서 (사실) |
-| "써보려면 Rust 빌드" | "docker run 한 줄" |
-| "L1 노드에서 차단" (검증 안 됨) | "오픈소스 셀프호스팅 런타임 보안" (검증 가능) |
-| Reth ExEx 장기 검토 | Reth ExEx PoC Phase 1 순차 (기여자 합류 시 병렬) |
-| 소규모 팀 = 중간 리스크 | 1인 체제 = 높은 리스크. 즉시 해소 시작 |
+Goal: **ContextExtractor + 2-tier AI Judge + Hallucination Guard + Cost Control + Sentinel Integration**
+
+| # | Item | Description | Status |
+|---|------|-------------|--------|
+| AI-1-1 | **CostTracker + CircuitBreaker + Config** | JSON persistence, daily/monthly reset, circuit breaker, TOML configuration | Completed |
+| AI-1-2 | **ContextExtractor** | StepRecord[] → AgentContext (call_graph, storage_mutations, logs, transfers) | Completed |
+| AI-1-3 | **AiJudge 2-tier + HallucinationGuard** | screening (gemini-3-flash) → escalation → deep (gemini-3-pro) + evidence verification | Completed |
+| AI-1-4 | **Sentinel Pipeline integration** | Async AI judge integration in rpc_service.rs, SentinelAlert.agent_verdict field | Completed |
+
+**Deliverables:** 18 new files, ~6,500 LoC, 145 new tests (total 767 pass + 27 ignored)
+
+**Known limitations:** input_selector = None (Phase 2 will add calldata capture in recorder.rs), CREATE deployed = Address::zero()
+
+---
+
+## Phase 3: Adoption Growth (Q3–Q4 2026)
+
+Goal: **Acquire the first external user.**
+
+| # | Item | Description |
+|---|------|-------------|
+| 3-1 | **Publish to crates.io** | Install with `cargo install argus` |
+| 3-2 | **Reth ExEx integration** (depending on Phase 1-3 PoC results) | Reth users can activate Sentinel as a plugin |
+| 3-3 | **Focus on Sentinel** | Concentrate resources on Sentinel, the most differentiated of the three modules. Position as "an open-source runtime security tool specialized for Ethereum L1" rather than "all-in-one" |
+| 3-4 | **Community growth** | Launch Discord/Telegram, publish regular security analysis content |
+
+---
+
+## Strategic Pivot Summary
+
+| Previous Direction | New Direction |
+|--------------------|---------------|
+| Optimize for GitHub stars (marketing) | Optimize for production track record (product) |
+| ethrex-only | RPC-independent mode as first-class citizen + parallel Reth ExEx |
+| All-in-one (3 modules simultaneously) | Focus on Sentinel; others become auxiliary |
+| Synthetic demos | Real mainnet/testnet data |
+| Case studies (subjunctive) | Detection track record reports (factual) |
+| "Need to build Rust to try it" | "One-line docker run" |
+| "Block propagation at L1 node" (unverified) | "Open-source self-hosted runtime security" (verifiable) |
+| Reth ExEx as long-term consideration | Reth ExEx PoC in Phase 1, sequential (parallel if contributors join) |
+| Small team = medium risk | Single developer = high risk. Begin addressing immediately |

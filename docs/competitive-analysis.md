@@ -1,197 +1,197 @@
-# Argus 경쟁 분석 및 포지셔닝 전략 — 실시간 EVM 보안 시장
+# Argus Competitive Analysis & Positioning Strategy — Real-Time EVM Security Market
 
-## 요약
+## Summary
 
-Argus는 오픈소스(Open Source) + 셀프호스팅(Self-Hosted) + 옵코드(Opcode) 수준 분석이라는 차별점을 가진다. 그러나 **프로덕션 검증 실적 0건, ethrex 클라이언트 종속(시장 점유율 ~0%), 1인 개발 체제**라는 구조적 약점이 존재한다. 상용 경쟁 서비스(Forta, Phalcon, Hexagate)는 이미 수억 건의 트랜잭션 스캔과 실제 해킹 차단 실적을 보유하고 있다.
+Argus is differentiated by being open-source + self-hosted + opcode-level analysis. However, it has structural weaknesses: **zero production detection record, ethrex client dependency (market share ~0%), and a single-developer project**. Commercial competitors (Forta, Phalcon, Hexagate) already have hundreds of millions of transactions scanned and real hack prevention track records.
 
-이 문서는 경쟁 환경을 **있는 그대로** 비교하고, Argus가 실질적 경쟁력을 확보하기 위해 해결해야 할 과제를 제시한다.
-
----
-
-## 비교 대상 선정 기준
-
-**실시간 런타임 보안**에 특화된 도구 4개를 선정했다. 정적 분석 도구(Slither, Mythril)와 감사 전문 업체(CertiK, Halborn)는 Argus와 카테고리가 다르므로 제외한다. OpenZeppelin Defender는 [2026년 7월 종료 예정](https://www.openzeppelin.com/news/doubling-down-on-open-source-and-phasing-out-defender)이므로 비교 대상에서 제외한다.
-
-| 서비스 | 한 줄 소개 |
-|--------|-----------|
-| **[Forta](https://forta.org)** | 탈중앙 봇 네트워크 기반 실시간 위협 탐지. FORT 토큰 이코노미. |
-| **[BlockSec Phalcon](https://blocksec.com/phalcon)** | 멤풀(Mempool) 모니터링 + 자동 대응 SaaS. 실전 해킹 차단 실적 보유. |
-| **[Tenderly](https://tenderly.co)** | 트랜잭션 시뮬레이션 + 디버깅 + 알림. 109개 체인 지원. |
-| **[Hexagate (Chainalysis)](https://www.chainalysis.com/product/hexagate/)** | 실시간 시뮬레이션 기반 위협 탐지 + 자동 차단. Chainalysis에 인수됨. |
+This document compares the competitive landscape **as it is** and lays out the challenges Argus must address to achieve real competitiveness.
 
 ---
 
-## 핵심 비교표
+## Selection Criteria for Comparison
 
-비교 항목을 9개로 확대했다. Argus에 불리한 항목도 포함한다.
+Four tools specializing in **real-time runtime security** were selected. Static analysis tools (Slither, Mythril) and audit firms (CertiK, Halborn) are excluded as they belong to a different category than Argus. OpenZeppelin Defender is excluded because it is [scheduled to shut down in July 2026](https://www.openzeppelin.com/news/doubling-down-on-open-source-and-phasing-out-defender).
+
+| Service | One-line Description |
+|---------|---------------------|
+| **[Forta](https://forta.org)** | Real-time threat detection via a decentralized bot network. FORT token economy. |
+| **[BlockSec Phalcon](https://blocksec.com/phalcon)** | Mempool monitoring + automated response SaaS. Has real hack prevention track record. |
+| **[Tenderly](https://tenderly.co)** | Transaction simulation + debugging + alerts. Supports 109 chains. |
+| **[Hexagate (Chainalysis)](https://www.chainalysis.com/product/hexagate/)** | Real-time simulation-based threat detection + automated blocking. Acquired by Chainalysis. |
+
+---
+
+## Core Comparison Table
+
+Expanded to 9 comparison dimensions. Includes items unfavorable to Argus.
 
 | | **Argus** | **Forta** | **Phalcon** | **Tenderly** | **Hexagate** |
 |---|:---:|:---:|:---:|:---:|:---:|
-| 실시간 탐지 | O | O | O | △^1 | O |
-| 멤풀 사전 탐지 | O | X | O | O | O |
-| 자동 차단(서킷브레이커) | O^2 | X | O | X | O |
-| 사후 포렌식 보고서 | O | X | X | △^3 | X |
-| 오픈소스 + 셀프호스팅 | **O** | △^4 | X | X | X |
-| 멀티체인 지원 | **X** | O (7+) | O | O (109) | O |
-| 이상 탐지 모델 | 규칙 기반 + Z-score 통계^5 | 뉴럴넷 (FORTRESS) | ML 기반 | X | ML 기반 |
-| **프로덕션 실적** | **메인넷 스캔 운영중 (2026.03~)**^10 | 2.7억 TX 스캔^6 | 해킹 20건+ 차단^7 | 1.4M+ 시뮬레이션^8 | 미공개 |
-| **L1 노드 내장 통합** | 잠재적^9 | X | X | X | X |
+| Real-time detection | O | O | O | △^1 | O |
+| Pre-execution mempool detection | O | X | O | O | O |
+| Automated blocking (circuit breaker) | O^2 | X | O | X | O |
+| Post-incident forensic reports | O | X | X | △^3 | X |
+| Open-source + self-hosted | **O** | △^4 | X | X | X |
+| Multi-chain support | **X** | O (7+) | O | O (109) | O |
+| Anomaly detection model | Rule-based + Z-score statistics^5 | Neural net (FORTRESS) | ML-based | X | ML-based |
+| **Production track record** | **Mainnet scanning in operation (2026.03~)**^10 | 270M TXs scanned^6 | 20+ hacks blocked^7 | 1.4M+ simulations^8 | Undisclosed |
+| **L1 node-embedded integration** | Potential^9 | X | X | X | X |
 
-> ^1 Tenderly는 알림(Alert) 기능을 제공하지만, 전용 공격 탐지 파이프라인은 아님.
-> ^2 합성 테스트에서만 검증됨. 실제 밸리데이터 노드에서 활성화 시 어테스테이션(attestation) 누락 → 슬래싱(slashing) 리스크가 존재함. [부작용 섹션](#auto-pause-risk) 참조.
-> ^3 Tenderly는 트랜잭션 디버거를 제공하지만, 공격 패턴 자동 분류나 포렌식 보고서 생성은 미지원.
-> ^4 Forta 봇 코드는 공개되나, 플랫폼 인프라(FORTRESS 등)는 비공개.
-> ^5 하드코딩된 플레이스홀더(placeholder) 평균/표준편차로 작동하는 초기 구현. 실제 메인넷 데이터로 교정(calibration)되지 않은 상태. 경쟁사의 뉴럴넷/ML과는 수준 차이가 있음.
-> ^6 [Messari 보고서](https://messari.io/report/forta-firewall-security-and-compliance-infrastructure-for-rollups) — 99% 탐지율, 0.0002% 미만 오탐률.
-> ^7 [BlockSec 공식](https://blocksec.com/phalcon/security) — $20M+ 자산 구출.
-> ^8 [Tenderly 2025 리캡](https://blog.tenderly.co/2025-recap-blockchain-adoption-chain-operations/) — 42K+ 트랜잭션 디버깅.
-> ^9 ethrex LEVM 위에서만 가능하며, ethrex의 메인넷 시장 점유율은 ~0%. 현재로서는 실현 불가능한 잠재적 장점. RPC 독립 모드 완성 후 Reth ExEx 통합을 통해 현실화할 수 있음. [TAM 문제 섹션](#1-ethrex-종속--tam-문제) 참조.
-> ^10 AWS ECS Fargate에서 Ethereum 메인넷 블록을 실시간 스캔 중 (2026년 3월~). 아직 실제 해킹 탐지 실적은 없으며, 14일 검증 기간 진행 중.
-
----
-
-## Argus의 현재 강점
-
-### 1. 오픈소스 + 셀프호스팅 — 유일하게 검증 가능한 차별점
-
-SaaS 의존 없이 자체 인프라에서 운영 가능하다. 코드 감사가 가능하고, 데이터가 외부로 유출되지 않는다. 규제에 민감한 조직(거래소, 기관 커스터디)에 유리하다.
-
-이 차별점은 경쟁사가 구조적으로 따라오기 어렵다. Forta는 탈중앙 네트워크에 종속되어 있고, Phalcon/Hexagate/Tenderly는 SaaS 비즈니스 모델이다.
-
-### 2. 옵코드(Opcode) 수준 분석
-
-바이트코드 수준까지 분석하므로, 함수명이나 이벤트 시그니처를 변경하는 수준의 우회는 방지된다. 다만 한계도 있다:
-- 옵코드 패턴 자체를 변형한 공격(예: `STATICCALL` 대신 직접 스토리지 접근)에는 추가 휴리스틱(heuristic)이 필요
-- 경쟁사도 유사한 깊이의 분석을 수행하므로 독점적 장점은 아님
-
-### 3. 탐지 + 포렌식 + 디버거 통합 — 전략적 리스크를 수반하는 장점
-
-Forta는 탐지만, Tenderly는 디버깅/시뮬레이션만, Phalcon은 모니터링+대응만 제공한다. Argus는 실시간 탐지(Sentinel) + 사후 분석(Autopsy) + 인터랙티브 디버거(CLI)를 하나의 크레이트(crate)에서 제공한다.
-
-**단, 이것은 리스크이기도 하다.** 17K LoC를 세 모듈에 분산시킨 결과, 어느 하나도 해당 카테고리의 전문 경쟁자와 깊이 면에서 대등하지 못하다. 전략적으로 **Sentinel에 집중하고 나머지는 보조 모듈로 포지셔닝**하는 것이 현실적이다.
+> ^1 Tenderly provides alerting, but it is not a dedicated attack detection pipeline.
+> ^2 Verified only in synthetic tests. If activated on an actual validator node, missed attestations could result in slashing penalties. See [operational risk section](#auto-pause-risk).
+> ^3 Tenderly provides a transaction debugger, but does not support automated attack pattern classification or forensic report generation.
+> ^4 Forta bot code is open-source, but the platform infrastructure (FORTRESS, etc.) is proprietary.
+> ^5 An initial implementation using hardcoded placeholder mean/standard deviation for Z-score calculation (~100 lines). Not calibrated with real mainnet data. A significant gap compared to competitors' neural net/ML approaches.
+> ^6 [Messari report](https://messari.io/report/forta-firewall-security-and-compliance-infrastructure-for-rollups) — 99% detection rate, <0.0002% false positive rate.
+> ^7 [BlockSec official](https://blocksec.com/phalcon/security) — $20M+ in assets rescued.
+> ^8 [Tenderly 2025 recap](https://blog.tenderly.co/2025-recap-blockchain-adoption-chain-operations/) — 42K+ transactions debugged.
+> ^9 Only possible on top of ethrex LEVM, and ethrex's mainnet market share is ~0%. Currently an unrealizable potential advantage. Could be materialized through Reth ExEx integration after completing the RPC-independent mode. See [TAM problem section](#1-ethrex-dependency--tam-problem).
+> ^10 Scanning Ethereum mainnet blocks in real-time on AWS ECS Fargate (March 2026~). No actual hack detections yet; 14-day validation period in progress.
 
 ---
 
-## Argus의 약점 — 정직한 진단
+## Current Strengths of Argus
 
-### 1. ethrex 종속 = TAM 문제
+### 1. Open-Source + Self-Hosted — The Only Verifiable Differentiator
 
-| 항목 | 상세 |
-|------|------|
-| 심각도 | **치명적** |
-| 현상 | Argus의 핵심 차별점("L1 노드 내장 통합")이 ethrex 클라이언트 위에서만 작동. ethrex의 메인넷 시장 점유율은 ~0%. |
-| 영향 | "L1 노드에서 블록 전파를 중단할 수 있다"는 능력이 발현될 노드가 메인넷에 0대. TAM(Total Addressable Market)이 0에 수렴. |
-| 대응 | RPC 독립 모드를 1급 시민으로 개발 + Reth ExEx PoC 병렬 진행. 자세한 계획은 [ROADMAP Phase 1](ROADMAP.md) 참조. |
-| 시기 | **최우선** (Q2 2026) |
+Operable on your own infrastructure without SaaS dependency. Code is auditable, and data never leaves your environment. Advantageous for regulation-sensitive organizations (exchanges, institutional custody).
 
-### 2. 프로덕션 검증 — 메인넷 스캔 시작
+This differentiator is structurally difficult for competitors to replicate. Forta is locked into a decentralized network, and Phalcon/Hexagate/Tenderly are SaaS business models.
 
-| 항목 | 상세 |
-|------|------|
-| 심각도 | **높음** (기존 치명적에서 하향) |
-| 현상 | AWS ECS Fargate에서 Ethereum 메인넷 실시간 스캔 운영 중 (2026년 3월~). 단, 실제 해킹 탐지 실적은 아직 0건. |
-| 영향 | "스캔 중"과 "실제 해킹을 잡았다"는 다른 단계. 14일 검증 기간을 완료하고 탐지 품질 보고서를 공개해야 신뢰를 확보할 수 있다. |
-| 대응 | (1) 14일 메인넷 연속 운영 후 탐지 보고서 공개. (2) 과거 해킹 TX Autopsy 리플레이 결과와 실시간 스캔 결과 비교. |
-| 시기 | 진행중 (2026년 3월) |
+### 2. Opcode-Level Analysis
 
-### 3. 1인 개발 체제 = 지속가능성 의문
+Analysis at the bytecode level prevents circumvention through superficial changes like renaming function names or event signatures. However, there are limitations:
+- Attacks that mutate opcode patterns themselves (e.g., direct storage access instead of `STATICCALL`) require additional heuristics
+- Competitors also perform similarly deep analysis, so this is not an exclusive advantage
 
-| 항목 | 상세 |
-|------|------|
-| 심각도 | **높음** |
-| 현상 | 전체 git 히스토리 커밋 6개, 기여자 1명. 외부 기여자 0, 이슈 0, 커뮤니티 채널 없음. |
-| 영향 | 버스 팩터(Bus Factor) = 1. 새로운 공격 벡터가 등장하면 48시간 내 탐지 규칙 업데이트가 필요한데, 1인 체제에서 이것이 가능한가? 기여자가 부재 시 프로젝트가 멈춘다. |
-| 대응 | GitHub Discussions 개설, `good first issue` 라벨 이슈 5개 생성, 정기 보안 분석 콘텐츠 발행으로 기여자 유입 유도. |
-| 시기 | 즉시 시작, 지속적 |
+### 3. Detection + Forensics + Debugger Integration — An Advantage with Strategic Risk
 
-### 4. 이상 탐지 모델의 성숙도 차이
+Forta does detection only, Tenderly does debugging/simulation only, Phalcon does monitoring+response only. Argus provides real-time detection (Sentinel) + post-incident analysis (Autopsy) + interactive debugger (CLI) in a single crate.
 
-| 항목 | 상세 |
-|------|------|
-| 심각도 | 중간 |
-| 현상 | Argus의 `StatisticalAnomalyDetector`는 하드코딩된 플레이스홀더 평균/표준편차로 Z-score를 계산하는 100줄 규모의 통계 함수다. 코드 주석에도 "until real calibration data is available"이라고 적혀 있다. |
-| 영향 | Forta FORTRESS는 뉴럴넷 기반 시뮬레이션(50ms 미만)을 수행한다. 소규모 팀으로 ML 경쟁은 리소스 제약상 비현실적. |
-| 대응 | ML 경쟁 대신 **규칙 기반 탐지의 정확도를 높이는 데 집중**한다. 실 트래픽 데이터가 축적되면 통계 모델 교정을 검토한다. |
-| 시기 | 수용 (장기 검토) |
+**However, this is also a risk.** Distributing 17K LoC across three modules means none of them matches the depth of specialized competitors in their respective categories. The realistic strategy is to **focus on Sentinel and position the rest as auxiliary modules**.
 
-### 5. Ethereum Only (단일 체인)
+---
 
-| 항목 | 상세 |
-|------|------|
-| 심각도 | 중간 |
-| 현상 | Forta 7+체인, Tenderly 109체인, Phalcon/Hexagate 멀티체인. Argus는 Ethereum L1만 지원. |
-| 영향 | 멀티체인 환경의 프로토콜(Balancer, Aave 등)은 단일 체인 도구만으로 커버할 수 없다. |
-| 대응 | 독자적 멀티체인 확장은 리소스 대비 비현실적. **Ethereum L1 특화**를 유지하고, "한 체인을 가장 깊이 본다"로 포지셔닝. |
-| 시기 | 장기 |
+## Weaknesses of Argus — An Honest Diagnosis
 
-### 6. 사용 편의성
+### 1. ethrex Dependency = TAM Problem
 
-| 항목 | 상세 |
-|------|------|
-| 심각도 | 낮음 |
-| 현상 | Rust 1.85+ 빌드 환경 필수. 5분 안에 실제 결과를 볼 수 없음. |
-| 대응 | Docker 이미지 퍼블리시 + RPC 모드 완성 후 `docker run tokamak/argus --rpc https://...` 한 줄로 시작 가능하도록 개선. |
-| 시기 | 단기 (Q2 2026) |
+| Item | Detail |
+|------|--------|
+| Severity | **Critical** |
+| Symptom | Argus's key differentiator ("L1 node-embedded integration") only works on the ethrex client. ethrex's mainnet market share is ~0%. |
+| Impact | The ability to "halt block propagation at the L1 node" has zero nodes on mainnet where it can be exercised. TAM (Total Addressable Market) converges to 0. |
+| Mitigation | Develop RPC-independent mode as a first-class citizen + parallel Reth ExEx PoC. Detailed plan in [ROADMAP Phase 1](ROADMAP.md). |
+| Timeline | **Highest priority** (Q2 2026) |
+
+### 2. Production Validation — Mainnet Scanning Started
+
+| Item | Detail |
+|------|--------|
+| Severity | **High** (downgraded from Critical) |
+| Symptom | Running real-time Ethereum mainnet scanning on AWS ECS Fargate (March 2026~). However, zero actual hack detections so far. |
+| Impact | "Scanning" and "actually caught a hack" are different levels. Trust requires completing the 14-day validation period and publishing a detection quality report. |
+| Mitigation | (1) Publish detection report after 14-day continuous mainnet operation. (2) Compare historical hack TX Autopsy replay results with live scan results. |
+| Timeline | In progress (March 2026) |
+
+### 3. Single-Developer Project = Sustainability Concern
+
+| Item | Detail |
+|------|--------|
+| Severity | **High** |
+| Symptom | Entire git history: 6 commits, 1 contributor. Zero external contributors, zero issues, no community channels. |
+| Impact | Bus Factor = 1. When a new attack vector emerges, detection rules need updating within 48 hours — is that feasible with a single developer? The project halts if the contributor is unavailable. |
+| Mitigation | Open GitHub Discussions, create 5 issues with `good first issue` labels, publish regular security analysis content to attract contributors. |
+| Timeline | Start immediately, ongoing |
+
+### 4. Anomaly Detection Model Maturity Gap
+
+| Item | Detail |
+|------|--------|
+| Severity | Medium |
+| Symptom | Argus's `StatisticalAnomalyDetector` is a ~100-line statistical function that computes Z-scores using hardcoded placeholder mean/standard deviation. The code comments state "until real calibration data is available." |
+| Impact | Forta's FORTRESS performs neural net-based simulation (<50ms). Competing on ML is unrealistic given resource constraints for a small team. |
+| Mitigation | Instead of competing on ML, **focus on improving rule-based detection accuracy**. Consider calibrating the statistical model once real traffic data accumulates. |
+| Timeline | Accepted (long-term consideration) |
+
+### 5. Ethereum Only (Single Chain)
+
+| Item | Detail |
+|------|--------|
+| Severity | Medium |
+| Symptom | Forta supports 7+ chains, Tenderly 109 chains, Phalcon/Hexagate are multi-chain. Argus supports Ethereum L1 only. |
+| Impact | Multi-chain protocols (Balancer, Aave, etc.) cannot be fully covered by a single-chain tool. |
+| Mitigation | Independent multi-chain expansion is unrealistic given resource constraints. **Maintain the Ethereum L1 specialization** and position as "the deepest analysis on a single chain." |
+| Timeline | Long-term |
+
+### 6. Usability
+
+| Item | Detail |
+|------|--------|
+| Severity | Low |
+| Symptom | Requires Rust 1.85+ build environment. Cannot see real results within 5 minutes. |
+| Mitigation | After Docker image publishing + RPC mode completion, enable starting with a single line: `docker run tokamak/argus-demo --rpc https://...` |
+| Timeline | Short-term (Q2 2026) |
 
 ---
 
 <a id="auto-pause-risk"></a>
 
-## 자동 차단(Auto-Pause)의 운영 리스크
+## Operational Risk of Auto-Pause (Circuit Breaker)
 
-Argus의 서킷브레이커(Circuit Breaker)가 실제 밸리데이터 노드에서 활성화되면, 해당 밸리데이터가 어테스테이션(attestation)을 누락하여 슬래싱(slashing) 페널티를 받을 수 있다. 이 기능은 **"무조건 차단"이 아닌 "경고 및 선택적 중단"으로 운영**해야 한다.
+If Argus's circuit breaker is activated on an actual validator node, that validator may miss attestations and incur slashing penalties. This feature must be operated as **"alert and optional pause"**, not **"unconditional blocking."**
 
-권장 운영 방식:
-- **기본 모드:** 경고만 발송 (Webhook/WebSocket), 블록 처리는 계속
-- **선택적 중단 모드:** 운영자가 명시적으로 활성화한 경우에만 블록 처리 중단
-- **문서에 슬래싱 리스크를 명시**하고, 운영자가 트레이드오프를 이해한 상태에서 결정하도록 유도
-
----
-
-## 시장 기회: OpenZeppelin Defender 종료
-
-OpenZeppelin Defender는 [2026년 7월 종료 예정](https://www.openzeppelin.com/news/doubling-down-on-open-source-and-phasing-out-defender)이다.
-
-**기회와 현실의 격차:**
-- Defender 사용자 대부분은 이미 프로덕션에서 검증된 Forta, Phalcon, Hexagate로 이동할 가능성이 높다
-- Argus가 이 수요를 포착하려면 Defender 종료 전(2026년 7월)까지 RPC 독립 모드와 Docker 배포가 완료되어야 한다
-- 현재(2026년 3월) 기준으로 남은 기간은 4개월 — Phase 1 완성이 선행 조건
-
-**현실적 판단:** Phase 1(RPC 독립 모드)과 Docker 배포가 Defender 종료 전에 완료되면 Phase 4에서 이 기회를 노린다. 완료되지 않으면 이 타겟은 삭제하고 다른 채택 경로에 집중한다.
+Recommended operational approach:
+- **Default mode:** Send alerts only (Webhook/WebSocket); continue block processing
+- **Selective pause mode:** Halt block processing only when the operator has explicitly enabled it
+- **Document the slashing risk explicitly** so operators make informed trade-off decisions
 
 ---
 
-## 포지셔닝 전략
+## Market Opportunity: OpenZeppelin Defender Shutdown
 
-### 핵심 메시지
+OpenZeppelin Defender is [scheduled to shut down in July 2026](https://www.openzeppelin.com/news/doubling-down-on-open-source-and-phasing-out-defender).
 
-> **"Ethereum L1에 특화된 오픈소스 런타임 보안 도구."**
+**The gap between opportunity and reality:**
+- Most Defender users will likely migrate to already production-proven Forta, Phalcon, or Hexagate
+- For Argus to capture this demand, the RPC-independent mode and Docker deployment must be ready before Defender shuts down (July 2026)
+- As of March 2026, that leaves 4 months — completing Phase 1 is a prerequisite
 
-"올인원", "L1 노드 통합", "가장 빠른 탐지" 같은 검증되지 않은 표현은 사용하지 않는다. 실적이 뒷받침된 후에만 확장한다.
-
-### 단계별 타겟
-
-| 순서 | 타겟 | 메시지 | 선행 조건 |
-|------|------|--------|-----------|
-| **Phase 1** | 보안 연구자 / 감사팀 | "과거 해킹 트랜잭션을 옵코드 수준에서 리플레이·분석하는 오픈소스 도구" | 과거 해킹 TX 리플레이 결과 공개 |
-| **Phase 2** | Rust 이더리움 생태계 (ethrex/Reth) | "Rust L1 클라이언트와 네이티브 통합되는 보안 플러그인" | RPC 독립 모드 완성 + Reth ExEx PoC |
-| **Phase 3** | L1 노드 운영자 / 밸리데이터 | "노드에 보안 레이어를 추가하는 셀프호스팅 도구" | 테스트넷 14일 연속 운영 실적 |
-| **Phase 4** | OZ Defender 이탈 사용자 | "오픈소스 대안 — SaaS 종료 걱정 없음" | Phase 1 완료가 Defender 종료 전에 달성된 경우에만 |
-
-**기존 대비 변경점:**
-- Phase 1 타겟을 "보안 연구자"로 변경 — 실적 없이도 도구의 가치를 판단할 수 있는 유일한 대상
-- "블록 전파 전에 차단" 메시지 삭제 — 검증되지 않은 주장
-- Phase 4에 선행 조건 추가 — 비현실적 기회 추구 방지
+**Realistic assessment:** If Phase 1 (RPC-independent mode) and Docker deployment are completed before Defender's shutdown, target this opportunity in Phase 4. If not, drop this target and focus on alternative adoption paths.
 
 ---
 
-## 즉시 실행 항목
+## Positioning Strategy
 
-| # | 항목 | 기한 | 비고 |
-|---|------|------|------|
-| 1 | **과거 해킹 TX 리플레이 결과 공개** — Balancer, Bybit TX를 Autopsy에서 실행, 결과를 문서화 | 2주 내 | "would have" → "did (on replay)" 전환의 첫 단계 |
-| 2 | **Docker Hub 이미지 퍼블리시** — GitHub Secrets 등록 후 `v0.1.0` 태그 푸시 | 즉시 | 진입 장벽 해소 |
-| 3 | **RPC 독립 모드 개발 착수** — Phase 1-1의 첫 마일스톤 | Q2 2026 | ethrex 탈피의 핵심 |
-| 4 | **Reth ExEx PoC 착수** — RPC 모드(1-1) 완료 후 착수 | Q2 2026 | "장기 검토"에서 승격. 기여자 합류 시 병렬 전환 |
-| 5 | **커뮤니티 기반 구축** — GitHub Discussions 활성화, `good first issue` 5개 생성 | 1주 내 | 버스 팩터 해소의 시작 |
-| 6 | **지연 벤치마크(Latency Benchmark) 측정** — Pre-filter μs/tx, Deep Analyzer ms/tx | Q2 2026 | 성능 주장의 근거 확보 |
+### Core Message
+
+> **"An open-source runtime security tool specialized for Ethereum L1."**
+
+Avoid unverified claims like "all-in-one," "L1 node integration," or "fastest detection." Expand messaging only after track record justifies it.
+
+### Phased Targets
+
+| Phase | Target | Message | Prerequisite |
+|-------|--------|---------|--------------|
+| **Phase 1** | Security researchers / audit teams | "An open-source tool for replaying and analyzing historical hack transactions at the opcode level" | Publish historical hack TX replay results |
+| **Phase 2** | Rust Ethereum ecosystem (ethrex/Reth) | "A security plugin with native integration for Rust L1 clients" | RPC-independent mode complete + Reth ExEx PoC |
+| **Phase 3** | L1 node operators / validators | "A self-hosted tool for adding a security layer to your node" | 14-day testnet continuous operation track record |
+| **Phase 4** | OZ Defender migrating users | "An open-source alternative — no SaaS sunset worries" | Only if Phase 1 is completed before Defender shutdown |
+
+**Changes from previous strategy:**
+- Phase 1 target changed to "security researchers" — the only audience that can evaluate the tool's value without a production track record
+- Removed "block propagation before reaching the network" messaging — unverified claim
+- Added prerequisite to Phase 4 — prevent pursuing unrealistic opportunities
+
+---
+
+## Immediate Action Items
+
+| # | Item | Deadline | Notes |
+|---|------|----------|-------|
+| 1 | **Publish historical hack TX replay results** — Run Balancer, Bybit TXs through Autopsy and document results | 2 weeks | First step in transitioning from "would have" to "did (on replay)" |
+| 2 | **Publish Docker Hub image** — Register GitHub Secrets and push `v0.1.0` tag | Immediately | Lower the barrier to entry |
+| 3 | **Start RPC-independent mode development** — First milestone of Phase 1-1 | Q2 2026 | Core of breaking free from ethrex |
+| 4 | **Start Reth ExEx PoC** — Begin after RPC mode (1-1) completion | Q2 2026 | Promoted from "long-term consideration." Parallelize if contributors join |
+| 5 | **Build community foundation** — Enable GitHub Discussions, create 5 `good first issue` items | 1 week | First step toward resolving Bus Factor |
+| 6 | **Measure latency benchmark** — Pre-filter μs/tx, Deep Analyzer ms/tx | Q2 2026 | Evidence to back performance claims |

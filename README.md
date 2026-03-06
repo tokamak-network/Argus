@@ -251,13 +251,13 @@ cargo build --all-features
 
 ```bash
 # Pull pre-built image
-docker pull tokamak-network/argus:v0.1.3
+docker pull tokamak/argus-demo:latest
 
 # Run Sentinel on mainnet
 docker run -d \
   -e ARGUS_RPC_URL="https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY" \
   -p 9090:9090 \
-  tokamak-network/argus:v0.1.3
+  tokamak/argus-demo:latest
 
 # Or build locally
 docker build -t argus-demo .

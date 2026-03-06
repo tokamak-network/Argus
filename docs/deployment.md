@@ -25,7 +25,7 @@ Run Argus Sentinel on Ethereum mainnet (or any EVM chain) to detect attacks in r
 
 ```bash
 # Pull the pre-built image
-docker pull tokamak-network/argus:v0.1.3
+docker pull tokamak/argus-demo:latest
 
 # Run in prefilter-only mode (works with any full node)
 docker run -d \
@@ -33,7 +33,7 @@ docker run -d \
   -e ARGUS_RPC_URL="https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY" \
   -e ARGUS_METRICS_PORT="9090" \
   -p 9090:9090 \
-  tokamak-network/argus:v0.1.3
+  tokamak/argus-demo:latest
 
 # Stream logs
 docker logs -f argus-sentinel
@@ -51,7 +51,7 @@ docker run -d \
   -e ARGUS_METRICS_PORT="9090" \
   -p 9090:9090 \
   -v $(pwd)/alerts:/data \
-  tokamak-network/argus:v0.1.3 \
+  tokamak/argus-demo:latest \
   "exec argus sentinel --rpc \"$ARGUS_RPC_URL\" --metrics-port \"$ARGUS_METRICS_PORT\" --alert-file /data/alerts.jsonl --prefilter-only"
 ```
 
@@ -485,8 +485,8 @@ aws logs create-log-group --log-group-name /ecs/argus-sentinel --region ap-north
 
 ```bash
 # Verify the argus binary exists in the image
-docker run --rm --entrypoint which tokamak-network/argus:v0.1.3 argus
+docker run --rm --entrypoint which tokamak/argus-demo:latest argus
 
 # Run sentinel --help to check CLI is working
-docker run --rm tokamak-network/argus:v0.1.3 "argus sentinel --help"
+docker run --rm tokamak/argus-demo:latest "argus sentinel --help"
 ```

@@ -9,3 +9,12 @@ dashboard/dist/
 dashboard/fixtures/
 docs/awesome-ethereum-security-pr.md
 autopsy-*.md
+
+# Internal reports (not for public release)
+kkirikkiri-report-*
+.kkirikkiri/
+docs/docker-hub-setup.md
+docs/scoring-research.md
+docs/devil-review-public-readiness.md
+docs/open-source-readiness-review.md
+node_modules/
