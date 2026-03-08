@@ -364,7 +364,10 @@ struct AnalysisContext<'a> {
 /// Takes ownership of the `ReplayTrace` to avoid unnecessary cloning.
 /// Callers should clone the trace before calling this if they need it afterward.
 #[cfg(feature = "autopsy")]
-fn analyze_and_report(mut trace: crate::types::ReplayTrace, ctx: &AnalysisContext) -> Result<(), DebuggerError> {
+fn analyze_and_report(
+    mut trace: crate::types::ReplayTrace,
+    ctx: &AnalysisContext,
+) -> Result<(), DebuggerError> {
     use crate::autopsy::{
         classifier::AttackClassifier,
         enrichment::{collect_sstore_slots, enrich_storage_writes},

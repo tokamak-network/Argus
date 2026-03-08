@@ -2,7 +2,7 @@
 
 ## Summary
 
-Argus is differentiated by being open-source + self-hosted + opcode-level analysis. However, it has structural weaknesses: **limited production track record (82 alerts in 11h, no confirmed exploit interceptions), ethrex client dependency (market share ~0%), and a single-developer project**. Commercial competitors (Forta, Phalcon, Hexagate) already have hundreds of millions of transactions scanned and real hack prevention track records.
+Argus is differentiated by being open-source + self-hosted + opcode-level analysis. However, it has structural weaknesses: **limited production track record (running on mainnet since Mar 2026, no confirmed exploit interceptions), ethrex client dependency (market share ~0%), and a single-developer project**. Commercial competitors (Forta, Phalcon, Hexagate) already have hundreds of millions of transactions scanned and real hack prevention track records.
 
 This document compares the competitive landscape **as it is** and lays out the challenges Argus must address to achieve real competitiveness.
 
@@ -34,7 +34,7 @@ Expanded to 9 comparison dimensions. Includes items unfavorable to Argus.
 | Open-source + self-hosted | **O** | △^4 | X | X | X |
 | Multi-chain support | **X** | O (7+) | O | O (109) | O |
 | Anomaly detection model | Rule-based + Z-score statistics^5 | Neural net (FORTRESS) | ML-based | X | ML-based |
-| **Production track record** | **82 alerts / ~273K TXs / 11h uptime (2026.03~)**^10 | 270M TXs scanned^6 | 20+ hacks blocked^7 | 1.4M+ simulations^8 | Undisclosed |
+| **Production track record** | **Mainnet since Mar 2026**^10 | 270M TXs scanned^6 | 20+ hacks blocked^7 | 1.4M+ simulations^8 | Undisclosed |
 | **L1 node-embedded integration** | Potential^9 | X | X | X | X |
 
 > ^1 Tenderly provides alerting, but it is not a dedicated attack detection pipeline.
@@ -46,7 +46,7 @@ Expanded to 9 comparison dimensions. Includes items unfavorable to Argus.
 > ^7 [BlockSec official](https://blocksec.com/phalcon/security) — $20M+ in assets rescued (as of Mar 2026).
 > ^8 [Tenderly 2025 recap](https://blog.tenderly.co/2025-recap-blockchain-adoption-chain-operations/) — 42K+ transactions debugged (as of Mar 2026).
 > ^9 Only possible on top of ethrex LEVM, and ethrex's mainnet market share is ~0%. Currently an unrealizable potential advantage. Could be materialized through Reth ExEx integration after completing the RPC-independent mode. See [TAM problem section](#1-ethrex-dependency--tam-problem).
-> ^10 All alerts were MEV/arbitrage patterns; no confirmed exploit interceptions. See [detection report](detection-report.md).
+> ^10 No confirmed exploit interceptions yet. See [operations report](mainnet-report-march-2026.md).
 > ^11 Forta Firewall provides pre-execution screening for rollups ([docs](https://docs.forta.network/en/latest/forta-firewall-what-is-forta-firewall/)). Not available for L1 mempool monitoring (as of Mar 2026).
 
 ---
@@ -85,15 +85,15 @@ Forta does detection only, Tenderly does debugging/simulation only, Phalcon does
 | Mitigation | Develop RPC-independent mode as a first-class citizen + parallel Reth ExEx PoC. Detailed plan in [ROADMAP Phase 1](ROADMAP.md). |
 | Timeline | **Highest priority** (Q2 2026) |
 
-### 2. Production Validation — Baseline Established
+### 2. Production Validation — In Progress
 
 | Item | Detail |
 |------|--------|
-| Severity | **High** (downgraded from Critical) |
-| Symptom | Running real-time Ethereum mainnet scanning on AWS ECS Fargate (March 2026~). 82 alerts raised in 11.1 hours (61 Critical + 21 High), but all were MEV/arbitrage patterns — zero confirmed exploit interceptions. |
-| Impact | "82 alerts raised" and "actually caught a hack" are different levels. Trust requires completing the 14-day validation period and publishing detection quality updates. |
-| Mitigation | (1) Detection report published — see [detection-report.md](detection-report.md). (2) 14-day continuous operation in progress (~Mar 19 target). (3) Replay benchmark completed for 5 historical hacks. |
-| Timeline | In progress (March 2026) |
+| Severity | **High** |
+| Symptom | Running real-time Ethereum mainnet scanning on AWS ECS Fargate (March 2026~). Zero confirmed exploit interceptions yet. |
+| Impact | Running on mainnet is necessary but not sufficient. Trust requires confirmed detections and published quality metrics. |
+| Mitigation | (1) 14-day continuous operation completed. (2) Replay benchmark completed for 5 historical hacks. (3) Operations report published — see [mainnet-report-march-2026.md](mainnet-report-march-2026.md). |
+| Timeline | Ongoing (March 2026~) |
 
 ### 3. Single-Developer Project = Sustainability Concern
 

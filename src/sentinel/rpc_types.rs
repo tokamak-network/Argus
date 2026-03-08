@@ -6,9 +6,7 @@
 #![cfg(all(feature = "sentinel", feature = "autopsy"))]
 
 use bytes::Bytes;
-use ethrex_common::types::{
-    Block, BlockBody, BlockHeader, Log, Receipt, Transaction, TxType,
-};
+use ethrex_common::types::{Block, BlockBody, BlockHeader, Log, Receipt, Transaction, TxType};
 use ethrex_levm::Environment;
 
 use crate::autopsy::rpc_client::{RpcBlock, RpcBlockHeader, RpcLog, RpcReceipt, RpcTransaction};

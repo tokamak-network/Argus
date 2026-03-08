@@ -9,7 +9,7 @@ Argus has strong code quality, but faces structural problems in external competi
 | Problem | Severity | Summary |
 |---------|----------|---------|
 | ethrex dependency | **Critical** | ethrex client market share ~0%. The "L1 node integration" advantage has nowhere to materialize |
-| Limited production detection record | **High** | 82 alerts raised (MEV/arb patterns) but zero confirmed exploit interceptions yet |
+| Limited production detection record | **High** | Running on mainnet since Mar 2026 but zero confirmed exploit interceptions yet |
 | Single-developer project | **High** | Bus Factor = 1. GitHub Discussions enabled, 5 good-first-issues created (#1–#5), but zero external contributors yet |
 | High barrier to entry | **Medium** | Docker image available; `cargo build` requires Rust 1.85+ (~5 min first build) |
 | All-in-one risk | **Medium** | All three modules are weaker than specialized competitors. Need to focus on Sentinel |
@@ -81,13 +81,13 @@ Goal: **Turn "would have detected" into "did detect."**
 | # | Item | Description | Status |
 |---|------|-------------|--------|
 | 2-1 | **14-day continuous mainnet operation** | Run RPC-mode Sentinel on Ethereum mainnet via AWS ECS Fargate for 14 days. Record blocks scanned, suspicious TXs flagged, and detection results. See [deployment guide](deployment.md) | In progress (~Mar 19 target) |
-| 2-2 | **Document detection results** | "In Q2 2026, scanned X blocks on mainnet, flagged Y suspicious TXs, confirmed Z detections" — the first production track record report | Done — [detection report](detection-report.md) (82 alerts / 11.1h) |
+| 2-2 | **Document detection results** | "In Q2 2026, scanned X blocks on mainnet, flagged Y suspicious TXs, confirmed Z detections" — the first production track record report | In progress — [operations report](mainnet-report-march-2026.md) |
 | 2-3 | **Systematic replay verification of historical hacks** | Run 5+ major hack TXs (Balancer, Bybit, Euler, etc.) through Autopsy, produce a report with quantitative results (detection rate, confidence, latency). Unlike Phase 0-6 smoke tests, this is a systematic benchmark | Done — [replay benchmark](../src/tests/replay_benchmark.rs) |
 | 2-4 | **Latency benchmark** | Measure and publish Pre-filter μs/tx and Deep Analyzer ms/tx | Done — [latency bench](../examples/sentinel_latency_bench.rs) |
 
 ### Success Criteria
 
-- "Argus raised 82 alerts scanning ~273K transactions (~3,300 blocks) on Ethereum mainnet" — initial baseline established (11.1h of 336h target); 14-day continuous operation in progress (~Mar 19 completion)
+- 14-day continuous mainnet operation completed; building production track record with confirmed detection results
 
 ---
 

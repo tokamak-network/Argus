@@ -151,18 +151,13 @@ Phase 6  Summary
 
 ---
 
-## Live Detection Results
+## Live Operation
 
-Argus is running on **Ethereum mainnet** via AWS ECS Fargate (since March 2026). Results from the first 11.1 hours of continuous operation:
+Argus is running on **Ethereum mainnet** via AWS ECS Fargate (since March 2026).
 
-- **82 alerts raised**: 61 scored Critical by pre-filter (flash loan MEV patterns) + 21 High (high-value reverts, SelfDestruct) — alert priority levels, not confirmed exploits
-- **Pre-filter flag rate**: 0.030% (target: <1%)
-- **Deep replay**: 100% success (82/82), avg 69,259 opcode steps/TX
+- **14-day continuous operation** completed — see [operations report](docs/mainnet-report-march-2026.md)
 - **Zero downtime**, $7/month on Fargate
-
-> No confirmed exploit interceptions yet — all alerts were MEV/arbitrage or revert patterns. Two reports cover different periods and configurations:
-> - [Detection report](docs/detection-report.md) — 11.1h snapshot, `suspicion_threshold=0.3`, 82 alerts (high-sensitivity tuning)
-> - [Operations report](docs/mainnet-report-march-2026.md) — 14-day run, `suspicion_threshold=0.7`, 14 alerts (production tuning)
+- No confirmed exploit interceptions yet — building baseline data
 
 ## Historical Validation
 
@@ -188,13 +183,13 @@ $1.4B drained from Bybit's cold wallet via supply chain attack on Safe{Wallet} (
 | Open source | **Fully** | Partial | No | No | No |
 | Self-hosted | **Yes** | No (SaaS) | No (SaaS) | No (SaaS) | No (SaaS) |
 | Multi-chain | No | Yes (7+) | Yes | Yes (109) | Yes |
-| Production track record | **82 alerts / ~273K TXs / 11h uptime (Mar 2026~)** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
+| Production track record | **Mainnet since Mar 2026** | 270M+ TX scanned | 20+ hacks blocked | 1.4M+ simulations | Undisclosed |
 
 > \* Argus mempool monitoring is available in embedded mode only; not yet wired in RPC-mode CLI.
 >
 > \*\* Forta Firewall provides pre-execution screening for rollups, not L1 mempool monitoring ([details](docs/competitive-analysis.md)).
 >
-> Argus is early-stage but running on Ethereum mainnet via AWS ECS Fargate. 82 alerts raised in 11.1 hours (~3,300 blocks, ~273K TXs scanned), zero downtime, $7/month — see [detection report](docs/detection-report.md). No confirmed exploit interceptions yet; all alerts were MEV/arbitrage patterns. Its primary differentiator is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
+> Argus is early-stage but running on Ethereum mainnet via AWS ECS Fargate with zero downtime at $7/month. No confirmed exploit interceptions yet. Its primary differentiator is being **fully open-source and self-hostable**. See [competitive analysis](docs/competitive-analysis.md) for an honest, detailed comparison.
 
 ---
 
