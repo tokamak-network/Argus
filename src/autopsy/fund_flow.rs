@@ -103,6 +103,10 @@ impl FundFlowTracer {
     /// executed) but the on-chain receipt shows success. Receipt logs contain
     /// the same Transfer events that would have been captured by opcode tracing.
     ///
+    /// Only ERC-20 Transfer logs (topic[0] == `TRANSFER_TOPIC`) are processed;
+    /// other event types (Swap, LiquidationCall, etc.) have a different log
+    /// structure and are not extractable as `FundFlow` entries here.
+    ///
     /// Each resulting `FundFlow` has `step_index = usize::MAX` to indicate it
     /// came from receipt data rather than opcode-level tracing.
     pub fn trace_from_receipt_logs(logs: &[RpcLog]) -> Vec<FundFlow> {
@@ -112,7 +116,8 @@ impl FundFlowTracer {
                     return None;
                 }
 
-                // Check full Transfer topic signature
+                // Only process ERC-20 Transfer(address,address,uint256) logs.
+                // Swap/Liquidation logs have incompatible topic/data layouts.
                 if log.topics[0].as_bytes() != TRANSFER_TOPIC {
                     return None;
                 }
@@ -127,25 +132,13 @@ impl FundFlowTracer {
                     U256::zero()
                 };
 
-                // Classify the event from the topic hash
-                let topic_bytes: Vec<[u8; 32]> = log
-                    .topics
-                    .iter()
-                    .map(|t| {
-                        let mut arr = [0u8; 32];
-                        arr.copy_from_slice(t.as_bytes());
-                        arr
-                    })
-                    .collect();
-                let event_type = classify_log_event(&topic_bytes);
-
                 Some(FundFlow {
                     from,
                     to,
                     value,
                     token: Some(token),
                     step_index: usize::MAX,
-                    event_type,
+                    event_type: EventType::Transfer,
                 })
             })
             .collect()
@@ -288,5 +281,73 @@ mod tests {
     #[test]
     fn test_event_type_default_is_unknown() {
         assert_eq!(EventType::default(), EventType::Unknown);
+    }
+
+    // --- trace_from_receipt_logs integration tests ---
+
+    fn make_transfer_log(from: [u8; 20], to: [u8; 20], amount: u64) -> RpcLog {
+        let mut from_topic = [0u8; 32];
+        from_topic[12..].copy_from_slice(&from);
+        let mut to_topic = [0u8; 32];
+        to_topic[12..].copy_from_slice(&to);
+        let mut data = [0u8; 32];
+        data[24..].copy_from_slice(&amount.to_be_bytes());
+        RpcLog {
+            address: Address::zero(),
+            topics: vec![
+                H256::from(TRANSFER_TOPIC),
+                H256::from(from_topic),
+                H256::from(to_topic),
+            ],
+            data: data.to_vec(),
+        }
+    }
+
+    #[test]
+    fn test_trace_from_receipt_logs_transfer_produces_flow() {
+        let from = [0x11u8; 20];
+        let to = [0x22u8; 20];
+        let log = make_transfer_log(from, to, 1000);
+        let flows = FundFlowTracer::trace_from_receipt_logs(&[log]);
+        assert_eq!(flows.len(), 1);
+        assert_eq!(flows[0].event_type, EventType::Transfer);
+        assert_eq!(flows[0].step_index, usize::MAX);
+    }
+
+    #[test]
+    fn test_trace_from_receipt_logs_swap_log_filtered_out() {
+        // Swap logs do not match TRANSFER_TOPIC — they must not produce FundFlow.
+        let log = RpcLog {
+            address: Address::zero(),
+            topics: vec![H256::from(SWAP_V2_TOPIC)],
+            data: vec![0u8; 32],
+        };
+        let flows = FundFlowTracer::trace_from_receipt_logs(&[log]);
+        assert!(
+            flows.is_empty(),
+            "Swap logs must not produce Transfer flows"
+        );
+    }
+
+    #[test]
+    fn test_trace_from_receipt_logs_liquidation_log_filtered_out() {
+        let log = RpcLog {
+            address: Address::zero(),
+            topics: vec![H256::from(LIQUIDATION_CALL_TOPIC)],
+            data: vec![0u8; 32],
+        };
+        let flows = FundFlowTracer::trace_from_receipt_logs(&[log]);
+        assert!(flows.is_empty());
+    }
+
+    #[test]
+    fn test_trace_from_receipt_logs_too_few_topics_filtered_out() {
+        let log = RpcLog {
+            address: Address::zero(),
+            topics: vec![H256::from(TRANSFER_TOPIC), H256::zero()], // only 2 topics
+            data: vec![0u8; 32],
+        };
+        let flows = FundFlowTracer::trace_from_receipt_logs(&[log]);
+        assert!(flows.is_empty());
     }
 }

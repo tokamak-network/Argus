@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use ethrex_common::U256;
 use ethrex_levm::opcodes::Opcode;
 
-use crate::types::{ReplayTrace, StepRecord};
+use crate::types::{EventType, ReplayTrace, StepRecord};
 
 /// Format a step for detailed display (after step/goto).
 pub fn format_step(step: &StepRecord, total: usize) -> String {
@@ -209,36 +209,19 @@ pub fn format_autopsy_summary(
             ));
         }
         // Show DeFi event type breakdown (skip if all Unknown/Transfer)
-        let defi_events: Vec<_> = all_flows
-            .iter()
-            .filter(|f| {
-                !matches!(
-                    f.event_type,
-                    crate::types::EventType::Unknown | crate::types::EventType::Transfer
-                )
-            })
-            .collect();
-        if !defi_events.is_empty() {
-            let swaps = defi_events
+        let (swaps, liquidations) =
+            all_flows
                 .iter()
-                .filter(|f| f.event_type == crate::types::EventType::Swap)
-                .count();
-            let liquidations = defi_events
-                .iter()
-                .filter(|f| {
-                    matches!(
-                        f.event_type,
-                        crate::types::EventType::LiquidationCall
-                            | crate::types::EventType::LiquidateBorrow
-                    )
-                })
-                .count();
-            if swaps > 0 {
-                lines.push_str(&format!("    Swap:  {} event(s)\n", swaps));
-            }
-            if liquidations > 0 {
-                lines.push_str(&format!("    Liq:   {} event(s)\n", liquidations));
-            }
+                .fold((0usize, 0usize), |(s, l), f| match f.event_type {
+                    EventType::Swap => (s + 1, l),
+                    EventType::LiquidationCall | EventType::LiquidateBorrow => (s, l + 1),
+                    _ => (s, l),
+                });
+        if swaps > 0 {
+            lines.push_str(&format!("    Swap:  {} event(s)\n", swaps));
+        }
+        if liquidations > 0 {
+            lines.push_str(&format!("    Liq:   {} event(s)\n", liquidations));
         }
         lines
     };
@@ -506,7 +489,7 @@ mod tests {
             value: U256::from(1_500_000_000_000_000_000u64),
             token: Some(Address::from_low_u64_be(0xAA)),
             step_index: 0,
-            event_type: crate::types::EventType::Unknown,
+            event_type: EventType::Unknown,
         }];
         let result = format_autopsy_summary(&[], &[], &trace, "0xabcdef1234", 100);
         assert!(result.contains("via receipt logs"));
@@ -527,7 +510,7 @@ mod tests {
             value: U256::from(1_000u64),
             token: Some(Address::from_low_u64_be(0xAA)),
             step_index: usize::MAX,
-            event_type: crate::types::EventType::Unknown,
+            event_type: EventType::Unknown,
         };
         let receipt_flows = vec![flow.clone(), flow.clone(), flow.clone()];
 
