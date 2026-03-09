@@ -3,7 +3,7 @@
 use ethrex_common::{Address, H256, U256};
 use serde::Serialize;
 
-use crate::types::{StepRecord, StorageWrite};
+use crate::types::{EventType, StepRecord, StorageWrite};
 
 use super::labels::{
     format_addr, format_pattern_detail, interpret_value, known_label, opcode_name, pattern_name,
@@ -156,21 +156,29 @@ impl AutopsyReport {
                     borrow_step, repay_step
                 ));
             }
-            md.push_str("| Step | From | To | Value | Token |\n");
-            md.push_str("|---|---|---|---|---|\n");
+            md.push_str("| Step | From | To | Value | Token | Event |\n");
+            md.push_str("|---|---|---|---|---|---|\n");
             for flow in &self.fund_flows {
                 let token = flow
                     .token
                     .map(|t| format_addr(&t))
                     .unwrap_or_else(|| "ETH".to_string());
                 let value_str = format!("{}", flow.value);
+                let event = match flow.event_type {
+                    EventType::Transfer => "Transfer",
+                    EventType::Swap => "Swap",
+                    EventType::LiquidationCall => "LiquidationCall",
+                    EventType::LiquidateBorrow => "LiquidateBorrow",
+                    EventType::Unknown => "—",
+                };
                 md.push_str(&format!(
-                    "| {} | {} | {} | {} | {} |\n",
+                    "| {} | {} | {} | {} | {} | {} |\n",
                     flow.step_index,
                     format_addr(&flow.from),
                     format_addr(&flow.to),
                     value_str,
-                    token
+                    token,
+                    event
                 ));
             }
             md.push_str(
@@ -365,6 +373,29 @@ impl AutopsyReport {
             parts.push(format!(
                 "{} ERC-20 transfer(s) detected.",
                 token_flows.len()
+            ));
+        }
+
+        // DeFi event type breakdown
+        let swap_count = flows
+            .iter()
+            .filter(|f| f.event_type == EventType::Swap)
+            .count();
+        let liquidation_count = flows
+            .iter()
+            .filter(|f| {
+                matches!(
+                    f.event_type,
+                    EventType::LiquidationCall | EventType::LiquidateBorrow
+                )
+            })
+            .count();
+        if swap_count > 0 {
+            parts.push(format!("{swap_count} DEX swap event(s) detected."));
+        }
+        if liquidation_count > 0 {
+            parts.push(format!(
+                "{liquidation_count} liquidation event(s) detected."
             ));
         }
 
