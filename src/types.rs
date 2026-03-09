@@ -14,7 +14,7 @@ use crate::autopsy::types::FundFlow;
 /// tracing (`High`). When LEVM reverts but the on-chain receipt shows success,
 /// fund flows are recovered from receipt logs (`Medium`). `Low` is reserved for
 /// partial or missing data.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
 pub enum DataQuality {
     /// Full opcode-level trace — LEVM execution matched on-chain result.
     #[default]

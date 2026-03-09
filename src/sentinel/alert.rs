@@ -362,6 +362,7 @@ mod tests {
             whitelist_matches: 0,
             summary: "test alert".to_string(),
             total_steps: 100,
+            data_quality: None,
             feature_vector: None,
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,

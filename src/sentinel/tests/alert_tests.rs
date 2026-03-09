@@ -93,6 +93,7 @@ fn test_sentinel_alert_serialization() {
         whitelist_matches: 0,
         summary: "Flash Loan detected".to_string(),
         total_steps: 10_000,
+        data_quality: None,
         feature_vector: None,
         #[cfg(feature = "ai_agent")]
         agent_verdict: None,
@@ -124,6 +125,7 @@ fn test_sentinel_alert_priority_from_score() {
         whitelist_matches: 0,
         summary: String::new(),
         total_steps: 0,
+        data_quality: None,
         feature_vector: None,
         #[cfg(feature = "ai_agent")]
         agent_verdict: None,
@@ -156,6 +158,7 @@ fn test_sentinel_alert_empty_patterns() {
         whitelist_matches: 0,
         summary: "Unusual gas pattern".to_string(),
         total_steps: 500,
+        data_quality: None,
         feature_vector: None,
         #[cfg(feature = "ai_agent")]
         agent_verdict: None,
@@ -199,6 +202,7 @@ fn test_sentinel_alert_multiple_suspicion_reasons() {
         whitelist_matches: 0,
         summary: "Multi-signal alert".to_string(),
         total_steps: 8000,
+        data_quality: None,
         feature_vector: None,
         #[cfg(feature = "ai_agent")]
         agent_verdict: None,
@@ -407,6 +411,7 @@ mod autopsy_sentinel_tests {
             whitelist_matches: 0,
             summary: "Flash Loan detected".to_string(),
             total_steps: 10_000,
+            data_quality: None,
             feature_vector: None,
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,
@@ -455,6 +460,7 @@ mod autopsy_sentinel_tests {
             whitelist_matches: 0,
             summary: String::new(),
             total_steps: 1000,
+            data_quality: None,
             feature_vector: None,
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,
@@ -484,6 +490,7 @@ mod autopsy_sentinel_tests {
             whitelist_matches: 0,
             summary: String::new(),
             total_steps: 0,
+            data_quality: None,
             feature_vector: None,
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,
@@ -520,6 +527,7 @@ mod autopsy_sentinel_tests {
             whitelist_matches: 0,
             summary: "Price manipulation detected".to_string(),
             total_steps: 5000,
+            data_quality: None,
             feature_vector: None,
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,
@@ -588,6 +596,7 @@ mod autopsy_sentinel_tests {
             total_value_at_risk: U256::zero(),
             summary: String::new(),
             total_steps: 100,
+            data_quality: None,
             feature_vector: None,
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,
@@ -636,4 +645,121 @@ mod autopsy_sentinel_tests {
 
         assert_eq!(total, one_eth() * 15);
     }
+}
+
+// ===========================================================================
+// Phase 2-A: data_quality field tests
+// ===========================================================================
+
+#[test]
+fn test_prefilter_alert_has_no_data_quality() {
+    let alert = SentinelAlert {
+        block_number: 1,
+        block_hash: H256::zero(),
+        tx_hash: H256::zero(),
+        tx_index: 0,
+        alert_priority: AlertPriority::Medium,
+        suspicion_reasons: vec![],
+        suspicion_score: 0.4,
+        #[cfg(feature = "autopsy")]
+        detected_patterns: vec![],
+        #[cfg(feature = "autopsy")]
+        fund_flows: vec![],
+        total_value_at_risk: U256::zero(),
+        whitelist_matches: 0,
+        summary: "prefilter only".to_string(),
+        total_steps: 0,
+        data_quality: None,
+        feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
+    };
+    assert!(alert.data_quality.is_none());
+}
+
+#[test]
+fn test_deep_replay_alert_has_high_data_quality() {
+    let alert = SentinelAlert {
+        block_number: 1,
+        block_hash: H256::zero(),
+        tx_hash: H256::zero(),
+        tx_index: 0,
+        alert_priority: AlertPriority::High,
+        suspicion_reasons: vec![],
+        suspicion_score: 0.7,
+        #[cfg(feature = "autopsy")]
+        detected_patterns: vec![],
+        #[cfg(feature = "autopsy")]
+        fund_flows: vec![],
+        total_value_at_risk: U256::zero(),
+        whitelist_matches: 0,
+        summary: "deep replay".to_string(),
+        total_steps: 500,
+        data_quality: Some(crate::types::DataQuality::High),
+        feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
+    };
+    assert_eq!(alert.data_quality, Some(crate::types::DataQuality::High));
+}
+
+#[test]
+fn test_data_quality_none_omitted_from_json() {
+    let alert = SentinelAlert {
+        block_number: 1,
+        block_hash: H256::zero(),
+        tx_hash: H256::zero(),
+        tx_index: 0,
+        alert_priority: AlertPriority::Medium,
+        suspicion_reasons: vec![],
+        suspicion_score: 0.4,
+        #[cfg(feature = "autopsy")]
+        detected_patterns: vec![],
+        #[cfg(feature = "autopsy")]
+        fund_flows: vec![],
+        total_value_at_risk: U256::zero(),
+        whitelist_matches: 0,
+        summary: String::new(),
+        total_steps: 0,
+        data_quality: None,
+        feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
+    };
+    let json = serde_json::to_string(&alert).expect("serialize");
+    assert!(
+        !json.contains("data_quality"),
+        "data_quality=None should be omitted from JSON, got: {json}"
+    );
+}
+
+#[test]
+fn test_data_quality_some_included_in_json() {
+    let alert = SentinelAlert {
+        block_number: 1,
+        block_hash: H256::zero(),
+        tx_hash: H256::zero(),
+        tx_index: 0,
+        alert_priority: AlertPriority::High,
+        suspicion_reasons: vec![],
+        suspicion_score: 0.7,
+        #[cfg(feature = "autopsy")]
+        detected_patterns: vec![],
+        #[cfg(feature = "autopsy")]
+        fund_flows: vec![],
+        total_value_at_risk: U256::zero(),
+        whitelist_matches: 0,
+        summary: String::new(),
+        total_steps: 0,
+        data_quality: Some(crate::types::DataQuality::High),
+        feature_vector: None,
+        #[cfg(feature = "ai_agent")]
+        agent_verdict: None,
+    };
+    let json = serde_json::to_string(&alert).expect("serialize");
+    assert!(
+        json.contains("data_quality"),
+        "data_quality=Some should be present in JSON, got: {json}"
+    );
+    assert!(json.contains("High"));
 }

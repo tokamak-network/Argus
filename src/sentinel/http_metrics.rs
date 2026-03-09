@@ -285,6 +285,7 @@ mod tests {
             whitelist_matches: 0,
             summary: format!("Test alert at block {block_number}"),
             total_steps: 100,
+            data_quality: None,
             feature_vector: None,
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,

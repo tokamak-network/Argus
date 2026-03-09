@@ -128,6 +128,7 @@ impl AnalysisContext {
             whitelist_matches: suspicion.whitelist_matches,
             summary,
             total_steps,
+            data_quality: None,
             feature_vector: self.features.clone(),
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,

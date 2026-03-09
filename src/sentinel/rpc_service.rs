@@ -340,7 +340,9 @@ async fn process_rpc_block(
             }
             Err(_) if prefilter_alert_mode => {
                 // Deep analysis failed but prefilter_alert_mode is on
-                build_prefilter_alert(rpc_block, suspicion)
+                let mut alert = build_prefilter_alert(rpc_block, suspicion);
+                alert.data_quality = Some(crate::types::DataQuality::Low);
+                alert
             }
             Err(_) => {
                 // Deep analysis failed and mode is strict — skip alert
@@ -388,6 +390,7 @@ fn build_alert_base(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelA
         whitelist_matches: suspicion.whitelist_matches,
         summary: String::new(),
         total_steps: 0,
+        data_quality: None,
         feature_vector: None,
         #[cfg(feature = "ai_agent")]
         agent_verdict: None,
@@ -435,6 +438,7 @@ fn build_deep_alert(
         detected_patterns,
         fund_flows,
         total_value_at_risk,
+        data_quality: Some(crate::types::DataQuality::High),
         ..build_alert_base(rpc_block, suspicion)
     }
 }

@@ -52,6 +52,7 @@ mod h5_integration_tests {
             whitelist_matches: 0,
             summary: format!("H5 test alert block={}", block_number),
             total_steps: 100,
+            data_quality: None,
             feature_vector: None,
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,

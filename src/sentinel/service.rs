@@ -205,6 +205,7 @@ impl SentinelService {
                             alert.score
                         ),
                         total_steps: 0,
+                        data_quality: None,
                         feature_vector: None,
                         #[cfg(feature = "ai_agent")]
                         agent_verdict: None,
@@ -315,6 +316,7 @@ impl SentinelService {
                 suspicion.score
             ),
             total_steps: 0,
+            data_quality: None,
             feature_vector: None,
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,

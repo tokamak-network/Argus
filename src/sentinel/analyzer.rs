@@ -123,6 +123,7 @@ impl DeepAnalyzer {
             whitelist_matches: suspicion.whitelist_matches,
             summary,
             total_steps,
+            data_quality: None,
             feature_vector: None,
             #[cfg(feature = "ai_agent")]
             agent_verdict: None,

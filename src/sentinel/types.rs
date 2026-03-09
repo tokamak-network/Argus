@@ -184,6 +184,12 @@ pub struct SentinelAlert {
     pub summary: String,
     /// Number of opcode steps recorded during replay.
     pub total_steps: usize,
+    /// Data quality indicator for the alert's underlying trace data.
+    /// `None` for prefilter-only alerts (no replay), `Some(High)` for successful
+    /// deep replay, `Some(Medium)` for receipt-based fallback, `Some(Low)` for
+    /// partial/failed replay.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_quality: Option<crate::types::DataQuality>,
     /// Numerical feature vector extracted by the adaptive pipeline.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub feature_vector: Option<super::pipeline::FeatureVector>,
