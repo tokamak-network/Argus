@@ -24,3 +24,9 @@ scripts/.defillama_hacks_cache.json
 
 # Promotional content (drafts, not for repo)
 content/
+
+# Tool directories (local only)
+.openclaw/
+
+# Scripts not for public release
+scripts/cross_validate.py
