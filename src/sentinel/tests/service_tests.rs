@@ -205,9 +205,7 @@ fn test_alert_handler_log_handler_doesnt_panic() {
         alert_priority: crate::sentinel::types::AlertPriority::High,
         suspicion_reasons: vec![],
         suspicion_score: 0.6,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: U256::zero(),
         whitelist_matches: 0,
@@ -270,9 +268,7 @@ fn test_counting_alert_handler() {
         alert_priority: crate::sentinel::types::AlertPriority::Medium,
         suspicion_reasons: vec![],
         suspicion_score: 0.4,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: U256::zero(),
         whitelist_matches: 0,

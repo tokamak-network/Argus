@@ -44,9 +44,7 @@ mod h5_integration_tests {
                 AlertPriority::High => 0.6,
                 AlertPriority::Medium => 0.4,
             },
-            #[cfg(feature = "autopsy")]
             detected_patterns: vec![],
-            #[cfg(feature = "autopsy")]
             fund_flows: vec![],
             total_value_at_risk: U256::zero(),
             whitelist_matches: 0,
@@ -362,7 +360,6 @@ mod h5_integration_tests {
 /// Executes actual attacker + victim contracts through LEVM, captures the
 /// opcode trace, and verifies the classifier detects Reentrancy with
 /// confidence >= 0.7.
-#[cfg(feature = "autopsy")]
 mod reentrancy_bytecode_tests {
     use std::sync::Arc;
 
@@ -590,7 +587,6 @@ mod reentrancy_bytecode_tests {
 //   5. Verifies alerts and metrics end-to-end
 // ===========================================================================
 
-#[cfg(feature = "autopsy")]
 mod live_reentrancy_pipeline_tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};

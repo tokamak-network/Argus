@@ -10,7 +10,6 @@
 //! Because `EthRpcClient` uses blocking reqwest, all RPC calls are wrapped
 //! in `tokio::task::spawn_blocking` to avoid blocking the async runtime.
 
-#![cfg(all(feature = "sentinel", feature = "autopsy"))]
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

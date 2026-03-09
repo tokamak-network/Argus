@@ -85,9 +85,7 @@ fn test_sentinel_alert_serialization() {
             provider_address: Address::zero(),
         }],
         suspicion_score: 0.9,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: U256::from(50_u64) * one_eth(),
         whitelist_matches: 0,
@@ -117,9 +115,7 @@ fn test_sentinel_alert_priority_from_score() {
         alert_priority: AlertPriority::from_score(0.85),
         suspicion_reasons: vec![],
         suspicion_score: 0.85,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: U256::zero(),
         whitelist_matches: 0,
@@ -150,9 +146,7 @@ fn test_sentinel_alert_empty_patterns() {
             gas_limit: 620_000,
         }],
         suspicion_score: 0.15,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: U256::zero(),
         whitelist_matches: 0,
@@ -194,9 +188,7 @@ fn test_sentinel_alert_multiple_suspicion_reasons() {
         alert_priority: AlertPriority::from_score(total_score),
         suspicion_reasons: reasons,
         suspicion_score: total_score,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: one_eth(),
         whitelist_matches: 0,
@@ -231,7 +223,6 @@ fn test_replay_result_fields() {
             success: true,
             output: bytes::Bytes::new(),
             success_override: None,
-            #[cfg(feature = "autopsy")]
             receipt_fund_flows: Vec::new(),
             data_quality: crate::types::DataQuality::High,
             revert_cause: None,
@@ -372,7 +363,6 @@ fn test_load_block_header_not_found() {
 // H-2: Autopsy-gated deep analysis tests
 // ===========================================================================
 
-#[cfg(feature = "autopsy")]
 mod autopsy_sentinel_tests {
     use super::*;
     use crate::autopsy::types::{AttackPattern, DetectedPattern, FundFlow};
@@ -667,9 +657,7 @@ fn test_prefilter_alert_has_no_data_quality() {
         alert_priority: AlertPriority::Medium,
         suspicion_reasons: vec![],
         suspicion_score: 0.4,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: U256::zero(),
         whitelist_matches: 0,
@@ -693,9 +681,7 @@ fn test_deep_replay_alert_has_high_data_quality() {
         alert_priority: AlertPriority::High,
         suspicion_reasons: vec![],
         suspicion_score: 0.7,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: U256::zero(),
         whitelist_matches: 0,
@@ -719,9 +705,7 @@ fn test_data_quality_none_omitted_from_json() {
         alert_priority: AlertPriority::Medium,
         suspicion_reasons: vec![],
         suspicion_score: 0.4,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: U256::zero(),
         whitelist_matches: 0,
@@ -749,9 +733,7 @@ fn test_data_quality_some_included_in_json() {
         alert_priority: AlertPriority::High,
         suspicion_reasons: vec![],
         suspicion_score: 0.7,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: U256::zero(),
         whitelist_matches: 0,

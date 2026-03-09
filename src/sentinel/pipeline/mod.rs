@@ -17,7 +17,6 @@ pub use context::{AnalysisContext, AnalysisStep, StepResult};
 pub use features::{FeatureVector, detect_reentrancy_depth};
 pub use orchestrator::{AnalysisPipeline, PipelineMetrics};
 pub use steps::{AnomalyDetector, ConfidenceScorer, ReportGenerator, TraceAnalyzer};
-#[cfg(feature = "autopsy")]
 pub use steps::{FundFlowAnalyzer, PatternMatcher};
 
 // Re-export opcode constants for feature extraction (used by features + steps)

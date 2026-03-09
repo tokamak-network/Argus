@@ -3,11 +3,9 @@
 use ethrex_common::types::Block;
 use ethrex_storage::Store;
 
-#[cfg(feature = "autopsy")]
 use crate::autopsy::types::{DetectedPattern, FundFlow};
 
 use super::features::FeatureVector;
-#[cfg(feature = "autopsy")]
 use super::steps::{compute_total_value, generate_summary};
 use crate::sentinel::replay::ReplayResult;
 use crate::sentinel::types::{
@@ -49,10 +47,8 @@ pub struct AnalysisContext {
     /// Replay result from TraceAnalyzer (populated by step 1).
     pub replay_result: Option<ReplayResult>,
     /// Attack patterns detected by the classifier.
-    #[cfg(feature = "autopsy")]
     pub patterns: Vec<DetectedPattern>,
     /// Fund flows extracted by the tracer.
-    #[cfg(feature = "autopsy")]
     pub fund_flows: Vec<FundFlow>,
     /// Extracted numerical features for anomaly scoring.
     pub features: Option<FeatureVector>,
@@ -70,9 +66,7 @@ impl AnalysisContext {
     pub(super) fn new() -> Self {
         Self {
             replay_result: None,
-            #[cfg(feature = "autopsy")]
             patterns: Vec::new(),
-            #[cfg(feature = "autopsy")]
             fund_flows: Vec::new(),
             features: None,
             anomaly_score: None,
@@ -97,20 +91,8 @@ impl AnalysisContext {
         let combined = suspicion.score.max(confidence);
         let alert_priority = AlertPriority::from_score(combined);
 
-        #[cfg(feature = "autopsy")]
         let total_value_at_risk = compute_total_value(&self.fund_flows);
-        #[cfg(not(feature = "autopsy"))]
-        let total_value_at_risk = ethrex_common::U256::zero();
-
-        #[cfg(feature = "autopsy")]
         let summary = generate_summary(&self.patterns, total_value_at_risk, block_number);
-        #[cfg(not(feature = "autopsy"))]
-        let summary = format!(
-            "Block {}: anomaly score {:.2}, confidence {:.2}",
-            block_number,
-            self.anomaly_score.unwrap_or(0.0),
-            confidence,
-        );
 
         SentinelAlert {
             block_number,
@@ -120,9 +102,7 @@ impl AnalysisContext {
             alert_priority,
             suspicion_reasons: suspicion.reasons.clone(),
             suspicion_score: combined,
-            #[cfg(feature = "autopsy")]
             detected_patterns: self.patterns.clone(),
-            #[cfg(feature = "autopsy")]
             fund_flows: self.fund_flows.clone(),
             total_value_at_risk,
             whitelist_matches: suspicion.whitelist_matches,

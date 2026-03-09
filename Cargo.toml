@@ -31,6 +31,7 @@ autopsy = [
     "dep:rustc-hash",
 ]
 sentinel = [
+    "autopsy",
     "dep:rustc-hash",
     "dep:hex",
     "dep:ethrex-storage",

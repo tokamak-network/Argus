@@ -168,44 +168,41 @@ impl AlertDeduplicator {
 
     /// Extract deduplication keys from an alert.
     ///
-    /// With `autopsy`: one key per detected pattern (pattern_name + target_contract).
-    /// Without `autopsy`: single key from tx_hash.
+    /// One key per detected pattern (pattern_name + target_contract) when patterns
+    /// are present; falls back to a single key from tx_hash when none are found.
     fn extract_keys(alert: &SentinelAlert) -> Vec<DeduplicationKey> {
-        #[cfg(feature = "autopsy")]
-        {
-            if !alert.detected_patterns.is_empty() {
-                return alert
-                    .detected_patterns
-                    .iter()
-                    .map(|dp| {
-                        let pattern_name = match &dp.pattern {
-                            crate::autopsy::types::AttackPattern::Reentrancy {
-                                target_contract,
-                                ..
-                            } => format!("Reentrancy:{:#x}", target_contract),
-                            crate::autopsy::types::AttackPattern::FlashLoan {
-                                provider, ..
-                            } => {
-                                let addr = provider.unwrap_or_default();
-                                format!("FlashLoan:{:#x}", addr)
-                            }
-                            crate::autopsy::types::AttackPattern::PriceManipulation { .. } => {
-                                "PriceManipulation:global".to_string()
-                            }
-                            crate::autopsy::types::AttackPattern::AccessControlBypass {
-                                contract,
-                                ..
-                            } => format!("AccessControlBypass:{:#x}", contract),
-                        };
-                        DeduplicationKey {
-                            identity: pattern_name,
+        if !alert.detected_patterns.is_empty() {
+            return alert
+                .detected_patterns
+                .iter()
+                .map(|dp| {
+                    let pattern_name = match &dp.pattern {
+                        crate::autopsy::types::AttackPattern::Reentrancy {
+                            target_contract,
+                            ..
+                        } => format!("Reentrancy:{:#x}", target_contract),
+                        crate::autopsy::types::AttackPattern::FlashLoan {
+                            provider, ..
+                        } => {
+                            let addr = provider.unwrap_or_default();
+                            format!("FlashLoan:{:#x}", addr)
                         }
-                    })
-                    .collect();
-            }
+                        crate::autopsy::types::AttackPattern::PriceManipulation { .. } => {
+                            "PriceManipulation:global".to_string()
+                        }
+                        crate::autopsy::types::AttackPattern::AccessControlBypass {
+                            contract,
+                            ..
+                        } => format!("AccessControlBypass:{:#x}", contract),
+                    };
+                    DeduplicationKey {
+                        identity: pattern_name,
+                    }
+                })
+                .collect();
         }
 
-        // Fallback (no autopsy feature or no detected patterns): use tx_hash
+        // No detected patterns: fall back to tx_hash
         vec![DeduplicationKey {
             identity: format!("{:#x}", alert.tx_hash),
         }]
@@ -354,9 +351,7 @@ mod tests {
             alert_priority: super::super::types::AlertPriority::High,
             suspicion_reasons: vec![],
             suspicion_score: 0.7,
-            #[cfg(feature = "autopsy")]
             detected_patterns: vec![],
-            #[cfg(feature = "autopsy")]
             fund_flows: vec![],
             total_value_at_risk: U256::zero(),
             whitelist_matches: 0,

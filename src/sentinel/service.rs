@@ -193,9 +193,7 @@ impl SentinelService {
                         alert_priority: AlertPriority::from_score(alert.score),
                         suspicion_reasons: vec![],
                         suspicion_score: alert.score,
-                        #[cfg(feature = "autopsy")]
                         detected_patterns: vec![],
-                        #[cfg(feature = "autopsy")]
                         fund_flows: vec![],
                         total_value_at_risk: ethrex_common::U256::zero(),
                         whitelist_matches: 0,
@@ -304,9 +302,7 @@ impl SentinelService {
             alert_priority: AlertPriority::from_score(suspicion.score),
             suspicion_reasons: suspicion.reasons.clone(),
             suspicion_score: suspicion.score,
-            #[cfg(feature = "autopsy")]
             detected_patterns: vec![],
-            #[cfg(feature = "autopsy")]
             fund_flows: vec![],
             total_value_at_risk: ethrex_common::U256::zero(),
             whitelist_matches: suspicion.whitelist_matches,

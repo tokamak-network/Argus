@@ -7,7 +7,6 @@
 //! - **prefilter_only = false** (default): Deep RPC replay. Requires an archive node.
 //! - **prefilter_only = true**: Receipt heuristics only. Works with any full node.
 
-#![cfg(all(feature = "sentinel", feature = "autopsy"))]
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -382,9 +381,7 @@ fn build_alert_base(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelA
         alert_priority: AlertPriority::from_score(suspicion.score),
         suspicion_reasons: suspicion.reasons.clone(),
         suspicion_score: suspicion.score,
-        #[cfg(feature = "autopsy")]
         detected_patterns: vec![],
-        #[cfg(feature = "autopsy")]
         fund_flows: vec![],
         total_value_at_risk: ethrex_common::U256::zero(),
         whitelist_matches: suspicion.whitelist_matches,

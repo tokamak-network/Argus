@@ -131,7 +131,6 @@ pub fn replay_tx_from_store(
         success: report.is_success(),
         output: report.output,
         success_override: None,
-        #[cfg(feature = "autopsy")]
         receipt_fund_flows: Vec::new(),
         data_quality: crate::types::DataQuality::High,
         revert_cause,

@@ -6,7 +6,6 @@
 //! - `GET /sentinel/metrics`  — JSON metrics snapshot (for dashboard)
 //! - `GET /sentinel/history`  — JSON paginated alert history
 
-#![cfg(all(feature = "sentinel", feature = "autopsy"))]
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -277,9 +276,7 @@ mod tests {
                 AlertPriority::High => 0.6,
                 AlertPriority::Medium => 0.4,
             },
-            #[cfg(feature = "autopsy")]
             detected_patterns: vec![],
-            #[cfg(feature = "autopsy")]
             fund_flows: vec![],
             total_value_at_risk: U256::zero(),
             whitelist_matches: 0,

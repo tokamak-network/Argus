@@ -193,7 +193,6 @@ impl AlertHistory {
         self.check_pattern_match(alert, target)
     }
 
-    #[cfg(feature = "autopsy")]
     fn check_pattern_match(&self, alert: &SentinelAlert, target: &str) -> bool {
         if alert.detected_patterns.is_empty() {
             return false;
@@ -213,10 +212,6 @@ impl AlertHistory {
         })
     }
 
-    #[cfg(not(feature = "autopsy"))]
-    fn check_pattern_match(&self, _alert: &SentinelAlert, _target: &str) -> bool {
-        true
-    }
 }
 
 /// Numeric rank for priority comparison (higher = more severe).
@@ -250,9 +245,7 @@ mod tests {
                 AlertPriority::High => 0.6,
                 AlertPriority::Medium => 0.4,
             },
-            #[cfg(feature = "autopsy")]
             detected_patterns: vec![],
-            #[cfg(feature = "autopsy")]
             fund_flows: vec![],
             total_value_at_risk: U256::zero(),
             whitelist_matches: 0,
@@ -538,7 +531,6 @@ mod tests {
         let _ = std::fs::remove_file(&path);
     }
 
-    #[cfg(feature = "autopsy")]
     #[test]
     fn history_filter_pattern_type() {
         use crate::autopsy::types::{AttackPattern, DetectedPattern};

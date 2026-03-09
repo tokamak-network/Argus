@@ -31,7 +31,6 @@
 //! let result = replay_tx_from_rpc(rpc_url, block_number, 0, &rpc_block, &config);
 //! ```
 
-#![cfg(all(feature = "sentinel", feature = "autopsy"))]
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -135,7 +134,6 @@ pub fn replay_tx_from_rpc(
         success: report.is_success(),
         output: report.output,
         success_override: None,
-        #[cfg(feature = "autopsy")]
         receipt_fund_flows: Vec::new(),
         data_quality: crate::types::DataQuality::High,
         revert_cause,
@@ -302,7 +300,6 @@ mod tests {
             success: true,
             output: bytes::Bytes::new(),
             success_override: None,
-            #[cfg(feature = "autopsy")]
             receipt_fund_flows: Vec::new(),
             data_quality: crate::types::DataQuality::High,
             revert_cause: None,

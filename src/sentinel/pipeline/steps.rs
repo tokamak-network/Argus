@@ -4,11 +4,8 @@ use ethrex_common::U256;
 use ethrex_common::types::Block;
 use ethrex_storage::Store;
 
-#[cfg(feature = "autopsy")]
 use crate::autopsy::classifier::AttackClassifier;
-#[cfg(feature = "autopsy")]
 use crate::autopsy::fund_flow::FundFlowTracer;
-#[cfg(feature = "autopsy")]
 use crate::autopsy::types::{DetectedPattern, FundFlow};
 
 use crate::sentinel::ml_model::AnomalyModel;
@@ -52,10 +49,8 @@ impl AnalysisStep for TraceAnalyzer {
 // Step 2: Run AttackClassifier to detect known attack patterns.
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "autopsy")]
 pub struct PatternMatcher;
 
-#[cfg(feature = "autopsy")]
 impl AnalysisStep for PatternMatcher {
     fn name(&self) -> &'static str {
         "PatternMatcher"
@@ -102,10 +97,8 @@ impl AnalysisStep for PatternMatcher {
 // Step 3: Run FundFlowTracer to extract value transfers.
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "autopsy")]
 pub struct FundFlowAnalyzer;
 
-#[cfg(feature = "autopsy")]
 impl AnalysisStep for FundFlowAnalyzer {
     fn name(&self) -> &'static str {
         "FundFlowAnalyzer"
@@ -207,9 +200,7 @@ impl AnalysisStep for ConfidenceScorer {
         let anomaly = ctx.anomaly_score.unwrap_or(0.0);
         let prefilter = suspicion.score;
 
-        // With autopsy: pattern 0.4 + anomaly 0.3 + prefilter 0.2 + fund_flow 0.1
-        // Without autopsy: anomaly 0.6 + prefilter 0.4
-        #[cfg(feature = "autopsy")]
+        // Confidence: pattern 0.4 + anomaly 0.3 + prefilter 0.2 + fund_flow 0.1
         let confidence = {
             let pattern_score = ctx
                 .patterns
@@ -233,9 +224,6 @@ impl AnalysisStep for ConfidenceScorer {
 
             pattern_score * 0.4 + anomaly * 0.3 + prefilter * 0.2 + fund_flow_score * 0.1
         };
-
-        #[cfg(not(feature = "autopsy"))]
-        let confidence = anomaly * 0.6 + prefilter * 0.4;
 
         ctx.final_confidence = Some(confidence);
         ctx.evidence
@@ -274,7 +262,6 @@ impl AnalysisStep for ReportGenerator {
 // Helpers
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "autopsy")]
 pub(super) fn compute_total_value(flows: &[FundFlow]) -> U256 {
     flows
         .iter()
@@ -282,7 +269,6 @@ pub(super) fn compute_total_value(flows: &[FundFlow]) -> U256 {
         .fold(U256::zero(), |acc, f| acc.saturating_add(f.value))
 }
 
-#[cfg(feature = "autopsy")]
 pub(super) fn generate_summary(
     patterns: &[DetectedPattern],
     total_value: U256,

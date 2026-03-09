@@ -96,9 +96,7 @@ mod tests {
             alert_priority: priority,
             suspicion_reasons: vec![],
             suspicion_score: score,
-            #[cfg(feature = "autopsy")]
             detected_patterns: vec![],
-            #[cfg(feature = "autopsy")]
             fund_flows: vec![],
             total_value_at_risk: U256::zero(),
             whitelist_matches: 0,

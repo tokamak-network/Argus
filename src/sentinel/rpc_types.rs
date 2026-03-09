@@ -3,7 +3,6 @@
 //! Converts `RpcBlock`, `RpcReceipt`, and `RpcTransaction` (from the autopsy
 //! RPC client) into ethrex-native types used by the Sentinel pipeline.
 
-#![cfg(all(feature = "sentinel", feature = "autopsy"))]
 
 use bytes::Bytes;
 use ethrex_common::types::{Block, BlockBody, BlockHeader, Log, Receipt, Transaction, TxType};

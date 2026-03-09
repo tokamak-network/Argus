@@ -33,24 +33,18 @@ pub struct AnalysisPipeline {
 impl AnalysisPipeline {
     /// Build the default pipeline with all available steps.
     ///
-    /// With the `autopsy` feature: 6 steps (trace, pattern, fund-flow, anomaly, confidence, report).
-    /// Without `autopsy`: 4 steps (trace, anomaly, confidence, report).
-    #[allow(clippy::vec_init_then_push)] // cfg-gated pushes prevent vec![] macro usage
+    /// 6 steps: trace, pattern, fund-flow, anomaly, confidence, report.
     pub fn default_pipeline() -> Self {
-        let mut steps: Vec<Box<dyn AnalysisStep>> = Vec::new();
+        use super::steps::{FundFlowAnalyzer, PatternMatcher};
 
-        steps.push(Box::new(TraceAnalyzer));
-
-        #[cfg(feature = "autopsy")]
-        {
-            use super::steps::{FundFlowAnalyzer, PatternMatcher};
-            steps.push(Box::new(PatternMatcher));
-            steps.push(Box::new(FundFlowAnalyzer));
-        }
-
-        steps.push(Box::new(AnomalyDetector));
-        steps.push(Box::new(ConfidenceScorer));
-        steps.push(Box::new(ReportGenerator));
+        let steps: Vec<Box<dyn AnalysisStep>> = vec![
+            Box::new(TraceAnalyzer),
+            Box::new(PatternMatcher),
+            Box::new(FundFlowAnalyzer),
+            Box::new(AnomalyDetector),
+            Box::new(ConfidenceScorer),
+            Box::new(ReportGenerator),
+        ];
 
         Self {
             steps,

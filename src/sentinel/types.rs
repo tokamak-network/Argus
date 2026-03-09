@@ -3,7 +3,6 @@
 use ethrex_common::{Address, H256, U256};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "autopsy")]
 use crate::autopsy::types::{AttackPattern, DetectedPattern, FundFlow};
 
 /// Configuration for the sentinel pre-filter.
@@ -170,10 +169,8 @@ pub struct SentinelAlert {
     /// For alerts without pipeline analysis, this equals the prefilter score.
     pub suspicion_score: f64,
     /// Attack patterns confirmed by deep analysis.
-    #[cfg(feature = "autopsy")]
     pub detected_patterns: Vec<DetectedPattern>,
     /// Fund flows extracted by deep analysis.
-    #[cfg(feature = "autopsy")]
     pub fund_flows: Vec<FundFlow>,
     /// Total value at risk across all fund flows.
     pub total_value_at_risk: U256,
@@ -199,7 +196,6 @@ pub struct SentinelAlert {
     pub agent_verdict: Option<super::ai::types::AgentVerdict>,
 }
 
-#[cfg(feature = "autopsy")]
 impl SentinelAlert {
     /// Highest confidence among all detected patterns.
     pub fn max_confidence(&self) -> f64 {
