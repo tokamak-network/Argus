@@ -46,6 +46,9 @@ const LIQUIDATE_BORROW_TOPIC: [u8; 32] = [
 ];
 
 /// Classify a log event by matching the first topic against known DeFi event signatures.
+///
+/// Returns [`EventType::Unknown`] for unrecognized topics. Callers that only process
+/// ERC-20 Transfer logs can use [`TRANSFER_TOPIC`] directly instead.
 pub fn classify_log_event(topics: &[[u8; 32]]) -> EventType {
     if topics.is_empty() {
         return EventType::Unknown;
@@ -286,12 +289,16 @@ mod tests {
     // --- trace_from_receipt_logs integration tests ---
 
     fn make_transfer_log(from: [u8; 20], to: [u8; 20], amount: u64) -> RpcLog {
+        // Ethereum address (20 bytes) is right-aligned in a 32-byte topic word.
+        const ADDR_OFFSET: usize = 32 - 20;
+        // u64 (8 bytes) is right-aligned in a 32-byte uint256 data word.
+        const U64_OFFSET: usize = 32 - 8;
         let mut from_topic = [0u8; 32];
-        from_topic[12..].copy_from_slice(&from);
+        from_topic[ADDR_OFFSET..].copy_from_slice(&from);
         let mut to_topic = [0u8; 32];
-        to_topic[12..].copy_from_slice(&to);
+        to_topic[ADDR_OFFSET..].copy_from_slice(&to);
         let mut data = [0u8; 32];
-        data[24..].copy_from_slice(&amount.to_be_bytes());
+        data[U64_OFFSET..].copy_from_slice(&amount.to_be_bytes());
         RpcLog {
             address: Address::zero(),
             topics: vec![
@@ -310,6 +317,10 @@ mod tests {
         let log = make_transfer_log(from, to, 1000);
         let flows = FundFlowTracer::trace_from_receipt_logs(&[log]);
         assert_eq!(flows.len(), 1);
+        assert_eq!(flows[0].from, Address::from(from));
+        assert_eq!(flows[0].to, Address::from(to));
+        assert_eq!(flows[0].value, U256::from(1000u64));
+        assert_eq!(flows[0].token, Some(Address::zero()));
         assert_eq!(flows[0].event_type, EventType::Transfer);
         assert_eq!(flows[0].step_index, usize::MAX);
     }
