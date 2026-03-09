@@ -82,6 +82,7 @@ fn test_record_with_custom_stack_capture() {
     // Capture only 1 stack item per step
     let config = ReplayConfig {
         stack_top_capture: 1,
+        ..ReplayConfig::default()
     };
 
     let engine = ReplayEngine::record(&mut db, env, &tx, config).expect("recording should succeed");

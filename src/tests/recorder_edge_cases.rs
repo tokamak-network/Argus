@@ -18,6 +18,7 @@ use crate::types::ReplayConfig;
 fn test_capture_empty_stack() {
     let config = ReplayConfig {
         stack_top_capture: 8,
+        ..ReplayConfig::default()
     };
     let mut recorder = DebugRecorder::new(config);
     let stack = Stack::default(); // empty stack, len() == 0
@@ -47,6 +48,7 @@ fn test_capture_empty_stack() {
 fn test_capture_stack_fewer_than_requested() {
     let config = ReplayConfig {
         stack_top_capture: 8, // request 8 items
+        ..ReplayConfig::default()
     };
     let mut recorder = DebugRecorder::new(config);
     let mut stack = Stack::default();
@@ -86,6 +88,7 @@ fn test_capture_stack_fewer_than_requested() {
 fn test_capture_stack_exact_match() {
     let config = ReplayConfig {
         stack_top_capture: 2, // request exactly 2
+        ..ReplayConfig::default()
     };
     let mut recorder = DebugRecorder::new(config);
     let mut stack = Stack::default();
@@ -107,6 +110,7 @@ fn test_capture_stack_zero_config() {
     // Config requests 0 stack items — should always produce empty
     let config = ReplayConfig {
         stack_top_capture: 0,
+        ..ReplayConfig::default()
     };
     let mut recorder = DebugRecorder::new(config);
     let mut stack = Stack::default();
@@ -132,6 +136,7 @@ fn test_capture_stack_zero_config() {
 fn test_capture_stack_more_items_than_requested() {
     let config = ReplayConfig {
         stack_top_capture: 2, // request only 2
+        ..ReplayConfig::default()
     };
     let mut recorder = DebugRecorder::new(config);
     let mut stack = Stack::default();

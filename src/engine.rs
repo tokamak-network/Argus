@@ -176,6 +176,106 @@ impl ReplayEngine {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Autopsy: prior same-sender TX replay helpers
+// ---------------------------------------------------------------------------
+
+/// Find prior transactions from the same sender as the target transaction.
+///
+/// Returns all transactions from `block_txs` that:
+/// - have the same `from` address as `target_tx`
+/// - appear before `target_tx` in the block (by vector index)
+///
+/// The target TX is identified by its hash. When the target TX is not found
+/// in `block_txs` (or appears at index 0), an empty Vec is returned.
+#[cfg(feature = "autopsy")]
+pub(crate) fn find_prior_same_sender_txs(
+    block_txs: &[crate::autopsy::rpc_client::RpcTransaction],
+    target_tx: &crate::autopsy::rpc_client::RpcTransaction,
+) -> Vec<crate::autopsy::rpc_client::RpcTransaction> {
+    let target_index = block_txs
+        .iter()
+        .position(|tx| tx.hash == target_tx.hash)
+        .unwrap_or(0);
+
+    block_txs[..target_index]
+        .iter()
+        .filter(|tx| tx.from == target_tx.from)
+        .cloned()
+        .collect()
+}
+
+/// Replay prior same-sender transactions to establish correct nonce state.
+///
+/// Executes each transaction in `prior_txs` against `db` in order, updating
+/// the EVM state (account nonce, storage, balances). Results are discarded —
+/// only the state update matters. When a prior TX fails, logs a warning and
+/// continues (best-effort).
+///
+/// If `prior_txs.len() > max_prior_txs`, only the first `max_prior_txs`
+/// are replayed and a `[WARNING]` is emitted.
+#[cfg(feature = "autopsy")]
+pub(crate) fn replay_prior_txs(
+    db: &mut GeneralizedDatabase,
+    block_header: &crate::autopsy::rpc_client::RpcBlockHeader,
+    prior_txs: &[crate::autopsy::rpc_client::RpcTransaction],
+    max_prior_txs: usize,
+) -> Vec<crate::types::PriorTxReplayResult> {
+    use crate::autopsy::rpc_client::{build_env_from_rpc, rpc_tx_to_ethrex};
+
+    let total = prior_txs.len();
+    if total > max_prior_txs {
+        eprintln!(
+            "[autopsy] [WARNING] {total} prior txs from same sender exceed \
+             max_prior_txs={max_prior_txs}. Replaying first {max_prior_txs} only."
+        );
+    }
+
+    let limit = total.min(max_prior_txs);
+    let mut results = Vec::with_capacity(limit);
+
+    for (i, rpc_tx) in prior_txs[..limit].iter().enumerate() {
+        let env = build_env_from_rpc(rpc_tx, block_header);
+        let tx = rpc_tx_to_ethrex(rpc_tx);
+        let hash_short: String = format!("0x{:x}", rpc_tx.hash).chars().take(10).collect();
+        eprintln!(
+            "[autopsy] Replaying prior tx {}/{}: {}... (nonce {})",
+            i + 1,
+            limit,
+            hash_short,
+            rpc_tx.nonce,
+        );
+
+        let (success, error) = match VM::new(env, db, &tx, LevmCallTracer::disabled(), VMType::L1) {
+            Err(e) => (false, Some(format!("VM init: {e}"))),
+            Ok(mut vm) => match vm.execute() {
+                Ok(_) => (true, None),
+                Err(e) => (false, Some(format!("VM exec: {e}"))),
+            },
+        };
+
+        if success {
+            eprintln!("[autopsy] Prior tx {}/{} replayed ✓", i + 1, limit);
+        } else if let Some(ref err_msg) = error {
+            eprintln!(
+                "[autopsy] [WARNING] Prior tx {}/{} failed: {}. Continuing.",
+                i + 1,
+                limit,
+                err_msg
+            );
+        }
+
+        results.push(crate::types::PriorTxReplayResult {
+            tx_hash: rpc_tx.hash,
+            nonce: rpc_tx.nonce,
+            success,
+            error,
+        });
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use ethrex_levm::errors::{DatabaseError, ExceptionalHalt, InternalError, TxResult, VMError};

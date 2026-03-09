@@ -69,14 +69,40 @@ pub enum RevertCause {
 pub struct ReplayConfig {
     /// Number of stack top items to capture per step (default: 8).
     pub stack_top_capture: usize,
+    /// Maximum number of prior same-sender transactions to replay before
+    /// the target TX to establish correct nonce state (default: 10).
+    /// Exceeding this limit emits a `[WARNING]` and replays only the first N.
+    pub max_prior_txs: usize,
 }
 
 impl Default for ReplayConfig {
     fn default() -> Self {
         Self {
             stack_top_capture: 8,
+            max_prior_txs: 10,
         }
     }
+}
+
+/// Result of replaying a single prior same-sender transaction.
+///
+/// Prior TXs are replayed only to advance the EVM state (nonce, storage,
+/// balances) so that the target transaction can be replayed with the correct
+/// nonce. These results are **not** included in the Autopsy analysis report.
+#[cfg(feature = "autopsy")]
+#[derive(Debug, Clone, Serialize)]
+pub struct PriorTxReplayResult {
+    /// Transaction hash.
+    pub tx_hash: H256,
+    /// Transaction nonce.
+    pub nonce: u64,
+    /// Whether the VM executed the TX without a fatal error.
+    /// Note: a reverted TX (`TxResult::Revert`) still counts as success
+    /// because the nonce is incremented even on revert.
+    pub success: bool,
+    /// Fatal error message when the VM could not execute the TX at all.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 /// A storage write captured during SSTORE execution.

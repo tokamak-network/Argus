@@ -157,6 +157,20 @@ impl EthRpcClient {
         parse_rpc_receipt(&result)
     }
 
+    /// Fetch all transactions in a block in index order.
+    ///
+    /// Uses `eth_getBlockByNumber(block, true)` to retrieve the full block with
+    /// all transactions in a single RPC call. Transactions are returned in
+    /// transaction-index order (as they appear in the block), avoiding N+1 RPC
+    /// calls.
+    pub fn fetch_block_txs_ordered(
+        &self,
+        block_number: u64,
+    ) -> Result<Vec<RpcTransaction>, DebuggerError> {
+        let block = self.eth_get_block_by_number_with_txs(block_number)?;
+        Ok(block.transactions)
+    }
+
     /// Fetch all receipts for a block in a single RPC call.
     ///
     /// Uses `eth_getBlockReceipts` (supported by Alchemy, Infura, Geth 1.13+).

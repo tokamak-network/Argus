@@ -311,6 +311,8 @@ fn fetch_tx_and_block(
 }
 
 /// Create a remote VM database and build the EVM environment + transaction.
+///
+/// Returns `(db, env, tx, pre_block, block_header)`.
 #[cfg(feature = "autopsy")]
 fn setup_replay(
     rpc_url: &str,
@@ -323,6 +325,7 @@ fn setup_replay(
         Environment,
         Transaction,
         u64, // pre_block
+        crate::autopsy::rpc_client::RpcBlockHeader,
     ),
     DebuggerError,
 > {
@@ -343,7 +346,7 @@ fn setup_replay(
     let tx = crate::autopsy::rpc_types::rpc_tx_to_ethrex(rpc_tx);
 
     let db = GeneralizedDatabase::new(Arc::new(remote_db));
-    Ok((db, env, tx, pre_block))
+    Ok((db, env, tx, pre_block, block_header))
 }
 
 /// Parameters for post-replay analysis and report generation.
@@ -521,10 +524,46 @@ fn run_autopsy(
         fetch_tx_and_block(rpc_url, tx_hash, block_number_override, &rpc_config)?;
 
     eprintln!("[autopsy] Block #{block_num}, setting up remote database...");
-    let (mut db, env, tx, pre_block) = setup_replay(rpc_url, block_num, &rpc_tx, &rpc_config)?;
+    let (mut db, env, tx, pre_block, block_header) =
+        setup_replay(rpc_url, block_num, &rpc_tx, &rpc_config)?;
 
-    eprintln!("[autopsy] Replaying transaction...");
-    let engine = ReplayEngine::record(&mut db, env, &tx, ReplayConfig::default())?;
+    let replay_config = ReplayConfig::default();
+
+    // Replay prior same-sender transactions to establish correct nonce state.
+    // This fixes "Nonce mismatch" errors when the target TX is not the first
+    // transaction from its sender in the block.
+    {
+        use crate::autopsy::rpc_client::EthRpcClient;
+        use crate::engine::{find_prior_same_sender_txs, replay_prior_txs};
+        let block_client = EthRpcClient::with_config(rpc_url, 0, rpc_config.clone());
+        match block_client.fetch_block_txs_ordered(block_num) {
+            Ok(block_txs) => {
+                let prior_txs = find_prior_same_sender_txs(&block_txs, &rpc_tx);
+                if !prior_txs.is_empty() {
+                    eprintln!(
+                        "[autopsy] Found {} prior tx(s) from same sender, \
+                         replaying to establish nonce state...",
+                        prior_txs.len()
+                    );
+                    replay_prior_txs(
+                        &mut db,
+                        &block_header,
+                        &prior_txs,
+                        replay_config.max_prior_txs,
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!(
+                    "[autopsy] [WARNING] Failed to fetch block txs: {e}. \
+                     Skipping prior TX replay."
+                );
+            }
+        }
+    }
+
+    eprintln!("[autopsy] Replaying target transaction...");
+    let engine = ReplayEngine::record(&mut db, env, &tx, replay_config)?;
     eprintln!("[autopsy] Recorded {} steps. Analyzing...", engine.len());
 
     let ctx = AnalysisContext {
