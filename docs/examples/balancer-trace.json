@@ -1,0 +1,474 @@
+{
+  "tx_hash": "0x5a7f67e7edf2edea9ce6d5b485f1da1563a806be66f2e070ecb34c8ee2937c68",
+  "block_number": 24587746,
+  "summary": "**VERDICT: Reentrancy + Flash Loan + Price Manipulation + Price Manipulation + Price Manipulation + Price Manipulation + Price Manipulation + Access Control Bypass detected.** Execution reached depth 6 across 14 contract(s) with 28 external calls. Suspected flash loan provider: `0xba12222222228d8ba445958a75a0704d566bf2c8` (Balancer V2 Vault) (heuristic — first CALL at entry depth). 4 ERC-20 transfer(s) detected. 18 storage write(s).",
+  "execution_overview": {
+    "max_call_depth": 6,
+    "unique_contracts": 14,
+    "call_count": 28,
+    "sstore_count": 18,
+    "sload_count": 84,
+    "log_count": 6,
+    "create_count": 0,
+    "top_opcodes": [
+      [
+        0,
+        "PUSHn",
+        4543
+      ],
+      [
+        0,
+        "DUPn",
+        3531
+      ],
+      [
+        0,
+        "SWAPn",
+        1727
+      ],
+      [
+        0,
+        "POP",
+        1166
+      ],
+      [
+        0,
+        "JUMPI",
+        933
+      ]
+    ]
+  },
+  "attack_patterns": [
+    {
+      "Reentrancy": {
+        "target_contract": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+        "reentrant_call_step": 4763,
+        "state_modified_step": 8135,
+        "call_depth_at_entry": 3
+      }
+    },
+    {
+      "FlashLoan": {
+        "borrow_step": 1800,
+        "borrow_amount": "0x1bc16d674ec80000",
+        "repay_step": 12071,
+        "repay_amount": "0x16ce867cca910000",
+        "provider": "0xba12222222228d8ba445958a75a0704d566bf2c8",
+        "token": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+      }
+    },
+    {
+      "PriceManipulation": {
+        "oracle_read_before": 936,
+        "swap_step": 1800,
+        "oracle_read_after": 3604,
+        "price_delta_percent": -1.0
+      }
+    },
+    {
+      "PriceManipulation": {
+        "oracle_read_before": 3604,
+        "swap_step": 11573,
+        "oracle_read_after": 12189,
+        "price_delta_percent": -1.0
+      }
+    },
+    {
+      "PriceManipulation": {
+        "oracle_read_before": 4763,
+        "swap_step": 11573,
+        "oracle_read_after": 14034,
+        "price_delta_percent": -1.0
+      }
+    },
+    {
+      "PriceManipulation": {
+        "oracle_read_before": 6778,
+        "swap_step": 11573,
+        "oracle_read_after": 14034,
+        "price_delta_percent": -1.0
+      }
+    },
+    {
+      "PriceManipulation": {
+        "oracle_read_before": 10445,
+        "swap_step": 11573,
+        "oracle_read_after": 12189,
+        "price_delta_percent": -1.0
+      }
+    },
+    {
+      "AccessControlBypass": {
+        "sstore_step": 636,
+        "contract": "0xba12222222228d8ba445958a75a0704d566bf2c8"
+      }
+    }
+  ],
+  "fund_flows": [
+    {
+      "from": "0xba12222222228d8ba445958a75a0704d566bf2c8",
+      "to": "0x50d3865a63d52c0a54e4679949647ea752107390",
+      "value": "0x1bc16d674ec80000",
+      "token": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "step_index": 1800,
+      "event_type": "Transfer"
+    },
+    {
+      "from": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+      "to": "0x50d3865a63d52c0a54e4679949647ea752107390",
+      "value": "0xd0e5bb9f",
+      "token": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "step_index": 11573,
+      "event_type": "Transfer"
+    },
+    {
+      "from": "0x50d3865a63d52c0a54e4679949647ea752107390",
+      "to": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+      "value": "0x16ce867cca910000",
+      "token": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "step_index": 12071,
+      "event_type": "Transfer"
+    },
+    {
+      "from": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+      "to": "0xcf2e57261d038b76ccb29a124e93937000782da1",
+      "value": "0x95775c13ee6a",
+      "token": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "step_index": 12807,
+      "event_type": "Transfer"
+    }
+  ],
+  "storage_diffs": [
+    {
+      "address": "0xba12222222228d8ba445958a75a0704d566bf2c8",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "old_value": "0x1",
+      "new_value": "0x2"
+    },
+    {
+      "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "slot": "0x3a0f132b80eb284c2ac247698d2ec7dce851ca420b700161ad6082d0e9762150",
+      "old_value": "0x5d4a1adbe1b399205c",
+      "new_value": "0x5d2e596e7a64d1205c"
+    },
+    {
+      "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "slot": "0xc2dd227fe58f2de48af4ab19be66c6d76f4d8bee2e97311389994e403eec37d0",
+      "old_value": "0x0",
+      "new_value": "0x1bc16d674ec80000"
+    },
+    {
+      "address": "0xcbe3fefdc43cdb24869097ebd55f881ce2b82065",
+      "slot": "0x000000000000000000000000000000000000000000000000000000000000b833",
+      "old_value": "0x0",
+      "new_value": "0xa6c4fcf2d2fcf40c000000000000127947db52ffffbd2ac9d34869a8d15701"
+    },
+    {
+      "address": "0xcbe3fefdc43cdb24869097ebd55f881ce2b82065",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000010003",
+      "old_value": "0x454e62e725ad5a47931043f7e6369cfbb879bdfd0169a8d14bb82f",
+      "new_value": "0x454e62e725ad5a47931043f7e6369cfbb879bdfd0169a8d157b830"
+    },
+    {
+      "address": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "old_value": "0x103e8d70000fcf40c0000000000000000000306d54409b8735f930f03",
+      "new_value": "0x3e8d70000fcf40c0000000000000000000306d54409b8735f930f03"
+    },
+    {
+      "address": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "old_value": "0x3e8d70000fcf40c0000000000000000000306d54409b8735f930f03",
+      "new_value": "0x3e8d70000fcf40b0000000000000000000306cab55f50acb14d9c75"
+    },
+    {
+      "address": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "old_value": "0x10489adf6072364ae45d77522b45de7",
+      "new_value": "0x10489adf6072364ae45d77522b45de7"
+    },
+    {
+      "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "slot": "0xe8afbef606f9c1f5a0237a5c4fb54cef427f30633998ef02a15753397467a176",
+      "old_value": "0x9fd7ff7adf",
+      "new_value": "0x9f0719bf40"
+    },
+    {
+      "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "slot": "0x0419a41afdd714a68ae5d360eadf3c938ee64271e22174fefe972958890dffb7",
+      "old_value": "0x2c22b",
+      "new_value": "0xd0e87dca"
+    },
+    {
+      "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "slot": "0xc2dd227fe58f2de48af4ab19be66c6d76f4d8bee2e97311389994e403eec37d0",
+      "old_value": "0x1bc16d674ec80000",
+      "new_value": "0x4f2e6ea84370000"
+    },
+    {
+      "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "slot": "0xf0bef342da2b79d58016a406cebfa82d46b48b63d70d17a133638ae428e23aa6",
+      "old_value": "0x64c822d5f568a588b",
+      "new_value": "0x66350b3dc211b588b"
+    },
+    {
+      "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "slot": "0xf0bef342da2b79d58016a406cebfa82d46b48b63d70d17a133638ae428e23aa6",
+      "old_value": "0x66350b3dc211b588b",
+      "new_value": "0x663501e64c5076a21"
+    },
+    {
+      "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "slot": "0x11b7a45e8593be26c600dca1574119058e10079cef3643605a2345acaa859797",
+      "old_value": "0x872e6ba367ad02",
+      "new_value": "0x87c3e2ff7b9b6c"
+    },
+    {
+      "address": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000004",
+      "old_value": "0x69a8d14b0000000000000000000000000000000000000000000000000000",
+      "new_value": "0x0"
+    },
+    {
+      "address": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000004",
+      "old_value": "0x0",
+      "new_value": "0x69a8d1570000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "address": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+      "slot": "0x000000000000000000000000000000000000000000000000000000000000000c",
+      "old_value": "0x9fd7ff7adf00000000000000064c822d5f568a588b",
+      "new_value": "0x9f0719bf40000000000000000663501e64c5076a21"
+    },
+    {
+      "address": "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+      "slot": "0x0000000000000000000000000000000000000000000000000000000000000002",
+      "old_value": "0x3e8d70000fcf40b0000000000000000000306cab55f50acb14d9c75",
+      "new_value": "0x103e8d70000fcf40b0000000000000000000306cab55f50acb14d9c75"
+    }
+  ],
+  "total_steps": 17802,
+  "key_steps": [
+    {
+      "step_index": 636,
+      "annotation": "SSTORE without access control check",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 936,
+      "annotation": "Oracle price read (before manipulation)",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 1742,
+      "annotation": "SSTORE on `0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2` (WETH): Decreased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 1773,
+      "annotation": "SSTORE on `0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2` (WETH): New allocation (0 → nonzero)",
+      "severity": "Info"
+    },
+    {
+      "step_index": 1800,
+      "annotation": "Flash loan borrow: 2000000000000000000 wei",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 1800,
+      "annotation": "Swap / price manipulation",
+      "severity": "Critical"
+    },
+    {
+      "step_index": 3604,
+      "annotation": "Oracle price read (after manipulation)",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 3604,
+      "annotation": "Oracle price read (before manipulation)",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 4763,
+      "annotation": "Re-entrant call detected",
+      "severity": "Critical"
+    },
+    {
+      "step_index": 4763,
+      "annotation": "Oracle price read (before manipulation)",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 6683,
+      "annotation": "SSTORE on `0xcbe3fefdc43cdb24869097ebd55f881ce2b82065`: New allocation (0 → nonzero)",
+      "severity": "Info"
+    },
+    {
+      "step_index": 6733,
+      "annotation": "SSTORE on `0xcbe3fefdc43cdb24869097ebd55f881ce2b82065`: Increased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 6778,
+      "annotation": "Oracle price read (before manipulation)",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 8135,
+      "annotation": "State modified after re-entry",
+      "severity": "Critical"
+    },
+    {
+      "step_index": 10305,
+      "annotation": "SSTORE on `0xde758db54c1b4a87b06b34b30ef0a710dc35388f`: Decreased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 10329,
+      "annotation": "SSTORE on `0xde758db54c1b4a87b06b34b30ef0a710dc35388f`: Unchanged",
+      "severity": "Info"
+    },
+    {
+      "step_index": 10445,
+      "annotation": "Oracle price read (before manipulation)",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 11466,
+      "annotation": "SSTORE on `0xdac17f958d2ee523a2206206994597c13d831ec7` (USDT): Decreased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 11540,
+      "annotation": "SSTORE on `0xdac17f958d2ee523a2206206994597c13d831ec7` (USDT): Increased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 11573,
+      "annotation": "Swap / price manipulation",
+      "severity": "Critical"
+    },
+    {
+      "step_index": 11573,
+      "annotation": "Swap / price manipulation",
+      "severity": "Critical"
+    },
+    {
+      "step_index": 11573,
+      "annotation": "Swap / price manipulation",
+      "severity": "Critical"
+    },
+    {
+      "step_index": 11573,
+      "annotation": "Swap / price manipulation",
+      "severity": "Critical"
+    },
+    {
+      "step_index": 12013,
+      "annotation": "SSTORE on `0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2` (WETH): Decreased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 12044,
+      "annotation": "SSTORE on `0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2` (WETH): Increased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 12071,
+      "annotation": "Flash loan callback exit / repayment",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 12189,
+      "annotation": "Oracle price read (after manipulation)",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 12189,
+      "annotation": "Oracle price read (after manipulation)",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 12749,
+      "annotation": "SSTORE on `0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2` (WETH): Decreased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 12780,
+      "annotation": "SSTORE on `0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2` (WETH): Increased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 12807,
+      "annotation": "ERC-20 transfer (`0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2` (WETH)): `0xde758db54c1b4a87b06b34b30ef0a710dc35388f` → `0xcf2e57261d038b76ccb29a124e93937000782da1`",
+      "severity": "Info"
+    },
+    {
+      "step_index": 12901,
+      "annotation": "SSTORE on `0xde758db54c1b4a87b06b34b30ef0a710dc35388f`: Cleared (nonzero → 0)",
+      "severity": "Info"
+    },
+    {
+      "step_index": 13196,
+      "annotation": "SSTORE on `0xde758db54c1b4a87b06b34b30ef0a710dc35388f`: New allocation (0 → nonzero)",
+      "severity": "Info"
+    },
+    {
+      "step_index": 13383,
+      "annotation": "SSTORE on `0xde758db54c1b4a87b06b34b30ef0a710dc35388f`: Decreased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 13531,
+      "annotation": "SSTORE on `0xde758db54c1b4a87b06b34b30ef0a710dc35388f`: Increased",
+      "severity": "Info"
+    },
+    {
+      "step_index": 14034,
+      "annotation": "Oracle price read (after manipulation)",
+      "severity": "Warning"
+    },
+    {
+      "step_index": 14034,
+      "annotation": "Oracle price read (after manipulation)",
+      "severity": "Warning"
+    }
+  ],
+  "affected_contracts": [
+    "0x50d3865a63d52c0a54e4679949647ea752107390",
+    "0xba12222222228d8ba445958a75a0704d566bf2c8",
+    "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+    "0xce88686553686da562ce7cea497ce749da109f9f",
+    "0xde758db54c1b4a87b06b34b30ef0a710dc35388f",
+    "0xcbe3fefdc43cdb24869097ebd55f881ce2b82065",
+    "0x454e62e725ad5a47931043f7e6369cfbb879bdfd",
+    "0x31eda5529b8f219243e8248eff368bc36a3f5975",
+    "0xdac17f958d2ee523a2206206994597c13d831ec7",
+    "0x27bb6d0c21a057b2ca52e3fcda2f801d17d5428c",
+    "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    "0x43506849d7c04f9138d1a2050bbf3a0c054402dd",
+    "0xd26f20001a72a18c002b00e6710000d68700ce00",
+    "0x00000000000014aa86c5d3c41765bb24e11bd701",
+    "0xcf2e57261d038b76ccb29a124e93937000782da1"
+  ],
+  "suggested_fixes": [
+    "Add a reentrancy guard (e.g., OpenZeppelin ReentrancyGuard) to state-changing functions.",
+    "Follow the checks-effects-interactions pattern: update state before external calls.",
+    "Validate account solvency after all balance-modifying operations (e.g., donateToReserves, mint, burn).",
+    "Add flash loan protection: ensure functions that destroy collateral check the caller's liquidity position.",
+    "Use a decentralized oracle (e.g., Chainlink) with TWAP instead of spot AMM prices.",
+    "Add price deviation checks: revert if price moves > X% in a single transaction.",
+    "Use a decentralized oracle (e.g., Chainlink) with TWAP instead of spot AMM prices.",
+    "Add price deviation checks: revert if price moves > X% in a single transaction.",
+    "Use a decentralized oracle (e.g., Chainlink) with TWAP instead of spot AMM prices.",
+    "Add price deviation checks: revert if price moves > X% in a single transaction.",
+    "Use a decentralized oracle (e.g., Chainlink) with TWAP instead of spot AMM prices.",
+    "Add price deviation checks: revert if price moves > X% in a single transaction.",
+    "Use a decentralized oracle (e.g., Chainlink) with TWAP instead of spot AMM prices.",
+    "Add price deviation checks: revert if price moves > X% in a single transaction.",
+    "Add access control modifiers (onlyOwner, role-based) to state-changing functions.",
+    "Use OpenZeppelin AccessControl for role management."
+  ]
+}
