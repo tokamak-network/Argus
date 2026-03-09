@@ -121,6 +121,7 @@ fn make_trace_with_fallback(
         success_override,
         receipt_fund_flows,
         data_quality,
+        revert_cause: None,
     }
 }
 

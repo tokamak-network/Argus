@@ -40,16 +40,25 @@ pub fn format_step_compact(step: &StepRecord, total: usize, is_cursor: bool) -> 
 
 /// Format trace info summary.
 pub fn format_info(trace: &ReplayTrace, position: usize) -> String {
+    use crate::types::RevertCause;
+
     let output_hex = if trace.output.is_empty() {
         "0x".to_string()
     } else {
         format!("0x{}", hex::encode(&trace.output))
     };
+    let revert_str = match trace.revert_cause {
+        None => String::new(),
+        Some(RevertCause::StateDataMiss) => " | revert: StateDataMiss".to_string(),
+        Some(RevertCause::GasExhausted) => " | revert: GasExhausted".to_string(),
+        Some(RevertCause::EvmBehaviorDiff) => " | revert: EvmBehaviorDiff".to_string(),
+    };
     format!(
-        "Trace: {} steps | gas_used: {} | success: {} | output: {}\nPosition: {}/{}",
+        "Trace: {} steps | gas_used: {} | success: {}{} | output: {}\nPosition: {}/{}",
         trace.steps.len(),
         trace.gas_used,
         trace.effective_success(),
+        revert_str,
         output_hex,
         position,
         trace.steps.len(),
@@ -336,6 +345,7 @@ mod tests {
             #[cfg(feature = "autopsy")]
             receipt_fund_flows: vec![],
             data_quality: crate::types::DataQuality::High,
+            revert_cause: None,
         }
     }
 

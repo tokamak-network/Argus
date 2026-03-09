@@ -17,6 +17,7 @@ fn make_empty_trace() -> ReplayTrace {
         success_override: None,
         receipt_fund_flows: Vec::new(),
         data_quality: crate::types::DataQuality::High,
+        revert_cause: None,
     }
 }
 
@@ -47,6 +48,7 @@ fn make_trace(steps: usize, gas_used: u64, success: bool) -> ReplayTrace {
         success_override: None,
         receipt_fund_flows: Vec::new(),
         data_quality: crate::types::DataQuality::High,
+        revert_cause: None,
     }
 }
 

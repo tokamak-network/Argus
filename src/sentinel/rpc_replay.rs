@@ -134,6 +134,7 @@ pub fn replay_tx_from_rpc(
         #[cfg(feature = "autopsy")]
         receipt_fund_flows: Vec::new(),
         data_quality: crate::types::DataQuality::High,
+        revert_cause: None,
     };
 
     // Build block header from RPC header for ReplayResult
@@ -300,6 +301,7 @@ mod tests {
             #[cfg(feature = "autopsy")]
             receipt_fund_flows: Vec::new(),
             data_quality: crate::types::DataQuality::High,
+            revert_cause: None,
         };
 
         let block_header = ethrex_common::types::BlockHeader {

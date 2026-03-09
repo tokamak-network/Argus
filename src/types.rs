@@ -44,6 +44,26 @@ pub enum DataQuality {
     Low,
 }
 
+/// Classification of why LEVM reverted a transaction.
+///
+/// Extracted from [`ethrex_levm::errors::VMError`] when
+/// [`ethrex_levm::errors::TxResult::Revert`] is observed, and stored on the
+/// [`ReplayTrace`] so callers can distinguish archive data gaps from genuine
+/// on-chain failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize)]
+pub enum RevertCause {
+    /// Archive node was missing state data (account not found or database
+    /// access error).  The transaction *may* have succeeded on-chain; the
+    /// caller should consult the receipt.
+    StateDataMiss,
+    /// The transaction ran out of gas during execution.
+    GasExhausted,
+    /// LEVM's execution result diverged from the on-chain outcome for a reason
+    /// other than missing state data or gas exhaustion (e.g. an explicit
+    /// REVERT opcode, stack underflow, invalid opcode, etc.).
+    EvmBehaviorDiff,
+}
+
 /// Configuration for replay trace capture.
 #[derive(Debug, Clone, Serialize)]
 pub struct ReplayConfig {
@@ -152,6 +172,14 @@ pub struct ReplayTrace {
 
     /// Indicates the quality/source of the trace data.
     pub data_quality: DataQuality,
+
+    /// Why LEVM reverted, if the transaction did not succeed.
+    ///
+    /// `None` when `success` is `true` (or when the cause is unknown).
+    /// Set by [`crate::engine::ReplayEngine::record`] from the [`VMError`]
+    /// embedded in [`TxResult::Revert`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revert_cause: Option<RevertCause>,
 }
 
 impl ReplayTrace {

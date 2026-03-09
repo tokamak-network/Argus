@@ -234,6 +234,7 @@ fn test_replay_result_fields() {
             #[cfg(feature = "autopsy")]
             receipt_fund_flows: Vec::new(),
             data_quality: crate::types::DataQuality::High,
+            revert_cause: None,
         },
         tx_sender: Address::zero(),
         block_header: make_header(100),

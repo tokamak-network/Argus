@@ -9,9 +9,27 @@ use ethrex_levm::environment::Environment;
 use ethrex_levm::tracing::LevmCallTracer;
 use ethrex_levm::vm::{VM, VMType};
 
+use ethrex_levm::errors::{ExceptionalHalt, InternalError, TxResult, VMError};
+
 use crate::error::DebuggerError;
 use crate::recorder::DebugRecorder;
-use crate::types::{DataQuality, ReplayConfig, ReplayTrace, StepRecord};
+use crate::types::{DataQuality, ReplayConfig, ReplayTrace, RevertCause, StepRecord};
+
+/// Map a LEVM [`VMError`] to the higher-level [`RevertCause`] classification.
+///
+/// - [`ExceptionalHalt::OutOfGas`] → [`RevertCause::GasExhausted`]
+/// - [`InternalError::Database`] / [`InternalError::AccountNotFound`] →
+///   [`RevertCause::StateDataMiss`] (archive node gap)
+/// - Everything else → [`RevertCause::EvmBehaviorDiff`]
+fn revert_cause_from_vm_error(err: &VMError) -> RevertCause {
+    match err {
+        VMError::ExceptionalHalt(ExceptionalHalt::OutOfGas) => RevertCause::GasExhausted,
+        VMError::Internal(InternalError::Database(_) | InternalError::AccountNotFound) => {
+            RevertCause::StateDataMiss
+        }
+        _ => RevertCause::EvmBehaviorDiff,
+    }
+}
 
 /// Time-travel replay engine.
 ///
@@ -46,6 +64,12 @@ impl ReplayEngine {
         // issues since VM still holds a clone of the Rc).
         let steps = std::mem::take(&mut recorder.borrow_mut().steps);
 
+        let revert_cause = if let TxResult::Revert(ref err) = report.result {
+            Some(revert_cause_from_vm_error(err))
+        } else {
+            None
+        };
+
         let trace = ReplayTrace {
             steps,
             config,
@@ -56,6 +80,7 @@ impl ReplayEngine {
             #[cfg(feature = "autopsy")]
             receipt_fund_flows: Vec::new(),
             data_quality: DataQuality::High,
+            revert_cause,
         };
 
         Ok(Self { trace, cursor: 0 })
@@ -131,5 +156,57 @@ impl ReplayEngine {
     /// Consume the engine and return the owned trace.
     pub fn into_trace(self) -> ReplayTrace {
         self.trace
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ethrex_levm::errors::{DatabaseError, ExceptionalHalt, InternalError, VMError};
+
+    use super::revert_cause_from_vm_error;
+    use crate::types::RevertCause;
+
+    #[test]
+    fn test_revert_cause_out_of_gas() {
+        let err = VMError::ExceptionalHalt(ExceptionalHalt::OutOfGas);
+        assert_eq!(revert_cause_from_vm_error(&err), RevertCause::GasExhausted);
+    }
+
+    #[test]
+    fn test_revert_cause_state_data_miss_account_not_found() {
+        let err = VMError::Internal(InternalError::AccountNotFound);
+        assert_eq!(
+            revert_cause_from_vm_error(&err),
+            RevertCause::StateDataMiss
+        );
+    }
+
+    #[test]
+    fn test_revert_cause_state_data_miss_database_error() {
+        let err = VMError::Internal(InternalError::Database(DatabaseError::Custom(
+            "archive gap".to_string(),
+        )));
+        assert_eq!(
+            revert_cause_from_vm_error(&err),
+            RevertCause::StateDataMiss
+        );
+    }
+
+    #[test]
+    fn test_revert_cause_evm_behavior_diff_revert_opcode() {
+        let err = VMError::RevertOpcode;
+        assert_eq!(
+            revert_cause_from_vm_error(&err),
+            RevertCause::EvmBehaviorDiff
+        );
+    }
+
+    #[test]
+    fn test_revert_cause_evm_behavior_diff_stack_underflow() {
+        let err = VMError::ExceptionalHalt(ExceptionalHalt::StackUnderflow);
+        assert_eq!(
+            revert_cause_from_vm_error(&err),
+            RevertCause::EvmBehaviorDiff
+        );
     }
 }
