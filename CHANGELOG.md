@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Prior TX replay: `fetch_block_txs_ordered()` fetches all block TXs in index order (single RPC call)
+- Prior TX replay: `find_prior_same_sender_txs()` finds preceding TXs from same sender in block
+- Prior TX replay: `replay_prior_txs()` replays up to `max_prior_txs` prior TXs (best-effort, with warning on overflow)
+- `max_prior_txs` field on `ReplayConfig` (default 10) — caps unbounded prior TX replay
+- `PriorTxReplayResult` struct for per-prior-TX replay tracking (`tx_hash`, `nonce`, `success`, `error`)
+- Fixes nonce mismatch when target TX is not the sender's first TX in the block
+
+### Added (Phase 2-B)
 - `EventType` enum (`Transfer`, `Swap`, `LiquidationCall`, `LiquidateBorrow`, `Unknown`) for DeFi event classification
 - `classify_log_event()` — matches receipt log topics against Uniswap V2/V3, Aave V3, Compound event signatures
 - `trace_from_receipt_logs()` — ERC-20 Transfer recovery from on-chain receipt logs when LEVM reverts

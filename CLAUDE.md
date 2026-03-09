@@ -9,7 +9,7 @@ Built with Rust, powered by ethrex LEVM.
 
 ```bash
 cargo check                                    # Compile check
-cargo test                                     # Run 841 tests (+ 27 ignored)
+cargo test                                     # Run 854 tests (+ 27 ignored)
 cargo clippy --all-features -- -D warnings     # Lint (warnings = errors)
 cargo fmt --check                              # Format check
 
@@ -43,7 +43,7 @@ src/
 ├── lib.rs              # Module exports
 ├── engine.rs           # ReplayEngine — time-travel navigation
 ├── recorder.rs         # DebugRecorder — opcode step capture
-├── types.rs            # ReplayTrace, StepRecord, ReplayConfig, EventType, DataQuality
+├── types.rs            # ReplayTrace, StepRecord, ReplayConfig, PriorTxReplayResult, EventType, DataQuality
 ├── error.rs            # DebuggerError, RpcError
 ├── sentinel/           # Real-time detection (~10,500 LoC)
 │   ├── types.rs        #   Alert types, SuspicionReason
