@@ -127,6 +127,10 @@ pub fn replay_tx_from_store(
         gas_used: report.gas_used,
         success: report.is_success(),
         output: report.output,
+        success_override: None,
+        #[cfg(feature = "autopsy")]
+        receipt_fund_flows: Vec::new(),
+        data_quality: crate::types::DataQuality::High,
     };
 
     Ok(ReplayResult {

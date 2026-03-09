@@ -43,3 +43,6 @@ mod replay_benchmark;
 
 #[cfg(all(feature = "autopsy", feature = "cli"))]
 mod autopsy_cli;
+
+#[cfg(feature = "autopsy")]
+mod receipt_fallback_tests;

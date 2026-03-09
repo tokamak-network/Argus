@@ -130,6 +130,10 @@ pub fn replay_tx_from_rpc(
         gas_used: report.gas_used,
         success: report.is_success(),
         output: report.output,
+        success_override: None,
+        #[cfg(feature = "autopsy")]
+        receipt_fund_flows: Vec::new(),
+        data_quality: crate::types::DataQuality::High,
     };
 
     // Build block header from RPC header for ReplayResult
@@ -292,6 +296,10 @@ mod tests {
             gas_used: 21_000,
             success: true,
             output: bytes::Bytes::new(),
+            success_override: None,
+            #[cfg(feature = "autopsy")]
+            receipt_fund_flows: Vec::new(),
+            data_quality: crate::types::DataQuality::High,
         };
 
         let block_header = ethrex_common::types::BlockHeader {

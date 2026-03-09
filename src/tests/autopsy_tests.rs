@@ -280,6 +280,9 @@ fn test_enrich_no_sstores() {
         gas_used: 21000,
         success: true,
         output: Bytes::new(),
+        success_override: None,
+        receipt_fund_flows: Vec::new(),
+        data_quality: crate::types::DataQuality::High,
     };
     let initial = rustc_hash::FxHashMap::default();
     enrich_storage_writes(&mut trace, &initial);
@@ -297,6 +300,9 @@ fn test_enrich_single_sstore_with_initial() {
         gas_used: 21000,
         success: true,
         output: Bytes::new(),
+        success_override: None,
+        receipt_fund_flows: Vec::new(),
+        data_quality: crate::types::DataQuality::High,
     };
     let mut initial = rustc_hash::FxHashMap::default();
     initial.insert((contract, s), U256::from(50));
@@ -322,6 +328,9 @@ fn test_enrich_chained_sstores() {
         gas_used: 21000,
         success: true,
         output: Bytes::new(),
+        success_override: None,
+        receipt_fund_flows: Vec::new(),
+        data_quality: crate::types::DataQuality::High,
     };
     let initial = rustc_hash::FxHashMap::default();
     enrich_storage_writes(&mut trace, &initial);

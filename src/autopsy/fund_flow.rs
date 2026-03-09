@@ -9,7 +9,14 @@ use ethrex_common::{Address, H256, U256};
 use crate::opcodes::{OP_CALL, OP_CALLCODE, OP_CREATE, OP_CREATE2, OP_LOG3};
 use crate::types::StepRecord;
 
+use super::rpc_client::RpcLog;
 use super::types::FundFlow;
+
+/// keccak256("Transfer(address,address,uint256)") — full 32-byte topic.
+const TRANSFER_TOPIC: [u8; 32] = [
+    0xdd, 0xf2, 0x52, 0xad, 0x1b, 0xe2, 0xc8, 0x9b, 0x69, 0xc2, 0xb0, 0x68, 0xfc, 0x37, 0x8d, 0xaa,
+    0x95, 0x2b, 0xa7, 0xf1, 0x63, 0xc4, 0xa1, 0x16, 0x28, 0xf5, 0x5a, 0x4d, 0xf5, 0x23, 0xb3, 0xef,
+];
 
 /// keccak256("Transfer(address,address,uint256)") first 4 bytes = 0xddf252ad
 const TRANSFER_TOPIC_PREFIX: [u8; 4] = [0xdd, 0xf2, 0x52, 0xad];
@@ -45,6 +52,47 @@ impl FundFlowTracer {
                     value: *value,
                     token: None,
                     step_index: s.step_index,
+                })
+            })
+            .collect()
+    }
+
+    /// Trace ERC-20 Transfer events from receipt logs.
+    ///
+    /// This is the fallback path used when LEVM reverts (so LOG opcodes never
+    /// executed) but the on-chain receipt shows success. Receipt logs contain
+    /// the same Transfer events that would have been captured by opcode tracing.
+    ///
+    /// Each resulting `FundFlow` has `step_index = usize::MAX` to indicate it
+    /// came from receipt data rather than opcode-level tracing.
+    pub fn trace_from_receipt_logs(logs: &[RpcLog]) -> Vec<FundFlow> {
+        logs.iter()
+            .filter_map(|log| {
+                if log.topics.len() < 3 {
+                    return None;
+                }
+
+                // Check full Transfer topic signature
+                if log.topics[0].as_bytes() != TRANSFER_TOPIC {
+                    return None;
+                }
+
+                let from = address_from_topic(&log.topics[1]);
+                let to = address_from_topic(&log.topics[2]);
+                let token = log.address;
+
+                let value = if log.data.len() >= 32 {
+                    U256::from_big_endian(&log.data[..32])
+                } else {
+                    U256::zero()
+                };
+
+                Some(FundFlow {
+                    from,
+                    to,
+                    value,
+                    token: Some(token),
+                    step_index: usize::MAX,
                 })
             })
             .collect()

@@ -226,6 +226,10 @@ fn test_replay_result_fields() {
             gas_used: 21000,
             success: true,
             output: bytes::Bytes::new(),
+            success_override: None,
+            #[cfg(feature = "autopsy")]
+            receipt_fund_flows: Vec::new(),
+            data_quality: crate::types::DataQuality::High,
         },
         tx_sender: Address::zero(),
         block_header: make_header(100),

@@ -55,6 +55,10 @@ fn replay_trace_serializes() {
         gas_used: 21000,
         success: true,
         output: Bytes::new(),
+        success_override: None,
+        #[cfg(feature = "autopsy")]
+        receipt_fund_flows: Vec::new(),
+        data_quality: crate::types::DataQuality::High,
     };
     let json = serde_json::to_value(&trace).expect("ReplayTrace should serialize");
     assert_eq!(json["gas_used"], 21000);

@@ -11,7 +11,14 @@ use ethrex_levm::vm::{VM, VMType};
 
 use crate::error::DebuggerError;
 use crate::recorder::DebugRecorder;
-use crate::types::{ReplayConfig, ReplayTrace, StepRecord};
+use crate::types::{DataQuality, ReplayConfig, ReplayTrace, StepRecord};
+
+#[cfg(feature = "autopsy")]
+use crate::autopsy::fund_flow::FundFlowTracer;
+#[cfg(feature = "autopsy")]
+use crate::autopsy::rpc_client::EthRpcClient;
+#[cfg(feature = "autopsy")]
+use ethrex_common::H256;
 
 /// Time-travel replay engine.
 ///
@@ -52,9 +59,57 @@ impl ReplayEngine {
             gas_used: report.gas_used,
             success: report.is_success(),
             output: report.output,
+            success_override: None,
+            #[cfg(feature = "autopsy")]
+            receipt_fund_flows: Vec::new(),
+            data_quality: DataQuality::High,
         };
 
         Ok(Self { trace, cursor: 0 })
+    }
+
+    /// Execute and record a transaction, falling back to receipt data on LEVM divergence.
+    ///
+    /// When LEVM reports `success=false`, this method fetches the on-chain receipt
+    /// via `rpc_client`. If the receipt shows `status=0x1` (success), it:
+    /// - Sets `success_override = Some(true)`
+    /// - Parses Transfer events from receipt logs into `receipt_fund_flows`
+    /// - Sets `data_quality = Medium`
+    ///
+    /// This handles cases where LEVM cannot fully replay complex transactions
+    /// (e.g., Aave V3 with deep storage dependencies) but the on-chain result
+    /// is authoritative.
+    #[cfg(feature = "autopsy")]
+    pub fn record_with_receipt_fallback(
+        db: &mut GeneralizedDatabase,
+        env: Environment,
+        tx: &Transaction,
+        config: ReplayConfig,
+        rpc_client: &EthRpcClient,
+        tx_hash: H256,
+    ) -> Result<Self, DebuggerError> {
+        let mut engine = Self::record(db, env, tx, config)?;
+
+        if !engine.trace.success {
+            // LEVM reverted — check on-chain receipt for the authoritative result
+            match rpc_client.eth_get_transaction_receipt(tx_hash) {
+                Ok(receipt) => {
+                    if receipt.status {
+                        engine.trace.success_override = Some(true);
+                        engine.trace.receipt_fund_flows =
+                            FundFlowTracer::trace_from_receipt_logs(&receipt.logs);
+                        engine.trace.data_quality = DataQuality::Medium;
+                    }
+                }
+                Err(e) => {
+                    // Receipt fetch failed — log but don't fail the entire replay.
+                    // The trace is still valid, just without the fallback data.
+                    eprintln!("Warning: receipt fallback failed for tx 0x{tx_hash:x}: {e}");
+                }
+            }
+        }
+
+        Ok(engine)
     }
 
     /// Total number of recorded steps.

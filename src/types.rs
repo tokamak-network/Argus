@@ -5,6 +5,26 @@ use ethrex_common::{Address, H256, U256};
 use ethrex_levm::opcodes::Opcode;
 use serde::Serialize;
 
+#[cfg(feature = "autopsy")]
+use crate::autopsy::types::FundFlow;
+
+/// Data quality indicator for a replay trace.
+///
+/// When LEVM successfully replays a transaction, all data comes from opcode-level
+/// tracing (`High`). When LEVM reverts but the on-chain receipt shows success,
+/// fund flows are recovered from receipt logs (`Medium`). `Low` is reserved for
+/// partial or missing data.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub enum DataQuality {
+    /// Full opcode-level trace — LEVM execution matched on-chain result.
+    #[default]
+    High,
+    /// Receipt-based fallback — fund flows from logs, not opcode trace.
+    Medium,
+    /// Partial or missing data.
+    Low,
+}
+
 /// Configuration for replay trace capture.
 #[derive(Debug, Clone, Serialize)]
 pub struct ReplayConfig {
@@ -89,8 +109,38 @@ pub struct ReplayTrace {
     pub config: ReplayConfig,
     /// Total gas used by the transaction.
     pub gas_used: u64,
-    /// Whether the transaction succeeded.
+    /// Whether the transaction succeeded (from LEVM execution).
     pub success: bool,
     /// Transaction output data.
     pub output: Bytes,
+
+    /// Override of `success` from on-chain receipt when LEVM diverges.
+    ///
+    /// When LEVM reports `success=false` but the receipt shows `status=0x1`,
+    /// this field is set to `Some(true)` so downstream code can use the
+    /// authoritative on-chain result.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub success_override: Option<bool>,
+
+    /// Fund flows recovered from receipt logs (when opcode trace is incomplete).
+    ///
+    /// Populated only when LEVM reverts but the on-chain receipt shows success,
+    /// meaning LOG opcodes were never executed in the trace. In that case,
+    /// ERC-20 Transfer events are parsed directly from the receipt logs.
+    #[cfg(feature = "autopsy")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub receipt_fund_flows: Vec<FundFlow>,
+
+    /// Indicates the quality/source of the trace data.
+    pub data_quality: DataQuality,
+}
+
+impl ReplayTrace {
+    /// Returns the effective success status, preferring the on-chain override.
+    ///
+    /// Use this instead of `self.success` directly when displaying results
+    /// or making decisions based on transaction outcome.
+    pub fn effective_success(&self) -> bool {
+        self.success_override.unwrap_or(self.success)
+    }
 }

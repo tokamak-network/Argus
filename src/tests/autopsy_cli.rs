@@ -14,6 +14,9 @@ fn make_empty_trace() -> ReplayTrace {
         gas_used: 0,
         success: true,
         output: Bytes::new(),
+        success_override: None,
+        receipt_fund_flows: Vec::new(),
+        data_quality: crate::types::DataQuality::High,
     }
 }
 
@@ -41,6 +44,9 @@ fn make_trace(steps: usize, gas_used: u64, success: bool) -> ReplayTrace {
         gas_used,
         success,
         output: Bytes::new(),
+        success_override: None,
+        receipt_fund_flows: Vec::new(),
+        data_quality: crate::types::DataQuality::High,
     }
 }
 

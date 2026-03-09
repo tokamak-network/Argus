@@ -20,3 +20,7 @@ docs/devil-review-public-readiness.md
 docs/open-source-readiness-review.md
 node_modules/
 sentinel_alerts_backup.jsonl
+scripts/.defillama_hacks_cache.json
+
+# Promotional content (drafts, not for repo)
+content/

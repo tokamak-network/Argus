@@ -45,11 +45,12 @@ pub fn format_info(trace: &ReplayTrace, position: usize) -> String {
     } else {
         format!("0x{}", hex::encode(&trace.output))
     };
+    let effective_success = trace.success_override.unwrap_or(trace.success);
     format!(
         "Trace: {} steps | gas_used: {} | success: {} | output: {}\nPosition: {}/{}",
         trace.steps.len(),
         trace.gas_used,
-        trace.success,
+        effective_success,
         output_hex,
         position,
         trace.steps.len(),
@@ -139,7 +140,20 @@ pub fn format_autopsy_summary(
         tx_hash.to_string()
     };
 
-    let status = if trace.success { "Success" } else { "Reverted" };
+    let effective_success = trace.success_override.unwrap_or(trace.success);
+    let status = match (effective_success, trace.success_override) {
+        (true, Some(true)) => "Success (via receipt, LEVM reverted)",
+        (true, None) => "Success",
+        (false, _) => "Reverted",
+        _ => "Unknown",
+    };
+    let quality_note = match trace.data_quality {
+        crate::types::DataQuality::High => String::new(),
+        crate::types::DataQuality::Medium => {
+            "  Data:   Receipt fallback (opcode-level data limited)\n".to_string()
+        }
+        crate::types::DataQuality::Low => "  Data:   Incomplete (RPC fetch failed)\n".to_string(),
+    };
     let steps_formatted = format_number_with_commas(trace.steps.len() as u64);
     let gas_formatted = format_number_with_commas(trace.gas_used);
 
@@ -154,14 +168,29 @@ pub fn format_autopsy_summary(
         lines
     };
 
-    // Build fund flow section
-    let eth_flows: Vec<_> = flows.iter().filter(|f| f.token.is_none()).collect();
-    let erc20_flows: Vec<_> = flows.iter().filter(|f| f.token.is_some()).collect();
+    // Build fund flow section — combine opcode-traced flows with receipt-based fallback flows
+    let has_receipt_flows = !trace.receipt_fund_flows.is_empty();
+    let all_flows: Vec<&crate::autopsy::types::FundFlow> = flows
+        .iter()
+        .chain(trace.receipt_fund_flows.iter())
+        .collect();
 
-    let flow_section = if flows.is_empty() {
+    let eth_flows: Vec<_> = all_flows.iter().filter(|f| f.token.is_none()).collect();
+    let erc20_flows: Vec<_> = all_flows.iter().filter(|f| f.token.is_some()).collect();
+
+    let flow_section = if all_flows.is_empty() {
         "  No fund flows detected\n".to_string()
     } else {
-        let mut lines = format!("  Fund Flows: {} transfers\n", flows.len());
+        let receipt_suffix = if has_receipt_flows {
+            " (via receipt logs)"
+        } else {
+            ""
+        };
+        let mut lines = format!(
+            "  Fund Flows: {} transfers{}\n",
+            all_flows.len(),
+            receipt_suffix
+        );
         if !eth_flows.is_empty() {
             let total_eth: ethrex_common::U256 = eth_flows
                 .iter()
@@ -185,7 +214,7 @@ pub fn format_autopsy_summary(
     let risk = compute_risk_level(patterns);
 
     format!(
-        "{WIDE}\n  Argus Autopsy Report\n{WIDE}\n  TX:     {tx_display}\n  Block:  {block_number}\n  Steps:  {steps_formatted}\n  Gas:    {gas_formatted}\n  Status: {status}\n{THIN}\n{pattern_section}{THIN}\n{flow_section}{THIN}\n  Risk: {risk}\n{WIDE}"
+        "{WIDE}\n  Argus Autopsy Report\n{WIDE}\n  TX:     {tx_display}\n  Block:  {block_number}\n  Steps:  {steps_formatted}\n  Gas:    {gas_formatted}\n  Status: {status}\n{quality_note}{THIN}\n{pattern_section}{THIN}\n{flow_section}{THIN}\n  Risk: {risk}\n{WIDE}"
     )
 }
 
@@ -287,6 +316,10 @@ mod tests {
             gas_used,
             success,
             output: Bytes::new(),
+            success_override: None,
+            #[cfg(feature = "autopsy")]
+            receipt_fund_flows: vec![],
+            data_quality: crate::types::DataQuality::High,
         }
     }
 
@@ -412,5 +445,58 @@ mod tests {
         assert_eq!(format_number_with_commas(1_000), "1,000");
         assert_eq!(format_number_with_commas(1_200_000), "1,200,000");
         assert_eq!(format_number_with_commas(145_302), "145,302");
+    }
+
+    #[test]
+    #[cfg(feature = "autopsy")]
+    fn test_format_autopsy_success_override() {
+        // LEVM says reverted, but receipt says success
+        let mut trace = make_trace(10, 50_000, false);
+        trace.success_override = Some(true);
+        trace.data_quality = crate::types::DataQuality::Medium;
+        let result = format_autopsy_summary(&[], &[], &trace, "0xabcdef1234", 100);
+        assert!(result.contains("Status: Success"));
+        assert!(result.contains("MEDIUM"));
+        assert!(result.contains("receipt fallback"));
+    }
+
+    #[test]
+    #[cfg(feature = "autopsy")]
+    fn test_format_autopsy_receipt_fund_flows() {
+        use crate::autopsy::types::FundFlow;
+
+        let mut trace = make_trace(10, 50_000, false);
+        trace.success_override = Some(true);
+        trace.data_quality = crate::types::DataQuality::Medium;
+        trace.receipt_fund_flows = vec![FundFlow {
+            from: Address::default(),
+            to: Address::from_low_u64_be(0x42),
+            value: U256::from(1_500_000_000_000_000_000u64),
+            token: Some(Address::from_low_u64_be(0xAA)),
+            step_index: 0,
+        }];
+        let result = format_autopsy_summary(&[], &[], &trace, "0xabcdef1234", 100);
+        assert!(result.contains("via receipt logs"));
+        assert!(result.contains("ERC20: 1 transfer(s) detected"));
+    }
+
+    #[test]
+    #[cfg(feature = "autopsy")]
+    fn test_format_autopsy_data_quality_low() {
+        let mut trace = make_trace(0, 0, false);
+        trace.data_quality = crate::types::DataQuality::Low;
+        let result = format_autopsy_summary(&[], &[], &trace, "0xabcdef1234", 100);
+        assert!(result.contains("Status: Reverted (LOW)"));
+    }
+
+    #[test]
+    #[cfg(feature = "autopsy")]
+    fn test_format_autopsy_data_quality_high_no_label() {
+        let trace = make_trace(10, 50_000, true);
+        let result = format_autopsy_summary(&[], &[], &trace, "0xabcdef1234", 100);
+        // High quality should not show any quality label
+        assert!(result.contains("Status: Success\n") || result.contains("Status: Success\r"));
+        assert!(!result.contains("MEDIUM"));
+        assert!(!result.contains("LOW"));
     }
 }
