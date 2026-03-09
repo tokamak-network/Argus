@@ -167,9 +167,9 @@ The following are **retroactive, hypothetical** analyses of past exploits. Argus
 
 $128M drained via rounding error in Balancer V2's `batchSwap` (Nov 2025). Argus's pre-filter would likely flag the unusual gas + ERC-20 transfer count; deep analyzer classifies as price manipulation (82% confidence).
 
-**[Retroactive Analysis: $1.4B Bybit Exploit](docs/analysis-bybit-1.4b-exploit.md)**
+**[Retroactive Analysis: $1.5B Bybit Exploit](docs/analysis-bybit-1.5b-exploit.md)**
 
-$1.4B drained from Bybit's cold wallet via supply chain attack on Safe{Wallet} (Feb 2025). Argus's pre-filter would likely flag unusual gas pattern from the multisig; deep analyzer identifies proxy implementation overwrite. Full detection of proxy upgrade anomalies requires planned signal additions.
+$1.5B drained from Bybit's cold wallet via supply chain attack on Safe{Wallet} (Feb 2025). Argus's pre-filter would likely flag unusual gas pattern from the multisig; deep analyzer identifies proxy implementation overwrite. Full detection of proxy upgrade anomalies requires planned signal additions.
 
 ---
 
@@ -261,17 +261,16 @@ cargo build --all-features
 ### Docker
 
 ```bash
-# Pull pre-built image
-docker pull tokamak/argus-demo:latest
+# Build and run locally
+docker build -t argus-demo .
 
 # Run Sentinel on mainnet
 docker run -d \
   -e ARGUS_RPC_URL="https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY" \
   -p 9090:9090 \
-  tokamak/argus-demo:latest
+  argus-demo
 
-# Or build and run locally (runs sentinel in prefilter-only mode)
-docker build -t argus-demo .
+# Or run in prefilter-only mode (foreground — no archive RPC needed, logs shown directly)
 docker run -e ARGUS_RPC_URL="https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY" argus-demo
 ```
 

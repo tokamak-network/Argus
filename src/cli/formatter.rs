@@ -166,12 +166,16 @@ pub fn format_autopsy_summary(
         lines
     };
 
-    // Build fund flow section — combine opcode-traced flows with receipt-based fallback flows
-    let has_receipt_flows = !trace.receipt_fund_flows.is_empty();
-    let all_flows: Vec<&crate::autopsy::types::FundFlow> = flows
-        .iter()
-        .chain(trace.receipt_fund_flows.iter())
-        .collect();
+    // Build fund flow section.
+    // Use opcode-traced `flows` when available. If empty (LEVM reverted),
+    // fall back to `trace.receipt_fund_flows`. Never chain both — that doubles
+    // the count when analyze_and_report already passed receipt flows as `flows`.
+    let has_receipt_flows = flows.is_empty() && !trace.receipt_fund_flows.is_empty();
+    let all_flows: Vec<&crate::autopsy::types::FundFlow> = if flows.is_empty() {
+        trace.receipt_fund_flows.iter().collect()
+    } else {
+        flows.iter().collect()
+    };
 
     let eth_flows: Vec<_> = all_flows.iter().filter(|f| f.token.is_none()).collect();
     let erc20_flows: Vec<_> = all_flows.iter().filter(|f| f.token.is_some()).collect();
@@ -475,6 +479,40 @@ mod tests {
         let result = format_autopsy_summary(&[], &[], &trace, "0xabcdef1234", 100);
         assert!(result.contains("via receipt logs"));
         assert!(result.contains("ERC20: 1 transfer(s) detected"));
+    }
+
+    #[test]
+    #[cfg(feature = "autopsy")]
+    fn test_receipt_flows_not_doubled_when_passed_as_flows() {
+        // Regression: when analyze_and_report passes receipt flows as `flows`,
+        // the formatter must NOT also chain trace.receipt_fund_flows — that
+        // would double the count (6 transfers displayed as 12).
+        use crate::autopsy::types::FundFlow;
+
+        let flow = FundFlow {
+            from: Address::default(),
+            to: Address::from_low_u64_be(0x42),
+            value: U256::from(1_000u64),
+            token: Some(Address::from_low_u64_be(0xAA)),
+            step_index: usize::MAX,
+        };
+        let receipt_flows = vec![flow.clone(), flow.clone(), flow.clone()];
+
+        let mut trace = make_trace(0, 50_000, false);
+        trace.success_override = Some(true);
+        trace.data_quality = crate::types::DataQuality::Medium;
+        trace.receipt_fund_flows = receipt_flows.clone();
+
+        // Simulate analyze_and_report passing receipt flows as the `flows` arg
+        let result = format_autopsy_summary(&[], &receipt_flows, &trace, "0xabcdef1234", 100);
+        assert!(
+            result.contains("3 transfers"),
+            "expected 3 transfers, got:\n{result}"
+        );
+        assert!(
+            !result.contains("6 transfers"),
+            "receipt flows were doubled!"
+        );
     }
 
     #[test]
