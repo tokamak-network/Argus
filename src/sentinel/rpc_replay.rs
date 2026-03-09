@@ -41,8 +41,11 @@ use ethrex_levm::db::gen_db::GeneralizedDatabase;
 use ethrex_levm::tracing::LevmCallTracer;
 use ethrex_levm::vm::{VM, VMType};
 
+use ethrex_levm::errors::TxResult;
+
 use crate::autopsy::remote_db::RemoteVmDatabase;
 use crate::autopsy::rpc_client::RpcBlock;
+use crate::engine::revert_cause_from_vm_error;
 use crate::recorder::DebugRecorder;
 use crate::types::{ReplayConfig, ReplayTrace};
 
@@ -124,6 +127,12 @@ pub fn replay_tx_from_rpc(
         });
     }
 
+    let revert_cause = if let TxResult::Revert(ref err) = report.result {
+        Some(revert_cause_from_vm_error(err))
+    } else {
+        None
+    };
+
     let trace = ReplayTrace {
         steps,
         config: replay_config,
@@ -134,7 +143,7 @@ pub fn replay_tx_from_rpc(
         #[cfg(feature = "autopsy")]
         receipt_fund_flows: Vec::new(),
         data_quality: crate::types::DataQuality::High,
-        revert_cause: None,
+        revert_cause,
     };
 
     // Build block header from RPC header for ReplayResult

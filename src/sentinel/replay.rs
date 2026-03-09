@@ -16,6 +16,9 @@ use ethrex_storage::Store;
 use ethrex_vm::Evm;
 use ethrex_vm::backends::levm::LEVM;
 
+use ethrex_levm::errors::TxResult;
+
+use crate::engine::revert_cause_from_vm_error;
 use crate::recorder::DebugRecorder;
 use crate::types::{ReplayConfig, ReplayTrace};
 
@@ -121,6 +124,12 @@ pub fn replay_tx_from_store(
         });
     }
 
+    let revert_cause = if let TxResult::Revert(ref err) = report.result {
+        Some(revert_cause_from_vm_error(err))
+    } else {
+        None
+    };
+
     let trace = ReplayTrace {
         steps,
         config,
@@ -131,7 +140,7 @@ pub fn replay_tx_from_store(
         #[cfg(feature = "autopsy")]
         receipt_fund_flows: Vec::new(),
         data_quality: crate::types::DataQuality::High,
-        revert_cause: None,
+        revert_cause,
     };
 
     Ok(ReplayResult {

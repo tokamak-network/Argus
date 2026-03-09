@@ -20,14 +20,17 @@ use crate::types::{DataQuality, ReplayConfig, ReplayTrace, RevertCause, StepReco
 /// - [`ExceptionalHalt::OutOfGas`] → [`RevertCause::GasExhausted`]
 /// - [`InternalError::Database`] / [`InternalError::AccountNotFound`] →
 ///   [`RevertCause::StateDataMiss`] (archive node gap)
+/// - [`VMError::TxValidation`] → [`RevertCause::EvmBehaviorDiff`]
+///   (tx rejected before execution; not a state-data gap or gas issue)
 /// - Everything else → [`RevertCause::EvmBehaviorDiff`]
-fn revert_cause_from_vm_error(err: &VMError) -> RevertCause {
+pub(crate) fn revert_cause_from_vm_error(err: &VMError) -> RevertCause {
     match err {
         VMError::ExceptionalHalt(ExceptionalHalt::OutOfGas) => RevertCause::GasExhausted,
         VMError::Internal(InternalError::Database(_) | InternalError::AccountNotFound) => {
             RevertCause::StateDataMiss
         }
-        _ => RevertCause::EvmBehaviorDiff,
+        VMError::TxValidation(_) | VMError::ExceptionalHalt(_) | VMError::RevertOpcode
+        | VMError::Internal(_) => RevertCause::EvmBehaviorDiff,
     }
 }
 

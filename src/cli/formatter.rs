@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use ethrex_common::U256;
 use ethrex_levm::opcodes::Opcode;
 
-use crate::types::{EventType, ReplayTrace, StepRecord};
+use crate::types::{EventType, ReplayTrace, RevertCause, StepRecord};
 
 /// Format a step for detailed display (after step/goto).
 pub fn format_step(step: &StepRecord, total: usize) -> String {
@@ -40,8 +40,6 @@ pub fn format_step_compact(step: &StepRecord, total: usize, is_cursor: bool) -> 
 
 /// Format trace info summary.
 pub fn format_info(trace: &ReplayTrace, position: usize) -> String {
-    use crate::types::RevertCause;
-
     let output_hex = if trace.output.is_empty() {
         "0x".to_string()
     } else {
@@ -462,6 +460,40 @@ mod tests {
     #[cfg(feature = "autopsy")]
     fn test_format_u256_eth_zero() {
         assert_eq!(format_u256_eth(U256::zero()), "0 ETH");
+    }
+
+    #[test]
+    fn test_format_info_no_revert_cause() {
+        let trace = make_trace(10, 21_000, true);
+        let result = format_info(&trace, 3);
+        assert!(result.contains("success: true"));
+        assert!(!result.contains("revert:"), "no revert info expected for success");
+        assert!(result.contains("Position: 3/10"));
+    }
+
+    #[test]
+    fn test_format_info_gas_exhausted() {
+        let mut trace = make_trace(5, 50_000, false);
+        trace.revert_cause = Some(RevertCause::GasExhausted);
+        let result = format_info(&trace, 0);
+        assert!(result.contains("revert: GasExhausted"));
+        assert!(result.contains("success: false"));
+    }
+
+    #[test]
+    fn test_format_info_state_data_miss() {
+        let mut trace = make_trace(5, 50_000, false);
+        trace.revert_cause = Some(RevertCause::StateDataMiss);
+        let result = format_info(&trace, 0);
+        assert!(result.contains("revert: StateDataMiss"));
+    }
+
+    #[test]
+    fn test_format_info_evm_behavior_diff() {
+        let mut trace = make_trace(5, 50_000, false);
+        trace.revert_cause = Some(RevertCause::EvmBehaviorDiff);
+        let result = format_info(&trace, 0);
+        assert!(result.contains("revert: EvmBehaviorDiff"));
     }
 
     #[test]
