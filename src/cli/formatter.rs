@@ -475,25 +475,29 @@ mod tests {
     fn test_format_info_gas_exhausted() {
         let mut trace = make_trace(5, 50_000, false);
         trace.revert_cause = Some(RevertCause::GasExhausted);
-        let result = format_info(&trace, 0);
+        let result = format_info(&trace, 2);
         assert!(result.contains("revert: GasExhausted"));
         assert!(result.contains("success: false"));
+        assert!(result.contains("Position: 2/5"));
+        assert!(result.contains("5 steps"));
     }
 
     #[test]
     fn test_format_info_state_data_miss() {
         let mut trace = make_trace(5, 50_000, false);
         trace.revert_cause = Some(RevertCause::StateDataMiss);
-        let result = format_info(&trace, 0);
+        let result = format_info(&trace, 1);
         assert!(result.contains("revert: StateDataMiss"));
+        assert!(result.contains("Position: 1/5"));
     }
 
     #[test]
     fn test_format_info_evm_behavior_diff() {
         let mut trace = make_trace(5, 50_000, false);
         trace.revert_cause = Some(RevertCause::EvmBehaviorDiff);
-        let result = format_info(&trace, 0);
+        let result = format_info(&trace, 4);
         assert!(result.contains("revert: EvmBehaviorDiff"));
+        assert!(result.contains("Position: 4/5"));
     }
 
     #[test]

@@ -175,11 +175,10 @@ pub struct ReplayTrace {
 
     /// Why LEVM reverted, if the transaction did not succeed.
     ///
-    /// `None` when execution succeeded, or when the trace was not produced
-    /// via [`crate::engine::ReplayEngine::record`] (e.g. sentinel replay
-    /// paths that do not extract the cause from [`TxResult::Revert`]).
-    /// Set by [`crate::engine::ReplayEngine::record`] from the [`VMError`]
-    /// embedded in [`TxResult::Revert`].
+    /// Set by [`crate::engine::ReplayEngine::record`] and sentinel replay
+    /// paths from the [`VMError`] embedded in [`TxResult::Revert`].
+    /// `None` when the transaction succeeded, or when the trace source
+    /// does not extract the revert cause.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revert_cause: Option<RevertCause>,
 }

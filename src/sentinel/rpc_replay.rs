@@ -41,11 +41,10 @@ use ethrex_levm::db::gen_db::GeneralizedDatabase;
 use ethrex_levm::tracing::LevmCallTracer;
 use ethrex_levm::vm::{VM, VMType};
 
-use ethrex_levm::errors::TxResult;
 
 use crate::autopsy::remote_db::RemoteVmDatabase;
 use crate::autopsy::rpc_client::RpcBlock;
-use crate::engine::revert_cause_from_vm_error;
+use crate::engine::revert_cause_from_report;
 use crate::recorder::DebugRecorder;
 use crate::types::{ReplayConfig, ReplayTrace};
 
@@ -127,11 +126,7 @@ pub fn replay_tx_from_rpc(
         });
     }
 
-    let revert_cause = if let TxResult::Revert(ref err) = report.result {
-        Some(revert_cause_from_vm_error(err))
-    } else {
-        None
-    };
+    let revert_cause = revert_cause_from_report(&report.result);
 
     let trace = ReplayTrace {
         steps,
@@ -330,6 +325,35 @@ mod tests {
         assert_eq!(result.trace.gas_used, 21_000);
         assert_eq!(result.tx_sender, Address::from_low_u64_be(0x100));
         assert_eq!(result.block_header.number, 21_000_000);
+    }
+
+    /// Verify that `revert_cause_from_report` wiring is correct for the rpc_replay path.
+    ///
+    /// This test mirrors the extraction used in `replay_tx_from_rpc` to confirm
+    /// that `TxResult::Revert` maps to the expected `RevertCause` variant.
+    #[test]
+    fn test_revert_cause_extraction_wiring() {
+        use crate::engine::revert_cause_from_report;
+        use crate::types::RevertCause;
+        use ethrex_levm::errors::{ExceptionalHalt, TxResult, VMError};
+
+        // OutOfGas → GasExhausted
+        let oog = TxResult::Revert(VMError::ExceptionalHalt(ExceptionalHalt::OutOfGas));
+        assert_eq!(
+            revert_cause_from_report(&oog),
+            Some(RevertCause::GasExhausted)
+        );
+
+        // RevertOpcode → EvmBehaviorDiff
+        let revert_op = TxResult::Revert(VMError::RevertOpcode);
+        assert_eq!(
+            revert_cause_from_report(&revert_op),
+            Some(RevertCause::EvmBehaviorDiff)
+        );
+
+        // Success → None
+        let success = TxResult::Success;
+        assert_eq!(revert_cause_from_report(&success), None);
     }
 
     // =========================================================================

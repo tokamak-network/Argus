@@ -29,8 +29,24 @@ pub(crate) fn revert_cause_from_vm_error(err: &VMError) -> RevertCause {
         VMError::Internal(InternalError::Database(_) | InternalError::AccountNotFound) => {
             RevertCause::StateDataMiss
         }
+        // Exhaustive arms instead of `_` wildcard: if ethrex adds a new VMError
+        // variant the compiler forces us to classify it rather than silently
+        // falling through to EvmBehaviorDiff.
         VMError::TxValidation(_) | VMError::ExceptionalHalt(_) | VMError::RevertOpcode
         | VMError::Internal(_) => RevertCause::EvmBehaviorDiff,
+    }
+}
+
+/// Extract [`RevertCause`] from a [`TxResult`].
+///
+/// Returns `Some(cause)` when the result is [`TxResult::Revert`], `None`
+/// when the transaction succeeded. Use this instead of the three-line
+/// `if let TxResult::Revert` pattern at every call site.
+pub(crate) fn revert_cause_from_report(result: &TxResult) -> Option<RevertCause> {
+    if let TxResult::Revert(err) = result {
+        Some(revert_cause_from_vm_error(err))
+    } else {
+        None
     }
 }
 
@@ -67,11 +83,7 @@ impl ReplayEngine {
         // issues since VM still holds a clone of the Rc).
         let steps = std::mem::take(&mut recorder.borrow_mut().steps);
 
-        let revert_cause = if let TxResult::Revert(ref err) = report.result {
-            Some(revert_cause_from_vm_error(err))
-        } else {
-            None
-        };
+        let revert_cause = revert_cause_from_report(&report.result);
 
         let trace = ReplayTrace {
             steps,
@@ -164,9 +176,9 @@ impl ReplayEngine {
 
 #[cfg(test)]
 mod tests {
-    use ethrex_levm::errors::{DatabaseError, ExceptionalHalt, InternalError, VMError};
+    use ethrex_levm::errors::{DatabaseError, ExceptionalHalt, InternalError, TxResult, VMError};
 
-    use super::revert_cause_from_vm_error;
+    use super::{revert_cause_from_report, revert_cause_from_vm_error};
     use crate::types::RevertCause;
 
     #[test]
@@ -211,5 +223,17 @@ mod tests {
             revert_cause_from_vm_error(&err),
             RevertCause::EvmBehaviorDiff
         );
+    }
+
+    #[test]
+    fn test_revert_cause_from_report_revert() {
+        let result = TxResult::Revert(VMError::ExceptionalHalt(ExceptionalHalt::OutOfGas));
+        assert_eq!(revert_cause_from_report(&result), Some(RevertCause::GasExhausted));
+    }
+
+    #[test]
+    fn test_revert_cause_from_report_success() {
+        let result = TxResult::Success;
+        assert_eq!(revert_cause_from_report(&result), None);
     }
 }
