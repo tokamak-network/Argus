@@ -925,6 +925,9 @@ fn prefilter_benchmark_diagnostic() {
                         } => {
                             format!("H8:asymmetric({unique_destinations})")
                         }
+                        SuspicionReason::AccessControlBypass { score } => {
+                            format!("H9:acb({score:.2})")
+                        }
                     })
                     .collect();
                 (true, stx.score, reasons.join(", "))

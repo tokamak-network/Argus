@@ -291,6 +291,9 @@ impl SentinelService {
                 super::types::SuspicionReason::SelfDestructDetected => "self-destruct",
                 super::types::SuspicionReason::PriceOracleWithSwap { .. } => "oracle-swap",
                 super::types::SuspicionReason::AsymmetricCashFlow { .. } => "asymmetric-cash-flow",
+                super::types::SuspicionReason::AccessControlBypass { .. } => {
+                    "access-control-bypass"
+                }
             })
             .collect();
 

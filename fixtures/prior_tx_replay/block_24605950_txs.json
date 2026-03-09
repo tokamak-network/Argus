@@ -1,0 +1,35 @@
+{
+  "block_number": 24605950,
+  "block_header": {
+    "hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "number": 24605950,
+    "timestamp": 1741200000,
+    "gas_limit": 30000000,
+    "base_fee_per_gas": 1000000000,
+    "coinbase": "0x0000000000000000000000000000000000000000"
+  },
+  "txs": [
+    {
+      "hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "from": "0x1234567890abcdef1234567890abcdef12345678",
+      "to": "0x0000000000000000000000000000000000000000",
+      "value": "0x0",
+      "input": "0x",
+      "gas": 21000,
+      "gas_price": 1000000000,
+      "nonce": 13326,
+      "block_number": 24605950
+    },
+    {
+      "hash": "0x6a00b2d7000000000000000000000000000000000000000000000000ffffffff",
+      "from": "0x1234567890abcdef1234567890abcdef12345678",
+      "to": "0x0000000000000000000000000000000000000000",
+      "value": "0x0",
+      "input": "0x",
+      "gas": 21000,
+      "gas_price": 1000000000,
+      "nonce": 13327,
+      "block_number": 24605950
+    }
+  ]
+}

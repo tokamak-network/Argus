@@ -95,6 +95,10 @@ fn test_suspicion_reason_scores() {
             .abs()
             < f64::EPSILON
     );
+    // AccessControlBypass returns its inner score
+    assert!(
+        (SuspicionReason::AccessControlBypass { score: 0.3 }.score() - 0.3).abs() < f64::EPSILON
+    );
 }
 
 #[test]
@@ -598,4 +602,182 @@ dedup_window_blocks = 5\n\
         "mev_selfdestruct_factor should default to 0.25, got {}",
         sc.mev_selfdestruct_factor
     );
+}
+
+// ---------------------------------------------------------------------------
+// Access control bypass tests (H9)
+// ---------------------------------------------------------------------------
+
+/// ACB fires when: success + gas < 100k + known DeFi + >= 3 ERC-20 transfers.
+#[test]
+fn test_acb_detected_low_gas_known_defi_multiple_transfers() {
+    // H9(ACB) = +0.3, H4(known) = 0.0. With relevance factor 0.3: 0.3 * 0.3 = 0.09.
+    // Need threshold <= 0.09 or disable relevance factor.
+    let filter = PreFilter::new(SentinelConfig {
+        suspicion_threshold: 0.05,
+        min_independent_signals: 1,
+        relevance_factor: 1.0, // disable relevance dampening for isolated H9 test
+        min_erc20_transfers: 5, // only H3 fires at >=5, but ACB checks >=3 internally
+        ..Default::default()
+    });
+    // 4 ERC-20 transfer logs from Aave V2 pool (known DeFi)
+    let logs: Vec<Log> = (0..4)
+        .map(|i| make_erc20_transfer_log(random_address(i), random_address(i + 100)))
+        .collect();
+    // Low gas, success, to known DeFi contract
+    let receipt = make_receipt(true, 80_000, logs);
+    let tx = make_tx_call(aave_v2_pool(), U256::zero(), 100_000);
+    let header = make_header(19_500_000);
+
+    let result = filter.scan_tx(&tx, &receipt, 0, &header);
+    assert!(result.is_some(), "ACB should be detected");
+    let stx = result.unwrap();
+    assert!(
+        stx.reasons
+            .iter()
+            .any(|r| matches!(r, SuspicionReason::AccessControlBypass { .. })),
+        "Should contain AccessControlBypass reason"
+    );
+}
+
+/// ACB does not fire for reverted TX.
+#[test]
+fn test_acb_not_detected_on_revert() {
+    let filter = PreFilter::new(SentinelConfig {
+        suspicion_threshold: 0.1,
+        min_independent_signals: 1,
+        ..Default::default()
+    });
+    let logs: Vec<Log> = (0..4)
+        .map(|i| make_erc20_transfer_log(random_address(i), random_address(i + 100)))
+        .collect();
+    // Reverted TX
+    let receipt = make_receipt(false, 80_000, logs);
+    let tx = make_tx_call(aave_v2_pool(), U256::zero(), 100_000);
+    let header = make_header(19_500_000);
+
+    let result = filter.scan_tx(&tx, &receipt, 0, &header);
+    // Should not fire ACB (reverted)
+    if let Some(stx) = result {
+        assert!(
+            !stx.reasons
+                .iter()
+                .any(|r| matches!(r, SuspicionReason::AccessControlBypass { .. })),
+            "ACB should not fire on reverted TX"
+        );
+    }
+}
+
+/// ACB does not fire when gas >= 100k.
+#[test]
+fn test_acb_not_detected_high_gas() {
+    let filter = PreFilter::new(SentinelConfig {
+        suspicion_threshold: 0.1,
+        min_independent_signals: 1,
+        ..Default::default()
+    });
+    let logs: Vec<Log> = (0..4)
+        .map(|i| make_erc20_transfer_log(random_address(i), random_address(i + 100)))
+        .collect();
+    // Gas >= 100k
+    let receipt = make_receipt(true, 150_000, logs);
+    let tx = make_tx_call(aave_v2_pool(), U256::zero(), 200_000);
+    let header = make_header(19_500_000);
+
+    let result = filter.scan_tx(&tx, &receipt, 0, &header);
+    if let Some(stx) = result {
+        assert!(
+            !stx.reasons
+                .iter()
+                .any(|r| matches!(r, SuspicionReason::AccessControlBypass { .. })),
+            "ACB should not fire when gas >= 100k"
+        );
+    }
+}
+
+/// ACB does not fire with fewer than 3 ERC-20 transfers.
+#[test]
+fn test_acb_not_detected_few_transfers() {
+    let filter = PreFilter::new(SentinelConfig {
+        suspicion_threshold: 0.1,
+        min_independent_signals: 1,
+        ..Default::default()
+    });
+    // Only 2 transfers
+    let logs: Vec<Log> = (0..2)
+        .map(|i| make_erc20_transfer_log(random_address(i), random_address(i + 100)))
+        .collect();
+    let receipt = make_receipt(true, 80_000, logs);
+    let tx = make_tx_call(aave_v2_pool(), U256::zero(), 100_000);
+    let header = make_header(19_500_000);
+
+    let result = filter.scan_tx(&tx, &receipt, 0, &header);
+    if let Some(stx) = result {
+        assert!(
+            !stx.reasons
+                .iter()
+                .any(|r| matches!(r, SuspicionReason::AccessControlBypass { .. })),
+            "ACB should not fire with < 3 transfers"
+        );
+    }
+}
+
+/// ACB does not fire for unknown contracts.
+#[test]
+fn test_acb_not_detected_unknown_contract() {
+    let filter = PreFilter::new(SentinelConfig {
+        suspicion_threshold: 0.1,
+        min_independent_signals: 1,
+        ..Default::default()
+    });
+    let logs: Vec<Log> = (0..4)
+        .map(|i| make_erc20_transfer_log(random_address(i), random_address(i + 100)))
+        .collect();
+    // Unknown contract (not in known DeFi list)
+    let receipt = make_receipt(true, 80_000, logs);
+    let tx = make_tx_call(random_address(0xFF), U256::zero(), 100_000);
+    let header = make_header(19_500_000);
+
+    let result = filter.scan_tx(&tx, &receipt, 0, &header);
+    if let Some(stx) = result {
+        assert!(
+            !stx.reasons
+                .iter()
+                .any(|r| matches!(r, SuspicionReason::AccessControlBypass { .. })),
+            "ACB should not fire for unknown contracts"
+        );
+    }
+}
+
+/// ACB score contribution is ACB_FACTOR (0.3).
+#[test]
+fn test_acb_score_contribution() {
+    let filter = PreFilter::new(SentinelConfig {
+        suspicion_threshold: 0.01,
+        min_independent_signals: 1,
+        relevance_factor: 1.0, // disable relevance dampening
+        ..Default::default()
+    });
+    // 4 transfers from known DeFi, low gas, success
+    let logs: Vec<Log> = (0..4)
+        .map(|i| make_erc20_transfer_log(random_address(i), random_address(i + 100)))
+        .collect();
+    let receipt = make_receipt(true, 80_000, logs);
+    let tx = make_tx_call(aave_v2_pool(), U256::zero(), 100_000);
+    let header = make_header(19_500_000);
+
+    let result = filter.scan_tx(&tx, &receipt, 0, &header);
+    assert!(result.is_some());
+    let stx = result.unwrap();
+    let acb_reason = stx
+        .reasons
+        .iter()
+        .find(|r| matches!(r, SuspicionReason::AccessControlBypass { .. }));
+    assert!(acb_reason.is_some());
+    if let SuspicionReason::AccessControlBypass { score } = acb_reason.unwrap() {
+        assert!(
+            (*score - 0.3).abs() < f64::EPSILON,
+            "ACB score should be 0.3, got {score}"
+        );
+    }
 }

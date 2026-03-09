@@ -395,6 +395,7 @@ fn reason_display_name(r: &SuspicionReason) -> &'static str {
         SuspicionReason::SelfDestructDetected => "self-destruct",
         SuspicionReason::PriceOracleWithSwap { .. } => "oracle-swap",
         SuspicionReason::AsymmetricCashFlow { .. } => "asymmetric-cash-flow",
+        SuspicionReason::AccessControlBypass { .. } => "access-control-bypass",
     }
 }
 

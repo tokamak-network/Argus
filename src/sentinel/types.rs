@@ -85,6 +85,9 @@ pub enum SuspicionReason {
     PriceOracleWithSwap { oracle: Address },
     /// Flash loan funds flow to new/unknown addresses instead of being repaid symmetrically.
     AsymmetricCashFlow { unique_destinations: usize },
+    /// Low-gas TX interacting with a known DeFi contract with multiple ERC-20 transfers,
+    /// suggesting a possible access control bypass (unauthorized state modification).
+    AccessControlBypass { score: f64 },
 }
 
 impl SuspicionReason {
@@ -105,6 +108,7 @@ impl SuspicionReason {
             Self::SelfDestructDetected => 0.3,
             Self::PriceOracleWithSwap { .. } => 0.2,
             Self::AsymmetricCashFlow { .. } => 0.2,
+            Self::AccessControlBypass { score } => *score,
         }
     }
 }

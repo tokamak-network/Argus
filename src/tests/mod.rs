@@ -46,3 +46,6 @@ mod autopsy_cli;
 
 #[cfg(feature = "autopsy")]
 mod receipt_fallback_tests;
+
+#[cfg(feature = "autopsy")]
+mod prior_tx_tests;

@@ -43,12 +43,23 @@ fn count_independent_signals(reasons: &[SuspicionReason]) -> usize {
             SuspicionReason::SelfDestructDetected => "selfdestruct",
             SuspicionReason::PriceOracleWithSwap { .. } => "oracle",
             SuspicionReason::AsymmetricCashFlow { .. } => "cashflow",
+            SuspicionReason::AccessControlBypass { .. } => "acb",
             SuspicionReason::KnownContractInteraction { .. } => continue,
         };
         categories.insert(cat);
     }
     categories.len()
 }
+
+/// Score contribution for the AccessControlBypass heuristic.
+pub(crate) const ACB_FACTOR: f64 = 0.3;
+
+/// Maximum gas_used for a TX to qualify as an ACB candidate.
+/// Real ACB attacks are simple (no flash loans), so gas is low.
+pub(crate) const ACB_MAX_GAS: u64 = 100_000;
+
+/// Minimum ERC-20 Transfer count for ACB heuristic (asset movement evidence).
+pub(crate) const ACB_MIN_TRANSFERS: usize = 3;
 
 /// ERC-20 Transfer(address,address,uint256) event topic prefix (first 4 bytes).
 const TRANSFER_TOPIC_PREFIX: [u8; 4] = [0xdd, 0xf2, 0x52, 0xad];
@@ -283,6 +294,12 @@ impl PreFilter {
         // Heuristic 7: Price oracle + swap
         if let Some(oracle) = self.check_price_oracle_swap(&receipt.logs) {
             reasons.push(SuspicionReason::PriceOracleWithSwap { oracle });
+        }
+
+        // Heuristic 9: Access control bypass candidate
+        // Low gas + known DeFi contract + multiple ERC-20 transfers + success
+        if let Some(score) = self.check_access_control_bypass(tx, receipt, erc20_count) {
+            reasons.push(SuspicionReason::AccessControlBypass { score });
         }
 
         if reasons.is_empty() {
@@ -598,6 +615,44 @@ impl PreFilter {
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
+
+    /// H9: Access control bypass candidate.
+    ///
+    /// Flags TXs with low gas usage, interaction with a known DeFi contract,
+    /// and multiple ERC-20 transfers — the signature of an unauthorized state
+    /// modification (e.g., directly writing storage without auth checks).
+    fn check_access_control_bypass(
+        &self,
+        tx: &Transaction,
+        receipt: &Receipt,
+        erc20_count: usize,
+    ) -> Option<f64> {
+        // Must be a successful TX
+        if !receipt.succeeded {
+            return None;
+        }
+
+        // Low gas usage (no complex flash loan)
+        // NOTE: `cumulative_gas_used` is the running block total, not per-TX gas.
+        // Same caveat as H2/H5/H9a — see GitHub issue #6.
+        let gas_used = receipt.cumulative_gas_used;
+        if gas_used >= ACB_MAX_GAS {
+            return None;
+        }
+
+        // Multiple asset movements
+        if erc20_count < ACB_MIN_TRANSFERS {
+            return None;
+        }
+
+        // Must interact with a known DeFi contract (tx.to or log emitter)
+        let interacts_known = self.check_known_contract(tx, &receipt.logs).is_some();
+        if !interacts_known {
+            return None;
+        }
+
+        Some(ACB_FACTOR)
+    }
 
     /// Return a static label for known contract addresses.
     fn label_address(&self, address: &Address) -> Option<String> {
