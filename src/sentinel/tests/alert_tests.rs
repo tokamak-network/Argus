@@ -375,6 +375,7 @@ fn test_load_block_header_not_found() {
 mod autopsy_sentinel_tests {
     use super::*;
     use crate::autopsy::types::{AttackPattern, DetectedPattern, FundFlow};
+    use crate::types::EventType;
 
     #[test]
     fn test_sentinel_alert_with_detected_patterns() {
@@ -406,6 +407,7 @@ mod autopsy_sentinel_tests {
                 value: one_eth() * 50,
                 token: None,
                 step_index: 200,
+                event_type: EventType::Unknown,
             }],
             total_value_at_risk: one_eth() * 50,
             whitelist_matches: 0,
@@ -620,6 +622,7 @@ mod autopsy_sentinel_tests {
                 value: one_eth() * 10,
                 token: None, // ETH
                 step_index: 100,
+                event_type: EventType::Unknown,
             },
             FundFlow {
                 from: random_address(0x02),
@@ -627,6 +630,7 @@ mod autopsy_sentinel_tests {
                 value: one_eth() * 5,
                 token: None, // ETH
                 step_index: 200,
+                event_type: EventType::Unknown,
             },
             FundFlow {
                 from: random_address(0x01),
@@ -634,6 +638,7 @@ mod autopsy_sentinel_tests {
                 value: one_eth() * 100,
                 token: Some(random_address(0xDD)), // ERC-20, should be excluded
                 step_index: 300,
+                event_type: EventType::Unknown,
             },
         ];
 

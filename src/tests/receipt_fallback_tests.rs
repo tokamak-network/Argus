@@ -11,7 +11,7 @@ use ethrex_common::{Address, H256, U256};
 use crate::autopsy::fund_flow::FundFlowTracer;
 use crate::autopsy::rpc_client::RpcLog;
 use crate::autopsy::types::FundFlow;
-use crate::types::{DataQuality, ReplayConfig, ReplayTrace, StepRecord};
+use crate::types::{DataQuality, EventType, ReplayConfig, ReplayTrace, StepRecord};
 
 // ============================================================
 // Helpers
@@ -282,6 +282,7 @@ fn test_data_quality_medium_when_receipt_fallback() {
         value: U256::from(1000),
         token: Some(addr(0xDEAD)),
         step_index: 0,
+        event_type: EventType::Unknown,
     }];
 
     let trace = make_trace_with_fallback(
@@ -332,6 +333,7 @@ fn test_receipt_fund_flows_takes_precedence_when_nonempty() {
             value: U256::from(40_000u64) * U256::from(10u64).pow(U256::from(18)),
             token: Some(addr(0x7FC6)),
             step_index: 0,
+            event_type: EventType::Unknown,
         },
         FundFlow {
             from: addr(0x4D5F),
@@ -339,6 +341,7 @@ fn test_receipt_fund_flows_takes_precedence_when_nonempty() {
             value: U256::from(1_500u64) * U256::from(10u64).pow(U256::from(18)),
             token: Some(addr(0xC02A)),
             step_index: 1,
+            event_type: EventType::Unknown,
         },
     ];
 
@@ -425,6 +428,7 @@ fn test_both_flows_present_prefers_opcode() {
         value: receipt_amount,
         token: Some(token),
         step_index: 0,
+        event_type: EventType::Unknown,
     }];
 
     let trace = make_trace_with_fallback(steps, true, None, receipt_flows, DataQuality::High);
@@ -471,6 +475,7 @@ fn test_full_fallback_scenario_aave_v3() {
             value: U256::from(40_000u64) * U256::from(10u64).pow(U256::from(18)),
             token: Some(aave),
             step_index: 0,
+            event_type: EventType::Unknown,
         },
         FundFlow {
             from: Address::zero(),
@@ -478,6 +483,7 @@ fn test_full_fallback_scenario_aave_v3() {
             value: U256::from(258),
             token: Some(aweth),
             step_index: 1,
+            event_type: EventType::Unknown,
         },
         FundFlow {
             from: user_c,
@@ -485,6 +491,7 @@ fn test_full_fallback_scenario_aave_v3() {
             value: U256::from(1_500u64) * U256::from(10u64).pow(U256::from(18)),
             token: Some(aweth),
             step_index: 2,
+            event_type: EventType::Unknown,
         },
         FundFlow {
             from: user_b,
@@ -492,6 +499,7 @@ fn test_full_fallback_scenario_aave_v3() {
             value: U256::from(1_500u64) * U256::from(10u64).pow(U256::from(18)),
             token: Some(aweth),
             step_index: 3,
+            event_type: EventType::Unknown,
         },
         FundFlow {
             from: user_d,
@@ -499,6 +507,7 @@ fn test_full_fallback_scenario_aave_v3() {
             value: U256::from(1_500u64) * U256::from(10u64).pow(U256::from(18)),
             token: Some(aweth),
             step_index: 4,
+            event_type: EventType::Unknown,
         },
         FundFlow {
             from: addr(0x4D5F),
@@ -506,6 +515,7 @@ fn test_full_fallback_scenario_aave_v3() {
             value: U256::from(1_500u64) * U256::from(10u64).pow(U256::from(18)),
             token: Some(weth),
             step_index: 5,
+            event_type: EventType::Unknown,
         },
     ];
 
@@ -675,6 +685,7 @@ fn test_replay_trace_new_fields_serialize() {
             value: U256::from(1000),
             token: Some(addr(0xDEAD)),
             step_index: usize::MAX,
+            event_type: EventType::Unknown,
         }],
         DataQuality::Medium,
     );

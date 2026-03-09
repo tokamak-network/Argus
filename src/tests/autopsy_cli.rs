@@ -195,6 +195,7 @@ mod fmt_summary {
 
     use crate::autopsy::types::{AttackPattern, FundFlow};
     use crate::cli::formatter;
+    use crate::types::EventType;
 
     use super::{make_empty_trace, make_trace};
 
@@ -328,6 +329,7 @@ mod fmt_summary {
                 value: U256::from(1_000_000_000_000_000_000u64), // 1 ETH
                 token: None,
                 step_index: 1,
+                event_type: EventType::Unknown,
             },
             FundFlow {
                 from: Address::default(),
@@ -335,6 +337,7 @@ mod fmt_summary {
                 value: U256::from(500u64),
                 token: Some(Address::default()),
                 step_index: 2,
+                event_type: EventType::Unknown,
             },
         ];
         let summary =

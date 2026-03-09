@@ -8,6 +8,25 @@ use serde::Serialize;
 #[cfg(feature = "autopsy")]
 use crate::autopsy::types::FundFlow;
 
+/// Classification of DeFi events detected from receipt logs or opcode traces.
+///
+/// Used to tag [`crate::autopsy::types::FundFlow`] entries with the specific
+/// DeFi protocol event they originated from (e.g., Uniswap Swap, Aave liquidation).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
+pub enum EventType {
+    /// ERC-20 Transfer(address,address,uint256).
+    Transfer,
+    /// DEX swap (Uniswap V2 or V3).
+    Swap,
+    /// Aave V3 LiquidationCall.
+    LiquidationCall,
+    /// Compound LiquidateBorrow.
+    LiquidateBorrow,
+    /// Unrecognized or non-DeFi event.
+    #[default]
+    Unknown,
+}
+
 /// Data quality indicator for a replay trace.
 ///
 /// When LEVM successfully replays a transaction, all data comes from opcode-level

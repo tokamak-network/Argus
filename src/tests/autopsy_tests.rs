@@ -897,6 +897,7 @@ fn test_report_markdown_sections() {
         value: U256::from(100),
         token: None,
         step_index: 3,
+        event_type: Default::default(),
     }];
 
     let diffs = vec![StorageWrite {
@@ -951,6 +952,7 @@ fn test_report_affected_contracts_deduped() {
             value: U256::from(100),
             token: None,
             step_index: 0,
+            event_type: Default::default(),
         },
         super::super::autopsy::types::FundFlow {
             from: addr(1),
@@ -958,6 +960,7 @@ fn test_report_affected_contracts_deduped() {
             value: U256::from(200),
             token: None,
             step_index: 1,
+            event_type: Default::default(),
         },
     ];
 

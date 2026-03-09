@@ -3,6 +3,8 @@
 use ethrex_common::{Address, U256};
 use serde::{Deserialize, Serialize};
 
+use crate::types::EventType;
+
 /// Detected attack pattern with evidence from the execution trace.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AttackPattern {
@@ -52,6 +54,9 @@ pub struct FundFlow {
     /// None = native ETH transfer, Some(addr) = ERC-20 token.
     pub token: Option<Address>,
     pub step_index: usize,
+    /// The DeFi event type this flow originated from.
+    #[serde(default)]
+    pub event_type: EventType,
 }
 
 /// Detected pattern with confidence score and evidence chain.
