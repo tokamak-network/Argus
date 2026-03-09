@@ -45,12 +45,11 @@ pub fn format_info(trace: &ReplayTrace, position: usize) -> String {
     } else {
         format!("0x{}", hex::encode(&trace.output))
     };
-    let effective_success = trace.success_override.unwrap_or(trace.success);
     format!(
         "Trace: {} steps | gas_used: {} | success: {} | output: {}\nPosition: {}/{}",
         trace.steps.len(),
         trace.gas_used,
-        effective_success,
+        trace.effective_success(),
         output_hex,
         position,
         trace.steps.len(),
@@ -140,8 +139,7 @@ pub fn format_autopsy_summary(
         tx_hash.to_string()
     };
 
-    let effective_success = trace.success_override.unwrap_or(trace.success);
-    let status = match (effective_success, trace.success_override) {
+    let status = match (trace.effective_success(), trace.success_override) {
         (true, Some(true)) => "Success (via receipt, LEVM reverted)",
         (true, None) => "Success",
         (false, _) => "Reverted",
@@ -455,9 +453,8 @@ mod tests {
         trace.success_override = Some(true);
         trace.data_quality = crate::types::DataQuality::Medium;
         let result = format_autopsy_summary(&[], &[], &trace, "0xabcdef1234", 100);
-        assert!(result.contains("Status: Success"));
-        assert!(result.contains("MEDIUM"));
-        assert!(result.contains("receipt fallback"));
+        assert!(result.contains("Status: Success (via receipt, LEVM reverted)"));
+        assert!(result.contains("Data:   Receipt fallback"));
     }
 
     #[test]
@@ -486,7 +483,8 @@ mod tests {
         let mut trace = make_trace(0, 0, false);
         trace.data_quality = crate::types::DataQuality::Low;
         let result = format_autopsy_summary(&[], &[], &trace, "0xabcdef1234", 100);
-        assert!(result.contains("Status: Reverted (LOW)"));
+        assert!(result.contains("Status: Reverted"));
+        assert!(result.contains("Data:   Incomplete (RPC fetch failed)"));
     }
 
     #[test]
@@ -494,9 +492,8 @@ mod tests {
     fn test_format_autopsy_data_quality_high_no_label() {
         let trace = make_trace(10, 50_000, true);
         let result = format_autopsy_summary(&[], &[], &trace, "0xabcdef1234", 100);
-        // High quality should not show any quality label
-        assert!(result.contains("Status: Success\n") || result.contains("Status: Success\r"));
-        assert!(!result.contains("MEDIUM"));
-        assert!(!result.contains("LOW"));
+        // High quality should not show Data: line
+        assert!(result.contains("Status: Success"));
+        assert!(!result.contains("Data:"));
     }
 }

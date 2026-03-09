@@ -359,6 +359,43 @@ struct AnalysisContext<'a> {
     output_path: Option<&'a str>,
 }
 
+/// Apply receipt fallback when LEVM reverts but on-chain receipt shows success.
+///
+/// Fetches the transaction receipt via RPC and, if status=0x1, sets
+/// `success_override`, parses Transfer logs into `receipt_fund_flows`,
+/// and marks `data_quality` as `Medium`.
+#[cfg(feature = "autopsy")]
+fn apply_receipt_fallback(trace: &mut crate::types::ReplayTrace, ctx: &AnalysisContext) {
+    if trace.success {
+        return;
+    }
+
+    use crate::autopsy::fund_flow::FundFlowTracer;
+    use crate::autopsy::rpc_client::EthRpcClient;
+    use crate::types::DataQuality;
+
+    let receipt_client =
+        EthRpcClient::with_config(ctx.rpc_url, ctx.block_num, ctx.rpc_config.clone());
+    match receipt_client.eth_get_transaction_receipt(ctx.tx_hash) {
+        Ok(receipt) => {
+            if receipt.status {
+                trace.success_override = Some(true);
+                trace.receipt_fund_flows = FundFlowTracer::trace_from_receipt_logs(&receipt.logs);
+                trace.data_quality = DataQuality::Medium;
+                eprintln!(
+                    "[autopsy] LEVM reverted but receipt shows success — \
+                     using receipt fallback ({} Transfer events recovered)",
+                    trace.receipt_fund_flows.len()
+                );
+            }
+        }
+        Err(e) => {
+            trace.data_quality = DataQuality::Low;
+            eprintln!("[autopsy] Warning: failed to fetch receipt: {e}");
+        }
+    }
+}
+
 /// Analyze a replayed trace: classify attacks, trace funds, enrich storage, and write report.
 ///
 /// Takes ownership of the `ReplayTrace` to avoid unnecessary cloning.
@@ -387,7 +424,13 @@ fn analyze_and_report(
     enrich_storage_writes(&mut trace, &initial_values);
 
     let patterns = AttackClassifier::classify(&trace.steps);
-    let flows = FundFlowTracer::trace(&trace.steps);
+    let opcode_flows = FundFlowTracer::trace(&trace.steps);
+    // Fallback: use receipt-based flows when opcode trace produced none
+    let flows = if opcode_flows.is_empty() && !trace.receipt_fund_flows.is_empty() {
+        trace.receipt_fund_flows.clone()
+    } else {
+        opcode_flows
+    };
 
     let storage_diffs: Vec<_> = trace
         .steps
@@ -497,13 +540,15 @@ fn run_autopsy(
 
     if interactive {
         // Clone trace for analysis; keep engine intact for the REPL.
-        let trace = engine.trace().clone();
+        let mut trace = engine.trace().clone();
+        apply_receipt_fallback(&mut trace, &ctx);
         analyze_and_report(trace, &ctx)?;
         eprintln!("[autopsy] Entering interactive debugger...");
         repl::start(engine)?;
     } else {
         // Consume engine — no clone needed.
-        let trace = engine.into_trace();
+        let mut trace = engine.into_trace();
+        apply_receipt_fallback(&mut trace, &ctx);
         analyze_and_report(trace, &ctx)?;
     }
 

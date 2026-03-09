@@ -71,6 +71,39 @@ fn make_transfer_step(
     }
 }
 
+/// Build an RpcLog representing a Transfer event.
+fn make_rpc_transfer_log(token: Address, from: Address, to: Address, amount: U256) -> RpcLog {
+    RpcLog {
+        address: token,
+        topics: vec![
+            transfer_topic(),
+            address_to_topic(from),
+            address_to_topic(to),
+        ],
+        data: amount.to_big_endian().to_vec(),
+    }
+}
+
+/// Build an RpcLog with a non-Transfer topic (e.g. Approval).
+fn make_rpc_approval_log(token: Address) -> RpcLog {
+    // keccak256("Approval(address,address,uint256)") = 0x8c5be1e5...
+    let mut approval_topic = [0u8; 32];
+    approval_topic[0] = 0x8c;
+    approval_topic[1] = 0x5b;
+    approval_topic[2] = 0xe1;
+    approval_topic[3] = 0xe5;
+
+    RpcLog {
+        address: token,
+        topics: vec![
+            H256::from(approval_topic),
+            address_to_topic(addr(0xA)),
+            address_to_topic(addr(0xB)),
+        ],
+        data: U256::from(1000).to_big_endian().to_vec(),
+    }
+}
+
 /// Build a minimal ReplayTrace with the new fields.
 fn make_trace_with_fallback(
     steps: Vec<StepRecord>,
@@ -530,4 +563,126 @@ fn test_full_fallback_scenario_aave_v3() {
     // Verify the redeem (to zero address)
     let redeem_flow = &effective_flows[4];
     assert_eq!(redeem_flow.to, Address::zero());
+}
+
+// ============================================================
+// 6. trace_from_receipt_logs() unit tests
+// ============================================================
+
+#[test]
+fn test_trace_from_receipt_logs_transfer() {
+    let token = addr(0xDEAD);
+    let from = addr(0xA);
+    let to = addr(0xB);
+    let amount = U256::from(40_000u64) * U256::from(10u64).pow(U256::from(18));
+
+    let logs = vec![make_rpc_transfer_log(token, from, to, amount)];
+    let flows = FundFlowTracer::trace_from_receipt_logs(&logs);
+
+    assert_eq!(flows.len(), 1);
+    assert_eq!(flows[0].from, from);
+    assert_eq!(flows[0].to, to);
+    assert_eq!(flows[0].value, amount);
+    assert_eq!(flows[0].token, Some(token));
+    assert_eq!(
+        flows[0].step_index,
+        usize::MAX,
+        "receipt flows use usize::MAX as step_index"
+    );
+}
+
+#[test]
+fn test_trace_from_receipt_logs_empty() {
+    let flows = FundFlowTracer::trace_from_receipt_logs(&[]);
+    assert!(flows.is_empty());
+}
+
+#[test]
+fn test_trace_from_receipt_logs_non_transfer() {
+    let logs = vec![make_rpc_approval_log(addr(0xDEAD))];
+    let flows = FundFlowTracer::trace_from_receipt_logs(&logs);
+    assert!(
+        flows.is_empty(),
+        "Approval events should not produce fund flows"
+    );
+}
+
+#[test]
+fn test_trace_from_receipt_logs_multiple_transfers() {
+    let token = addr(0xDEAD);
+    let logs = vec![
+        make_rpc_transfer_log(token, addr(0x1), addr(0x2), U256::from(1000)),
+        make_rpc_approval_log(token), // should be filtered out
+        make_rpc_transfer_log(token, addr(0x3), addr(0x4), U256::from(2000)),
+    ];
+
+    let flows = FundFlowTracer::trace_from_receipt_logs(&logs);
+    assert_eq!(
+        flows.len(),
+        2,
+        "should only have Transfer events, not Approval"
+    );
+    assert_eq!(flows[0].from, addr(0x1));
+    assert_eq!(flows[1].from, addr(0x3));
+}
+
+#[test]
+fn test_trace_from_receipt_logs_insufficient_topics() {
+    // LOG with only 2 topics (missing to address) — should be skipped
+    let log = RpcLog {
+        address: addr(0xDEAD),
+        topics: vec![transfer_topic(), address_to_topic(addr(0xA))],
+        data: U256::from(100).to_big_endian().to_vec(),
+    };
+    let flows = FundFlowTracer::trace_from_receipt_logs(&[log]);
+    assert!(flows.is_empty(), "logs with < 3 topics should be skipped");
+}
+
+#[test]
+fn test_trace_from_receipt_logs_short_data() {
+    // Transfer log with data shorter than 32 bytes — amount should be zero
+    let log = RpcLog {
+        address: addr(0xDEAD),
+        topics: vec![
+            transfer_topic(),
+            address_to_topic(addr(0xA)),
+            address_to_topic(addr(0xB)),
+        ],
+        data: vec![0x01, 0x02], // only 2 bytes
+    };
+    let flows = FundFlowTracer::trace_from_receipt_logs(&[log]);
+    assert_eq!(flows.len(), 1);
+    assert_eq!(
+        flows[0].value,
+        U256::zero(),
+        "short data should yield zero amount"
+    );
+}
+
+// ============================================================
+// 7. Serialization tests for new fields
+// ============================================================
+
+#[test]
+fn test_replay_trace_new_fields_serialize() {
+    let trace = make_trace_with_fallback(
+        vec![],
+        false,
+        Some(true),
+        vec![FundFlow {
+            from: addr(0x1),
+            to: addr(0x2),
+            value: U256::from(1000),
+            token: Some(addr(0xDEAD)),
+            step_index: usize::MAX,
+        }],
+        DataQuality::Medium,
+    );
+
+    let json = serde_json::to_value(&trace).expect("serialization should succeed");
+    assert_eq!(json["success"], false);
+    assert_eq!(json["success_override"], true);
+    assert_eq!(json["data_quality"], "Medium");
+    assert!(json["receipt_fund_flows"].is_array());
+    assert_eq!(json["receipt_fund_flows"].as_array().unwrap().len(), 1);
 }
