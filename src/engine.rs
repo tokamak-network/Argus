@@ -188,7 +188,7 @@ impl ReplayEngine {
 ///
 /// The target TX is identified by its hash. When the target TX is not found
 /// in `block_txs` (or appears at index 0), an empty Vec is returned.
-#[cfg(feature = "autopsy")]
+#[cfg(any(all(feature = "autopsy", feature = "cli"), test))]
 pub(crate) fn find_prior_same_sender_txs(
     block_txs: &[crate::autopsy::rpc_client::RpcTransaction],
     target_tx: &crate::autopsy::rpc_client::RpcTransaction,
@@ -214,7 +214,7 @@ pub(crate) fn find_prior_same_sender_txs(
 ///
 /// If `prior_txs.len() > max_prior_txs`, only the first `max_prior_txs`
 /// are replayed and a `[WARNING]` is emitted.
-#[cfg(feature = "autopsy")]
+#[cfg(any(all(feature = "autopsy", feature = "cli"), test))]
 pub(crate) fn replay_prior_txs(
     db: &mut GeneralizedDatabase,
     block_header: &crate::autopsy::rpc_client::RpcBlockHeader,
