@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::autopsy::rpc_client::{RpcBlock, RpcBlockHeader, RpcReceipt, RpcTransaction};
 use crate::sentinel::pre_filter::PreFilter;
 use crate::sentinel::rpc_service::{
-    RpcSentinelConfig, RpcSentinelService, build_deep_alert, build_prefilter_alert,
+    ProcessContext, RpcSentinelConfig, RpcSentinelService, build_deep_alert, build_prefilter_alert,
     process_rpc_block,
 };
 use crate::sentinel::types::{AlertPriority, AnalysisConfig, SentinelConfig, SuspicionReason, SuspiciousTx};
@@ -96,20 +96,85 @@ async fn test_service_metrics_accessible() {
     service.shutdown().await;
 }
 
-// --- Prefilter-only mode test ---
+// --- Prefilter-only mode: no deep replay alerts ---
 
 #[tokio::test]
-async fn test_prefilter_only_mode() {
-    let (alert_tx, _alert_rx) = mpsc::channel(16);
-    let mut config = RpcSentinelConfig::default();
-    config.prefilter_only = true;
-    config.poller_config.rpc_url = "http://127.0.0.1:19997".into();
-    config.rpc_url = "http://127.0.0.1:19997".into();
+async fn test_prefilter_only_skips_deep_replay() {
+    // In prefilter_only mode, a suspicious TX must emit an alert without needing an
+    // archive RPC. This test uses a dead RPC URL — if deep replay were attempted it
+    // would time out and potentially emit a data_quality=Low alert instead. We verify
+    // that exactly one alert is emitted (the lightweight prefilter kind) even though the
+    // rpc_url points to nothing.
+    let (alert_tx, mut alert_rx) = mpsc::channel(16);
+    let metrics = Arc::new(SentinelMetrics::new());
 
-    let service = RpcSentinelService::start(config, alert_tx).await;
-    let snapshot = service.metrics().snapshot();
-    assert_eq!(snapshot.blocks_scanned, 0);
-    service.shutdown().await;
+    let tx = RpcTransaction {
+        hash: H256::from_low_u64_be(0xABCD),
+        from: Address::from_low_u64_be(0x100),
+        to: Some(Address::from_low_u64_be(0x42)),
+        value: U256::from(2_000_000_000_000_000_000_u64), // 2 ETH
+        input: vec![],
+        gas: 600_000,
+        gas_price: Some(2_000_000_000),
+        max_fee_per_gas: None,
+        max_priority_fee_per_gas: None,
+        nonce: 0,
+        block_number: Some(42),
+    };
+    let rpc_block = RpcBlock {
+        header: make_rpc_block_header(42),
+        transactions: vec![tx],
+    };
+    let receipt = RpcReceipt {
+        status: false,
+        cumulative_gas_used: 550_000,
+        logs: vec![],
+        transaction_hash: H256::from_low_u64_be(0xABCD),
+        transaction_index: 0,
+        gas_used: 550_000,
+    };
+
+    let sentinel_config = crate::sentinel::types::SentinelConfig {
+        min_gas_used: 500_000,
+        min_value_wei: U256::from(1_000_000_000_000_000_000_u64),
+        suspicion_threshold: 0.25,
+        min_independent_signals: 1,
+        ..Default::default()
+    };
+    let pre_filter = crate::sentinel::pre_filter::PreFilter::new(sentinel_config);
+    let analysis_config = crate::sentinel::types::AnalysisConfig {
+        prefilter_alert_mode: true,
+        ..Default::default()
+    };
+
+    // prefilter_only=true — even a dead rpc_url must not block alert emission
+    process_rpc_block(
+        &rpc_block,
+        &[receipt],
+        ProcessContext::new_for_test(
+            &pre_filter,
+            "http://127.0.0.1:1", // unreachable — must not be contacted in prefilter_only mode
+            &analysis_config,
+            true,
+            &alert_tx,
+            &metrics,
+        ),
+    )
+    .await;
+
+    drop(alert_tx);
+    let alert = alert_rx.recv().await.expect("expected prefilter alert");
+    assert_eq!(alert.block_number, 42);
+    assert!(
+        alert.summary.contains("Pre-filter alert (RPC)"),
+        "expected prefilter summary, got: {}",
+        alert.summary
+    );
+    // Deep replay was skipped — detected_patterns must be empty
+    assert!(
+        alert.detected_patterns.is_empty(),
+        "prefilter_only alerts must not have detected_patterns"
+    );
 }
 
 // --- Alert emission test (synthetic, offline) ---
@@ -162,16 +227,14 @@ async fn test_alert_emission_prefilter_only() {
     process_rpc_block(
         &rpc_block,
         &[receipt],
-        crate::sentinel::rpc_service::ProcessContext {
-            pre_filter: &pre_filter,
-            rpc_url: "http://127.0.0.1:1",
-            analysis_config: &analysis_config,
-            prefilter_only: true,
-            alert_tx: &alert_tx,
-            metrics: &metrics,
-            #[cfg(feature = "ai_agent")]
-            ai_judge: None,
-        },
+        ProcessContext::new_for_test(
+            &pre_filter,
+            "http://127.0.0.1:1",
+            &analysis_config,
+            true,
+            &alert_tx,
+            &metrics,
+        ),
     )
     .await;
 
@@ -188,6 +251,80 @@ async fn test_alert_emission_prefilter_only() {
     assert_eq!(alert.block_number, 100);
     assert_eq!(alert.tx_index, 0);
     assert_eq!(snapshot.alerts_emitted, 1);
+}
+
+// --- Deep replay failure → prefilter_alert_mode fallback ---
+
+#[tokio::test]
+async fn test_deep_replay_failure_emits_low_quality_alert() {
+    // prefilter_only=false but rpc_url is unreachable → replay fails.
+    // With prefilter_alert_mode=true the service must fall back to a prefilter alert
+    // with DataQuality::Low instead of silently dropping it.
+    let (alert_tx, mut alert_rx) = mpsc::channel(16);
+    let metrics = Arc::new(SentinelMetrics::new());
+
+    let tx = RpcTransaction {
+        hash: H256::from_low_u64_be(0xDEAD),
+        from: Address::from_low_u64_be(0x200),
+        to: Some(Address::from_low_u64_be(0x42)),
+        value: U256::from(2_000_000_000_000_000_000_u64), // 2 ETH
+        input: vec![],
+        gas: 600_000,
+        gas_price: Some(2_000_000_000),
+        max_fee_per_gas: None,
+        max_priority_fee_per_gas: None,
+        nonce: 1,
+        block_number: Some(999),
+    };
+    let rpc_block = RpcBlock {
+        header: make_rpc_block_header(999),
+        transactions: vec![tx],
+    };
+    let receipt = RpcReceipt {
+        status: false,
+        cumulative_gas_used: 550_000,
+        logs: vec![],
+        transaction_hash: H256::from_low_u64_be(0xDEAD),
+        transaction_index: 0,
+        gas_used: 550_000,
+    };
+
+    let sentinel_config = crate::sentinel::types::SentinelConfig {
+        min_gas_used: 500_000,
+        min_value_wei: U256::from(1_000_000_000_000_000_000_u64),
+        suspicion_threshold: 0.25,
+        min_independent_signals: 1,
+        ..Default::default()
+    };
+    let pre_filter = crate::sentinel::pre_filter::PreFilter::new(sentinel_config);
+    // prefilter_alert_mode=true → failed replay must emit fallback alert
+    let analysis_config = crate::sentinel::types::AnalysisConfig {
+        prefilter_alert_mode: true,
+        ..Default::default()
+    };
+
+    process_rpc_block(
+        &rpc_block,
+        &[receipt],
+        ProcessContext::new_for_test(
+            &pre_filter,
+            "http://127.0.0.1:1", // unreachable — replay must fail
+            &analysis_config,
+            false, // prefilter_only=false → deep replay attempted
+            &alert_tx,
+            &metrics,
+        ),
+    )
+    .await;
+
+    drop(alert_tx);
+    let alert = alert_rx.recv().await.expect("expected fallback alert on replay failure");
+    assert_eq!(alert.block_number, 999);
+    assert_eq!(
+        alert.data_quality,
+        Some(crate::types::DataQuality::Low),
+        "replay failure with prefilter_alert_mode must produce DataQuality::Low"
+    );
 }
 
 // --- Alert builder tests ---

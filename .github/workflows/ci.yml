@@ -12,16 +12,20 @@ env:
 
 jobs:
   check:
-    name: Check
+    name: Check (${{ matrix.features }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        features:
+          - "--all-features"
+          - "--features autopsy"
+          - "--features sentinel"
+          - ""
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check --all-features
-      - run: cargo check
-      - run: cargo check --features autopsy
-      - run: cargo check --features sentinel
+      - run: cargo check ${{ matrix.features }}
 
   test:
     name: Test

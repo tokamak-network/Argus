@@ -21,7 +21,11 @@ use super::types::{
     AlertPriority, AnalysisConfig, SentinelAlert, SentinelConfig, SuspicionReason, SuspiciousTx,
 };
 use super::whitelist::WhitelistEngine;
+use crate::autopsy::classifier::AttackClassifier;
+use crate::autopsy::fund_flow::FundFlowTracer;
 use crate::autopsy::rpc_client::{RpcBlock, RpcReceipt};
+use crate::sentinel::analyzer::compute_total_value;
+use crate::types::StepRecord;
 
 /// Configuration for the RPC-mode sentinel service.
 #[derive(Debug, Clone)]
@@ -193,14 +197,37 @@ async fn service_loop(
 
 /// Shared processing context passed to `process_rpc_block`.
 pub(crate) struct ProcessContext<'a> {
-    pub(crate) pre_filter: &'a PreFilter,
-    pub(crate) rpc_url: &'a str,
-    pub(crate) analysis_config: &'a AnalysisConfig,
-    pub(crate) prefilter_only: bool,
-    pub(crate) alert_tx: &'a mpsc::Sender<SentinelAlert>,
-    pub(crate) metrics: &'a SentinelMetrics,
+    pre_filter: &'a PreFilter,
+    rpc_url: &'a str,
+    analysis_config: &'a AnalysisConfig,
+    prefilter_only: bool,
+    alert_tx: &'a mpsc::Sender<SentinelAlert>,
+    metrics: &'a SentinelMetrics,
     #[cfg(feature = "ai_agent")]
-    pub(crate) ai_judge: Option<&'a super::ai::judge::AiJudge<super::ai::LiteLLMClient>>,
+    ai_judge: Option<&'a super::ai::judge::AiJudge<super::ai::LiteLLMClient>>,
+}
+
+#[cfg(test)]
+impl<'a> ProcessContext<'a> {
+    pub(crate) fn new_for_test(
+        pre_filter: &'a PreFilter,
+        rpc_url: &'a str,
+        analysis_config: &'a AnalysisConfig,
+        prefilter_only: bool,
+        alert_tx: &'a mpsc::Sender<SentinelAlert>,
+        metrics: &'a SentinelMetrics,
+    ) -> Self {
+        Self {
+            pre_filter,
+            rpc_url,
+            analysis_config,
+            prefilter_only,
+            alert_tx,
+            metrics,
+            #[cfg(feature = "ai_agent")]
+            ai_judge: None,
+        }
+    }
 }
 
 /// Process one `(RpcBlock, Vec<RpcReceipt>)` pair through the detection pipeline.
@@ -410,13 +437,9 @@ pub(crate) fn build_prefilter_alert(rpc_block: &RpcBlock, suspicion: &Suspicious
 pub(crate) fn build_deep_alert(
     rpc_block: &RpcBlock,
     suspicion: &SuspiciousTx,
-    steps: &[crate::types::StepRecord],
+    steps: &[StepRecord],
     success: bool,
 ) -> SentinelAlert {
-    use crate::autopsy::classifier::AttackClassifier;
-    use crate::autopsy::fund_flow::FundFlowTracer;
-    use crate::sentinel::analyzer::compute_total_value;
-
     let total_steps = steps.len();
     let detected_patterns = AttackClassifier::classify_with_confidence(steps);
     let fund_flows = FundFlowTracer::trace(steps);
