@@ -9,7 +9,7 @@ Built with Rust, powered by ethrex LEVM.
 
 ```bash
 cargo check                                    # Compile check
-cargo test                                     # Run 815 tests (+ 27 ignored)
+cargo test                                     # Run 841 tests (+ 27 ignored)
 cargo clippy --all-features -- -D warnings     # Lint (warnings = errors)
 cargo fmt --check                              # Format check
 
@@ -43,7 +43,7 @@ src/
 ├── lib.rs              # Module exports
 ├── engine.rs           # ReplayEngine — time-travel navigation
 ├── recorder.rs         # DebugRecorder — opcode step capture
-├── types.rs            # ReplayTrace, StepRecord, ReplayConfig
+├── types.rs            # ReplayTrace, StepRecord, ReplayConfig, EventType, DataQuality
 ├── error.rs            # DebuggerError, RpcError
 ├── sentinel/           # Real-time detection (~10,500 LoC)
 │   ├── types.rs        #   Alert types, SuspicionReason
@@ -80,7 +80,7 @@ src/
 ├── autopsy/            # Post-hack forensics (3,544 LoC)
 │   ├── types.rs        #   AttackPattern, FundFlow
 │   ├── classifier.rs   #   Reentrancy, flash loan, price manipulation
-│   ├── fund_flow.rs    #   ETH/ERC-20 transfer tracing
+│   ├── fund_flow.rs    #   ETH/ERC-20 transfer tracing, DeFi event classification (Uniswap/Aave/Compound)
 │   ├── report.rs       #   Markdown report generation
 │   ├── rpc_client.rs   #   Archive node RPC with retry
 │   ├── abi_decoder.rs  #   Function/event decoding

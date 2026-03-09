@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `EventType` enum (`Transfer`, `Swap`, `LiquidationCall`, `LiquidateBorrow`, `Unknown`) for DeFi event classification
+- `classify_log_event()` — matches receipt log topics against Uniswap V2/V3, Aave V3, Compound event signatures
+- `trace_from_receipt_logs()` — ERC-20 Transfer recovery from on-chain receipt logs when LEVM reverts
+- `data_quality` field on `SentinelAlert` (`High` / `Medium` / `Low`) indicating trace data source
+- `event_type` field on `FundFlow` struct for DeFi protocol tagging
+- 26 new tests: 14 in `fund_flow.rs` (topic classification + receipt log integration), 12 in sentinel alert tests
+
+### Added (Phase 2-B documentation)
 - SECURITY.md vulnerability disclosure policy
 - CHANGELOG.md following Keep a Changelog format
 - CODE_OF_CONDUCT.md (Contributor Covenant v2.1)
