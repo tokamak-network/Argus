@@ -181,9 +181,7 @@ impl AlertDeduplicator {
                             target_contract,
                             ..
                         } => format!("Reentrancy:{:#x}", target_contract),
-                        crate::autopsy::types::AttackPattern::FlashLoan {
-                            provider, ..
-                        } => {
+                        crate::autopsy::types::AttackPattern::FlashLoan { provider, .. } => {
                             let addr = provider.unwrap_or_default();
                             format!("FlashLoan:{:#x}", addr)
                         }

@@ -7,7 +7,6 @@
 //! - **prefilter_only = false** (default): Deep RPC replay. Requires an archive node.
 //! - **prefilter_only = true**: Receipt heuristics only. Works with any full node.
 
-
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -193,19 +192,19 @@ async fn service_loop(
 }
 
 /// Shared processing context passed to `process_rpc_block`.
-struct ProcessContext<'a> {
-    pre_filter: &'a PreFilter,
-    rpc_url: &'a str,
-    analysis_config: &'a AnalysisConfig,
-    prefilter_only: bool,
-    alert_tx: &'a mpsc::Sender<SentinelAlert>,
-    metrics: &'a SentinelMetrics,
+pub(crate) struct ProcessContext<'a> {
+    pub(crate) pre_filter: &'a PreFilter,
+    pub(crate) rpc_url: &'a str,
+    pub(crate) analysis_config: &'a AnalysisConfig,
+    pub(crate) prefilter_only: bool,
+    pub(crate) alert_tx: &'a mpsc::Sender<SentinelAlert>,
+    pub(crate) metrics: &'a SentinelMetrics,
     #[cfg(feature = "ai_agent")]
-    ai_judge: Option<&'a super::ai::judge::AiJudge<super::ai::LiteLLMClient>>,
+    pub(crate) ai_judge: Option<&'a super::ai::judge::AiJudge<super::ai::LiteLLMClient>>,
 }
 
 /// Process one `(RpcBlock, Vec<RpcReceipt>)` pair through the detection pipeline.
-async fn process_rpc_block(
+pub(crate) async fn process_rpc_block(
     rpc_block: &RpcBlock,
     rpc_receipts: &[RpcReceipt],
     ctx: ProcessContext<'_>,
@@ -394,7 +393,7 @@ fn build_alert_base(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelA
     }
 }
 
-fn build_prefilter_alert(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelAlert {
+pub(crate) fn build_prefilter_alert(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelAlert {
     let reason_names: Vec<&str> = suspicion.reasons.iter().map(reason_display_name).collect();
     let summary = format!(
         "Pre-filter alert (RPC): {} (score={:.2})",
@@ -408,7 +407,7 @@ fn build_prefilter_alert(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> Sent
 }
 
 /// Build an enriched `SentinelAlert` after RPC replay (classifier + fund flow).
-fn build_deep_alert(
+pub(crate) fn build_deep_alert(
     rpc_block: &RpcBlock,
     suspicion: &SuspiciousTx,
     steps: &[crate::types::StepRecord],
@@ -440,371 +439,3 @@ fn build_deep_alert(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::autopsy::rpc_client::{RpcBlock, RpcBlockHeader, RpcReceipt, RpcTransaction};
-    use ethrex_common::{Address, H256, U256};
-    use std::time::Duration;
-
-    fn make_rpc_block_header(number: u64) -> RpcBlockHeader {
-        RpcBlockHeader {
-            hash: H256::from_low_u64_be(number),
-            number,
-            timestamp: 1_700_000_000 + number,
-            gas_limit: 30_000_000,
-            base_fee_per_gas: Some(1_000_000_000),
-            coinbase: Address::from_low_u64_be(0x01),
-        }
-    }
-
-    fn make_rpc_block(number: u64) -> RpcBlock {
-        RpcBlock {
-            header: make_rpc_block_header(number),
-            transactions: vec![],
-        }
-    }
-
-    // --- Configuration tests ---
-
-    #[test]
-    fn test_rpc_sentinel_config_defaults() {
-        let config = RpcSentinelConfig::default();
-        assert_eq!(config.rpc_url, "http://localhost:8545");
-        assert!(!config.prefilter_only);
-        assert!(config.analysis_config.prefilter_alert_mode);
-        assert_eq!(config.analysis_config.max_steps, 1_000_000);
-    }
-
-    #[test]
-    fn test_rpc_sentinel_config_new() {
-        let config = RpcSentinelConfig::new("https://mainnet.infura.io/v3/KEY");
-        assert_eq!(config.rpc_url, "https://mainnet.infura.io/v3/KEY");
-        assert_eq!(
-            config.poller_config.rpc_url,
-            "https://mainnet.infura.io/v3/KEY"
-        );
-    }
-
-    #[test]
-    fn test_rpc_sentinel_config_prefilter_only() {
-        let mut config = RpcSentinelConfig::default();
-        config.prefilter_only = true;
-        assert!(config.prefilter_only);
-    }
-
-    // --- Service lifecycle tests ---
-
-    #[tokio::test]
-    async fn test_service_lifecycle() {
-        let (alert_tx, _alert_rx) = mpsc::channel(16);
-        // Use a non-routable address so the poller fails immediately
-        let mut config = RpcSentinelConfig::default();
-        config.rpc_url = "http://127.0.0.1:19998".into();
-        config.poller_config = super::super::rpc_poller::RpcPollerConfig {
-            rpc_url: "http://127.0.0.1:19998".into(),
-            poll_interval: Duration::from_millis(50),
-            rpc_config: crate::autopsy::rpc_client::RpcConfig {
-                timeout: Duration::from_millis(100),
-                connect_timeout: Duration::from_millis(100),
-                max_retries: 0,
-                base_backoff: Duration::from_millis(10),
-            },
-        };
-
-        let service = RpcSentinelService::start(config, alert_tx).await;
-        // Metrics should be initialized at zero
-        let snapshot = service.metrics().snapshot();
-        assert_eq!(snapshot.blocks_scanned, 0);
-        // Shutdown should not panic
-        service.shutdown().await;
-    }
-
-    #[tokio::test]
-    async fn test_service_metrics_accessible() {
-        let (alert_tx, _alert_rx) = mpsc::channel(16);
-        let config = RpcSentinelConfig::default();
-        let service = RpcSentinelService::start(config, alert_tx).await;
-        let metrics = service.metrics();
-        let snapshot = metrics.snapshot();
-        assert_eq!(snapshot.alerts_emitted, 0);
-        assert_eq!(snapshot.txs_scanned, 0);
-        service.shutdown().await;
-    }
-
-    // --- Prefilter-only mode test ---
-
-    #[tokio::test]
-    async fn test_prefilter_only_mode() {
-        // In prefilter_only mode, the deep replay is skipped.
-        // We verify the config flag is respected by the service constructor.
-        let (alert_tx, _alert_rx) = mpsc::channel(16);
-        let mut config = RpcSentinelConfig::default();
-        config.prefilter_only = true;
-        config.poller_config.rpc_url = "http://127.0.0.1:19997".into();
-        config.rpc_url = "http://127.0.0.1:19997".into();
-
-        let service = RpcSentinelService::start(config, alert_tx).await;
-        // Service starts without panic — prefilter_only flag is accepted
-        let snapshot = service.metrics().snapshot();
-        assert_eq!(snapshot.blocks_scanned, 0);
-        service.shutdown().await;
-    }
-
-    // --- Alert emission test (synthetic, offline) ---
-
-    #[tokio::test]
-    async fn test_alert_emission_prefilter_only() {
-        // Build a suspicious block with a high-value-revert TX and feed it directly
-        // through process_rpc_block in prefilter_only mode to verify alert emission.
-
-        let (alert_tx, mut alert_rx) = mpsc::channel(16);
-        let metrics = Arc::new(SentinelMetrics::new());
-
-        // Build a block with one high-value transaction that failed (revert)
-        let high_value = U256::from(2_000_000_000_000_000_000_u64); // 2 ETH
-        let tx = RpcTransaction {
-            hash: H256::from_low_u64_be(0x1234),
-            from: Address::from_low_u64_be(0x100),
-            to: Some(Address::from_low_u64_be(0x42)),
-            value: high_value,
-            input: vec![],
-            gas: 600_000,
-            gas_price: Some(2_000_000_000),
-            max_fee_per_gas: None,
-            max_priority_fee_per_gas: None,
-            nonce: 0,
-            block_number: Some(100),
-        };
-        let rpc_block = RpcBlock {
-            header: make_rpc_block_header(100),
-            transactions: vec![tx],
-        };
-        // Receipt: TX failed (status=false) with high gas usage
-        let receipt = RpcReceipt {
-            status: false, // reverted
-            cumulative_gas_used: 550_000,
-            logs: vec![],
-            transaction_hash: H256::from_low_u64_be(0x1234),
-            transaction_index: 0,
-            gas_used: 550_000,
-        };
-
-        let sentinel_config = SentinelConfig {
-            min_gas_used: 500_000,
-            min_value_wei: U256::from(1_000_000_000_000_000_000_u64), // 1 ETH threshold
-            // Lower threshold so HighValueWithRevert (score=0.3) is enough to flag
-            suspicion_threshold: 0.25,
-            // Single signal test — relax min independent signals
-            min_independent_signals: 1,
-            ..Default::default()
-        };
-        let pre_filter = PreFilter::new(sentinel_config);
-        let analysis_config = AnalysisConfig {
-            prefilter_alert_mode: true,
-            ..Default::default()
-        };
-
-        process_rpc_block(
-            &rpc_block,
-            &[receipt],
-            super::ProcessContext {
-                pre_filter: &pre_filter,
-                rpc_url: "http://127.0.0.1:1", // unreachable — won't be called in prefilter_only
-                analysis_config: &analysis_config,
-                prefilter_only: true,
-                alert_tx: &alert_tx,
-                metrics: &metrics,
-                #[cfg(feature = "ai_agent")]
-                ai_judge: None,
-            },
-        )
-        .await;
-
-        // Drop alert_tx so recv() doesn't block
-        drop(alert_tx);
-
-        let snapshot = metrics.snapshot();
-        assert_eq!(snapshot.blocks_scanned, 1);
-        assert_eq!(snapshot.txs_scanned, 1);
-        assert!(
-            snapshot.txs_flagged > 0,
-            "expected TX to be flagged by pre-filter (high-value revert above threshold)"
-        );
-        let alert = alert_rx.recv().await.expect("expected alert");
-        assert_eq!(alert.block_number, 100);
-        assert_eq!(alert.tx_index, 0);
-        assert_eq!(snapshot.alerts_emitted, 1);
-    }
-
-    // --- Helper: verify build_prefilter_alert produces correct output ---
-
-    #[test]
-    fn test_build_prefilter_alert_fields() {
-        use super::super::types::{AlertPriority, SuspicionReason};
-
-        let rpc_block = make_rpc_block(42);
-        let suspicion = SuspiciousTx {
-            tx_hash: H256::from_low_u64_be(0xbeef),
-            tx_index: 3,
-            reasons: vec![SuspicionReason::SelfDestructDetected],
-            score: 0.8,
-            priority: AlertPriority::High,
-            whitelist_matches: 0,
-        };
-
-        let alert = build_prefilter_alert(&rpc_block, &suspicion);
-        assert_eq!(alert.block_number, 42);
-        assert_eq!(alert.tx_index, 3);
-        assert_eq!(alert.tx_hash, H256::from_low_u64_be(0xbeef));
-        assert_eq!(alert.suspicion_score, 0.8);
-        assert!(alert.summary.contains("Pre-filter alert (RPC)"));
-        assert!(alert.summary.contains("self-destruct"));
-    }
-
-    #[test]
-    fn test_build_deep_alert_fields() {
-        let rpc_block = make_rpc_block(100);
-        let suspicion = SuspiciousTx {
-            tx_hash: H256::from_low_u64_be(0xcafe),
-            tx_index: 1,
-            reasons: vec![SuspicionReason::MultipleErc20Transfers { count: 10 }],
-            score: 0.75,
-            priority: AlertPriority::High,
-            whitelist_matches: 0,
-        };
-
-        // Pass empty steps — no patterns expected, just verify alert fields
-        let empty_steps: Vec<crate::types::StepRecord> = Vec::new();
-        let alert = build_deep_alert(&rpc_block, &suspicion, &empty_steps, true);
-        assert_eq!(alert.block_number, 100);
-        assert_eq!(alert.total_steps, 0);
-        assert!(alert.summary.contains("Deep RPC alert"));
-        assert!(alert.summary.contains("steps=0"));
-        assert!(alert.summary.contains("success=true"));
-        assert!(alert.summary.contains("erc20-transfers"));
-    }
-
-    // --- RED: build_deep_alert should populate detected_patterns from replay steps ---
-
-    /// Create minimal StepRecords that trigger the reentrancy classifier.
-    /// Pattern: CALL at depth 0 from victim → attacker, then CALL at depth 1
-    /// back to victim (re-entry), then SSTORE in victim.
-    fn make_reentrancy_steps() -> Vec<crate::types::StepRecord> {
-        let victim = Address::from_low_u64_be(0x01C);
-        let attacker = Address::from_low_u64_be(0xA77);
-
-        // Encode addresses as U256 for stack_top[1] (CALL target)
-        let attacker_u256 = U256::from_big_endian(attacker.as_bytes());
-        let victim_u256 = U256::from_big_endian(victim.as_bytes());
-
-        vec![
-            // Step 0: Victim calls attacker (CALL opcode = 0xF1)
-            crate::types::StepRecord {
-                step_index: 0,
-                pc: 0,
-                opcode: 0xF1, // CALL
-                depth: 0,
-                gas_remaining: 1_000_000,
-                stack_top: vec![U256::zero(), attacker_u256, U256::from(1_000)],
-                stack_depth: 7,
-                memory_size: 0,
-                code_address: victim,
-                call_value: Some(U256::from(1_000)),
-                storage_writes: None,
-                log_topics: None,
-                log_data: None,
-                call_input_selector: None,
-            },
-            // Step 1: Attacker re-enters victim (CALL at depth > 0, target = victim)
-            crate::types::StepRecord {
-                step_index: 1,
-                pc: 0,
-                opcode: 0xF1, // CALL
-                depth: 1,
-                gas_remaining: 900_000,
-                stack_top: vec![U256::zero(), victim_u256, U256::zero()],
-                stack_depth: 7,
-                memory_size: 0,
-                code_address: attacker,
-                call_value: None,
-                storage_writes: None,
-                log_topics: None,
-                log_data: None,
-                call_input_selector: None,
-            },
-            // Step 2: SSTORE in victim contract after re-entry
-            crate::types::StepRecord {
-                step_index: 2,
-                pc: 10,
-                opcode: 0x55, // SSTORE
-                depth: 2,
-                gas_remaining: 800_000,
-                stack_top: vec![U256::from(1), U256::zero()],
-                stack_depth: 2,
-                memory_size: 0,
-                code_address: victim,
-                call_value: None,
-                storage_writes: Some(vec![crate::types::StorageWrite {
-                    address: victim,
-                    slot: H256::zero(),
-                    old_value: U256::zero(),
-                    new_value: U256::from(1),
-                }]),
-                log_topics: None,
-                log_data: None,
-                call_input_selector: None,
-            },
-        ]
-    }
-
-    #[test]
-    fn test_build_deep_alert_populates_detected_patterns_from_steps() {
-        // RED: This test MUST FAIL until we fix build_deep_alert to run
-        // AttackClassifier on the replay steps.
-        let rpc_block = make_rpc_block(200);
-        let suspicion = SuspiciousTx {
-            tx_hash: H256::from_low_u64_be(0xdead),
-            tx_index: 0,
-            reasons: vec![SuspicionReason::SelfDestructDetected],
-            score: 0.9,
-            priority: AlertPriority::Critical,
-            whitelist_matches: 0,
-        };
-
-        let steps = make_reentrancy_steps();
-        let alert = build_deep_alert(&rpc_block, &suspicion, &steps, true);
-
-        assert!(
-            !alert.detected_patterns.is_empty(),
-            "deep alert should populate detected_patterns from replay steps, \
-             but got empty vec. This is the detected_patterns bug."
-        );
-    }
-
-    #[test]
-    fn test_build_deep_alert_populates_fund_flows_from_steps() {
-        // RED: fund_flows should also be populated from replay steps.
-        let rpc_block = make_rpc_block(201);
-        let suspicion = SuspiciousTx {
-            tx_hash: H256::from_low_u64_be(0xbeef),
-            tx_index: 0,
-            reasons: vec![SuspicionReason::SelfDestructDetected],
-            score: 0.9,
-            priority: AlertPriority::Critical,
-            whitelist_matches: 0,
-        };
-
-        let steps = make_reentrancy_steps();
-        // The reentrancy steps include a CALL with value=1000 — should produce
-        // at least one ETH fund flow.
-        let alert = build_deep_alert(&rpc_block, &suspicion, &steps, true);
-
-        // When steps contain value transfers, fund_flows should be non-empty.
-        assert!(
-            !alert.fund_flows.is_empty(),
-            "deep alert should populate fund_flows from replay steps, \
-             but got empty vec."
-        );
-    }
-}

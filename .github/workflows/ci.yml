@@ -19,6 +19,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --all-features
+      - run: cargo check
+      - run: cargo check --features autopsy
+      - run: cargo check --features sentinel
 
   test:
     name: Test

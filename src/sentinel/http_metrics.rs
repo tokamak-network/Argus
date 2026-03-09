@@ -6,7 +6,6 @@
 //! - `GET /sentinel/metrics`  — JSON metrics snapshot (for dashboard)
 //! - `GET /sentinel/history`  — JSON paginated alert history
 
-
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;

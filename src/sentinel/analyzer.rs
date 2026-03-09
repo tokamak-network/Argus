@@ -69,10 +69,7 @@ impl DeepAnalyzer {
             .fold(0.0_f64, f64::max);
 
         // If no patterns detected with sufficient confidence, dismiss
-        let has_confirmed_patterns =
-            !detected_patterns.is_empty() && max_confidence >= config.min_alert_confidence;
-
-        if !has_confirmed_patterns {
+        if detected_patterns.is_empty() || max_confidence < config.min_alert_confidence {
             return Ok(None);
         }
 

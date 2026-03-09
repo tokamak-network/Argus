@@ -7,7 +7,8 @@ use ethrex_storage::Store;
 
 use super::context::{AnalysisContext, AnalysisStep, StepResult};
 use super::steps::{
-    AnomalyDetector, ConfidenceScorer, ReportGenerator, TraceAnalyzer, execute_anomaly_step,
+    AnomalyDetector, ConfidenceScorer, FundFlowAnalyzer, PatternMatcher, ReportGenerator,
+    TraceAnalyzer, execute_anomaly_step,
 };
 use crate::sentinel::ml_model::{AnomalyModel, StatisticalAnomalyDetector};
 use crate::sentinel::types::{AnalysisConfig, SentinelAlert, SentinelError, SuspiciousTx};
@@ -35,8 +36,6 @@ impl AnalysisPipeline {
     ///
     /// 6 steps: trace, pattern, fund-flow, anomaly, confidence, report.
     pub fn default_pipeline() -> Self {
-        use super::steps::{FundFlowAnalyzer, PatternMatcher};
-
         let steps: Vec<Box<dyn AnalysisStep>> = vec![
             Box::new(TraceAnalyzer),
             Box::new(PatternMatcher),

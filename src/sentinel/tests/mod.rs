@@ -118,5 +118,6 @@ mod pipeline_tests;
 mod prefilter_benchmark;
 mod prefilter_scoring_tests;
 mod prefilter_tests;
+mod rpc_service_tests;
 mod service_tests;
 mod whitelist_tests;

@@ -31,7 +31,6 @@
 //! let result = replay_tx_from_rpc(rpc_url, block_number, 0, &rpc_block, &config);
 //! ```
 
-
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -39,7 +38,6 @@ use std::sync::Arc;
 use ethrex_levm::db::gen_db::GeneralizedDatabase;
 use ethrex_levm::tracing::LevmCallTracer;
 use ethrex_levm::vm::{VM, VMType};
-
 
 use crate::autopsy::remote_db::RemoteVmDatabase;
 use crate::autopsy::rpc_client::RpcBlock;

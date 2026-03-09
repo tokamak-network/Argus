@@ -211,7 +211,6 @@ impl AlertHistory {
             name.eq_ignore_ascii_case(target)
         })
     }
-
 }
 
 /// Numeric rank for priority comparison (higher = more severe).
