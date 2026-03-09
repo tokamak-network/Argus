@@ -24,8 +24,9 @@ Run Argus Sentinel on Ethereum mainnet (or any EVM chain) to detect attacks in r
 ## Docker (local)
 
 ```bash
-# Pull the pre-built image
-docker pull tokamak/argus-demo:latest
+# Build the image locally
+git clone https://github.com/tokamak-network/Argus.git && cd Argus
+docker build -t argus-demo .
 
 # Run in prefilter-only mode (works with any full node)
 docker run -d \
@@ -33,7 +34,7 @@ docker run -d \
   -e ARGUS_RPC_URL="https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY" \
   -e ARGUS_METRICS_PORT="9090" \
   -p 9090:9090 \
-  tokamak/argus-demo:latest
+  argus-demo
 
 # Stream logs
 docker logs -f argus-sentinel
@@ -51,7 +52,7 @@ docker run -d \
   -e ARGUS_METRICS_PORT="9090" \
   -p 9090:9090 \
   -v $(pwd)/alerts:/data \
-  tokamak/argus-demo:latest \
+  argus-demo \
   "exec argus sentinel --rpc \"$ARGUS_RPC_URL\" --metrics-port \"$ARGUS_METRICS_PORT\" --alert-file /data/alerts.jsonl --prefilter-only"
 ```
 

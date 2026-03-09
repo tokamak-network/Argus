@@ -52,7 +52,7 @@ $ cargo run --example sentinel_realtime_demo
 
 ## What Argus Does
 
-> Core features (pre-filter, deep analyzer, alerts, forensics, debugger) are implemented and tested (815 tests). Some features (mempool monitoring, auto-pause, ML pipeline) are available in embedded mode only — not yet wired in the RPC-mode CLI. See [sentinel.toml.example](sentinel.toml.example) for details. Argus is currently running on **Ethereum mainnet** via AWS ECS Fargate — see [Deployment Guide](docs/deployment.md) and [Roadmap](docs/ROADMAP.md).
+> Core features (pre-filter, deep analyzer, alerts, forensics, debugger) are implemented and tested (864 tests). Some features (mempool monitoring, auto-pause, ML pipeline) are available in embedded mode only — not yet wired in the RPC-mode CLI. See [sentinel.toml.example](sentinel.toml.example) for details. Argus is currently running on **Ethereum mainnet** via AWS ECS Fargate — see [Deployment Guide](docs/deployment.md) and [Roadmap](docs/ROADMAP.md).
 
 ### Sentinel — Real-Time Attack Detection
 
