@@ -4,13 +4,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::autopsy::rpc_client::{RpcBlock, RpcBlockHeader, RpcReceipt, RpcTransaction};
+use crate::sentinel::metrics::SentinelMetrics;
 use crate::sentinel::pre_filter::PreFilter;
 use crate::sentinel::rpc_service::{
     ProcessContext, RpcSentinelConfig, RpcSentinelService, build_deep_alert, build_prefilter_alert,
     process_rpc_block,
 };
-use crate::sentinel::types::{AlertPriority, AnalysisConfig, SentinelConfig, SuspicionReason, SuspiciousTx};
-use crate::sentinel::metrics::SentinelMetrics;
+use crate::sentinel::types::{
+    AlertPriority, AnalysisConfig, SentinelConfig, SuspicionReason, SuspiciousTx,
+};
 use ethrex_common::{Address, H256, U256};
 use tokio::sync::mpsc;
 
@@ -318,7 +320,10 @@ async fn test_deep_replay_failure_emits_low_quality_alert() {
     .await;
 
     drop(alert_tx);
-    let alert = alert_rx.recv().await.expect("expected fallback alert on replay failure");
+    let alert = alert_rx
+        .recv()
+        .await
+        .expect("expected fallback alert on replay failure");
     assert_eq!(alert.block_number, 999);
     assert_eq!(
         alert.data_quality,

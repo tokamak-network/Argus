@@ -32,7 +32,9 @@ pub(crate) fn revert_cause_from_vm_error(err: &VMError) -> RevertCause {
         // Exhaustive arms instead of `_` wildcard: if ethrex adds a new VMError
         // variant the compiler forces us to classify it rather than silently
         // falling through to EvmBehaviorDiff.
-        VMError::TxValidation(_) | VMError::ExceptionalHalt(_) | VMError::RevertOpcode
+        VMError::TxValidation(_)
+        | VMError::ExceptionalHalt(_)
+        | VMError::RevertOpcode
         | VMError::Internal(_) => RevertCause::EvmBehaviorDiff,
     }
 }
@@ -190,10 +192,7 @@ mod tests {
     #[test]
     fn test_revert_cause_state_data_miss_account_not_found() {
         let err = VMError::Internal(InternalError::AccountNotFound);
-        assert_eq!(
-            revert_cause_from_vm_error(&err),
-            RevertCause::StateDataMiss
-        );
+        assert_eq!(revert_cause_from_vm_error(&err), RevertCause::StateDataMiss);
     }
 
     #[test]
@@ -201,10 +200,7 @@ mod tests {
         let err = VMError::Internal(InternalError::Database(DatabaseError::Custom(
             "archive gap".to_string(),
         )));
-        assert_eq!(
-            revert_cause_from_vm_error(&err),
-            RevertCause::StateDataMiss
-        );
+        assert_eq!(revert_cause_from_vm_error(&err), RevertCause::StateDataMiss);
     }
 
     #[test]
@@ -228,7 +224,10 @@ mod tests {
     #[test]
     fn test_revert_cause_from_report_revert() {
         let result = TxResult::Revert(VMError::ExceptionalHalt(ExceptionalHalt::OutOfGas));
-        assert_eq!(revert_cause_from_report(&result), Some(RevertCause::GasExhausted));
+        assert_eq!(
+            revert_cause_from_report(&result),
+            Some(RevertCause::GasExhausted)
+        );
     }
 
     #[test]

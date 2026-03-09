@@ -467,7 +467,10 @@ mod tests {
         let trace = make_trace(10, 21_000, true);
         let result = format_info(&trace, 3);
         assert!(result.contains("success: true"));
-        assert!(!result.contains("revert:"), "no revert info expected for success");
+        assert!(
+            !result.contains("revert:"),
+            "no revert info expected for success"
+        );
         assert!(result.contains("Position: 3/10"));
     }
 

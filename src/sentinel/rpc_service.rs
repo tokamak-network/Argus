@@ -420,7 +420,10 @@ fn build_alert_base(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelA
     }
 }
 
-pub(crate) fn build_prefilter_alert(rpc_block: &RpcBlock, suspicion: &SuspiciousTx) -> SentinelAlert {
+pub(crate) fn build_prefilter_alert(
+    rpc_block: &RpcBlock,
+    suspicion: &SuspiciousTx,
+) -> SentinelAlert {
     let reason_names: Vec<&str> = suspicion.reasons.iter().map(reason_display_name).collect();
     let summary = format!(
         "Pre-filter alert (RPC): {} (score={:.2})",
@@ -461,4 +464,3 @@ pub(crate) fn build_deep_alert(
         ..build_alert_base(rpc_block, suspicion)
     }
 }
-
