@@ -141,9 +141,8 @@ pub fn format_autopsy_summary(
 
     let status = match (trace.effective_success(), trace.success_override) {
         (true, Some(true)) => "Success (via receipt, LEVM reverted)",
-        (true, None) => "Success",
+        (true, None) | (true, Some(false)) => "Success",
         (false, _) => "Reverted",
-        _ => "Unknown",
     };
     let quality_note = match trace.data_quality {
         crate::types::DataQuality::High => String::new(),

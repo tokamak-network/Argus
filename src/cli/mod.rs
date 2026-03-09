@@ -605,10 +605,6 @@ async fn run_sentinel_async(
     full_config: crate::sentinel::config::SentinelFullConfig,
     #[cfg(feature = "ai_agent")] ai_enabled: bool,
 ) -> Result<(), DebuggerError> {
-    use std::time::{Duration, Instant};
-
-    use tokio::sync::mpsc;
-
     use crate::sentinel::{
         alert::{AlertDispatcher, JsonlFileAlertHandler, StdoutAlertHandler},
         rpc_poller::RpcPollerConfig,
@@ -616,20 +612,12 @@ async fn run_sentinel_async(
         service::AlertHandler,
         types::SentinelAlert,
     };
+    use std::time::{Duration, Instant};
+    use tokio::sync::mpsc;
 
     let start_time = Instant::now();
 
-    // Mask the URL for display (hide API keys embedded in paths)
-    let masked_url = if rpc_url.len() > 40 {
-        format!(
-            "{}...{}",
-            &rpc_url[..40],
-            &rpc_url[rpc_url.len().saturating_sub(4)..]
-        )
-    } else {
-        rpc_url.to_string()
-    };
-    eprintln!("[sentinel] Starting on {masked_url}");
+    eprintln!("[sentinel] Starting on {}", mask_url(rpc_url));
     eprintln!(
         "[sentinel] prefilter_only={prefilter_only}  poll_interval={poll_interval}s  metrics_port={metrics_port}"
     );
@@ -766,41 +754,48 @@ async fn run_sentinel_async(
     }
 
     eprintln!("[sentinel] Shutting down...");
-
-    // Shutdown service and collect final metrics
     let final_metrics = metrics.snapshot();
     service.shutdown().await;
     alert_task.abort();
-
-    // Print metrics summary
-    let uptime = start_time.elapsed();
-    let total_secs = uptime.as_secs();
-    let days = total_secs / 86400;
-    let hours = (total_secs % 86400) / 3600;
-    let mins = (total_secs % 3600) / 60;
-    let secs = total_secs % 60;
-    let uptime_str = if days > 0 {
-        format!("{days}d {hours}h {mins}m {secs}s")
-    } else if hours > 0 {
-        format!("{hours}h {mins}m {secs}s")
-    } else {
-        format!("{mins}m {secs}s")
-    };
-
-    eprintln!("[sentinel] Shutdown complete.");
-    eprintln!(
-        "[sentinel] blocks_scanned: {}",
-        final_metrics.blocks_scanned
-    );
-    eprintln!("[sentinel] txs_scanned: {}", final_metrics.txs_scanned);
-    eprintln!("[sentinel] txs_flagged: {}", final_metrics.txs_flagged);
-    eprintln!(
-        "[sentinel] alerts_emitted: {}",
-        final_metrics.alerts_emitted
-    );
-    eprintln!("[sentinel] uptime: {uptime_str}");
+    print_sentinel_metrics(&final_metrics, start_time.elapsed());
 
     Ok(())
+}
+
+/// Mask API key embedded in RPC URL for display (shows first 40 + last 4 chars).
+#[cfg(all(feature = "sentinel", feature = "autopsy"))]
+fn mask_url(url: &str) -> String {
+    if url.len() > 40 {
+        format!("{}...{}", &url[..40], &url[url.len().saturating_sub(4)..])
+    } else {
+        url.to_string()
+    }
+}
+
+#[cfg(all(feature = "sentinel", feature = "autopsy"))]
+fn format_uptime(uptime: std::time::Duration) -> String {
+    let s = uptime.as_secs();
+    let (d, h, m, sec) = (s / 86400, (s % 86400) / 3600, (s % 3600) / 60, s % 60);
+    if d > 0 {
+        format!("{d}d {h}h {m}m {sec}s")
+    } else if h > 0 {
+        format!("{h}h {m}m {sec}s")
+    } else {
+        format!("{m}m {sec}s")
+    }
+}
+
+#[cfg(all(feature = "sentinel", feature = "autopsy"))]
+fn print_sentinel_metrics(
+    m: &crate::sentinel::metrics::MetricsSnapshot,
+    uptime: std::time::Duration,
+) {
+    eprintln!("[sentinel] Shutdown complete.");
+    eprintln!("[sentinel] blocks_scanned: {}", m.blocks_scanned);
+    eprintln!("[sentinel] txs_scanned: {}", m.txs_scanned);
+    eprintln!("[sentinel] txs_flagged: {}", m.txs_flagged);
+    eprintln!("[sentinel] alerts_emitted: {}", m.alerts_emitted);
+    eprintln!("[sentinel] uptime: {}", format_uptime(uptime));
 }
 
 #[cfg(all(test, feature = "sentinel", feature = "autopsy"))]
