@@ -3,6 +3,28 @@
 [![CI](https://github.com/tokamak-network/Argus/actions/workflows/ci.yml/badge.svg)](https://github.com/tokamak-network/Argus/actions/workflows/ci.yml)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
 
+**Paste a tx hash. Get a forensic report. No setup required to read one.**
+
+> Argus turns any Ethereum transaction into a structured forensic report — attack patterns, fund flows, revert reasons — in seconds.
+
+**Real reports from mainnet transactions:**
+
+| Transaction | Risk | Patterns Detected |
+|---|---|---|
+| [Balancer exploit](docs/examples/balancer-autopsy.md) | 🔴 HIGH | Reentrancy, FlashLoan, PriceManipulation ×5, AccessControlBypass |
+| [Access control bypass](docs/examples/access-control-bypass-autopsy.md) | 🔴 HIGH | AccessControlBypass, 6 ERC-20 transfers |
+| [Flash loan + price manipulation](docs/examples/reentrancy-autopsy.md) | 🔴 HIGH | FlashLoan, PriceManipulation ×8 |
+
+**One command to run it yourself** (archive RPC required):
+```bash
+export ALCHEMY_API_KEY=your_key
+argus tx 0xabc...   # outputs a markdown forensic report
+```
+
+> No RPC key? Read the sample reports above — no installation needed.
+
+---
+
 **The Hundred-Eyed Guardian for Ethereum**
 
 Real-time attack detection, post-hack forensics, and time-travel debugging for EVM transactions.
