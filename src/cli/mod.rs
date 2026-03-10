@@ -35,6 +35,31 @@ pub struct Args {
 /// Input mode for the debugger.
 #[derive(Subcommand)]
 pub enum InputMode {
+    /// Quick forensic analysis of a mainnet transaction (no flags required)
+    ///
+    /// RPC URL is resolved in order: --rpc flag → ARGUS_RPC_URL env var →
+    /// ALCHEMY_API_KEY env var (auto-constructs Alchemy URL).
+    ///
+    /// Example: argus tx 0xabc123...
+    #[cfg(feature = "autopsy")]
+    #[command(name = "tx")]
+    Tx {
+        /// Transaction hash to analyze
+        hash: String,
+
+        /// Ethereum archive node RPC URL (overrides env vars)
+        #[arg(long)]
+        rpc: Option<String>,
+
+        /// Output file path (default: stdout / autopsy-<prefix>.md)
+        #[arg(long, short)]
+        output: Option<String>,
+
+        /// Output format: markdown or json
+        #[arg(long, default_value = "markdown")]
+        format: String,
+    },
+
     /// Debug raw EVM bytecode
     #[command(name = "bytecode")]
     Bytecode {
@@ -135,6 +160,16 @@ pub enum InputMode {
 /// Run the debugger CLI.
 pub fn run(args: Args) -> Result<(), DebuggerError> {
     match args.command {
+        #[cfg(feature = "autopsy")]
+        InputMode::Tx {
+            hash,
+            rpc,
+            output,
+            format,
+        } => {
+            let rpc_url = resolve_rpc_url(rpc.as_deref())?;
+            run_autopsy(&hash, &rpc_url, None, &format, output.as_deref(), 30, 3, false, false)
+        }
         InputMode::Bytecode { code, gas_limit } => run_bytecode(&code, gas_limit),
         #[cfg(feature = "autopsy")]
         InputMode::Autopsy {
@@ -255,6 +290,38 @@ fn make_cli_db(
     Ok(GeneralizedDatabase::new_with_account_state(
         Arc::new(vm_db),
         cache,
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// RPC URL resolution
+// ---------------------------------------------------------------------------
+
+/// Resolve the Ethereum RPC URL from (in priority order):
+/// 1. The `--rpc` CLI flag (if Some)
+/// 2. `ARGUS_RPC_URL` environment variable
+/// 3. `ALCHEMY_API_KEY` environment variable → Alchemy mainnet URL
+///
+/// Returns an error describing which env vars to set if none are found.
+#[cfg(feature = "autopsy")]
+fn resolve_rpc_url(flag: Option<&str>) -> Result<String, DebuggerError> {
+    if let Some(url) = flag {
+        return Ok(url.to_string());
+    }
+    if let Ok(url) = std::env::var("ARGUS_RPC_URL") {
+        if !url.is_empty() {
+            return Ok(url);
+        }
+    }
+    if let Ok(key) = std::env::var("ALCHEMY_API_KEY") {
+        if !key.is_empty() {
+            return Ok(format!(
+                "https://eth-mainnet.g.alchemy.com/v2/{key}"
+            ));
+        }
+    }
+    Err(DebuggerError::Cli(
+        "No RPC URL found. Set ARGUS_RPC_URL or ALCHEMY_API_KEY, or pass --rpc <url>".to_string(),
     ))
 }
 
