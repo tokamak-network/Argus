@@ -71,7 +71,7 @@ hex = { version = "0.4.3", optional = true }
 rustc-hash = { version = "2.1.1", optional = true }
 
 # Autopsy (optional)
-reqwest = { version = "0.12.7", features = ["blocking", "json"], optional = true }
+reqwest = { version = "0.13.3", features = ["blocking", "json"], optional = true }
 sha3 = { version = "0.10.8", optional = true }
 serde_json = { version = "1.0.117", optional = true }
 
